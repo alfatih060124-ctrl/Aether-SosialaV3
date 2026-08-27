@@ -15,6 +15,16 @@ Implementation follows `Social Trading Master Blueprint v1.0`.
 - `TradeEvent` is an observation, never an execution command.
 - Ambiguous decoder candidates are rejected.
 
+## Current V3 control surfaces
+
+- Public Marketplace: `/`
+- Admin Control Panel: `/admin`
+- Shadow Simulation API: `POST /api/shadow/simulate`
+- Fee configuration: `GET /api/marketplace/fees`, `PATCH /api/admin/fees`
+- Risk decisions: `GET /api/admin/risk`
+- Audit trail: `GET /api/admin/audit`
+- Execution status: `GET /api/execution/status`
+
 ## Planned production services
 
 - Public Web
@@ -32,3 +42,7 @@ Implementation follows `Social Trading Master Blueprint v1.0`.
 ## Execution boundary
 
 Only approved, authenticated execution requests may reach the isolated Execution Engine V3. Private keys and seed phrases must never be committed to this repository.
+
+## Deployment gate
+
+The public deployment remains `SHADOW` with `LIVE_ENABLED=false`. Production verification must prove database readiness, fixture simulation, risk decisions, simulated execution requests, audit continuity, and CI/deployment health before any live gate is considered.
