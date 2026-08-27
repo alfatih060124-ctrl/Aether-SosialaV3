@@ -1,0 +1,36 @@
+[
+  {
+    "id": "valid-jupiter-001",
+    "expected": "EVENT",
+    "transaction": {
+      "signature": "fixture-jup-001",
+      "slot": 1001,
+      "metadata": {
+        "aggregator": "jupiter",
+        "trade": {
+          "event_id": "fixture-event-001",
+          "trader_wallet": "wallet-fixture-1",
+          "tokenIn": "TOKEN_A",
+          "tokenOut": "TOKEN_B",
+          "amountInRaw": "1000",
+          "amountOutRaw": "990",
+          "tokenBalanceChanges": [
+            {"token":"TOKEN_A","deltaRaw":"-1000"},
+            {"token":"TOKEN_B","deltaRaw":"990"}
+          ],
+          "confidence": 0.99
+        }
+      }
+    }
+  },
+  {
+    "id": "reject-ambiguous-001",
+    "expected": "REJECT",
+    "transaction": {"signature":"fixture-ambiguous-001","slot":1002,"metadata":{}}
+  },
+  {
+    "id": "reject-malformed-001",
+    "expected": "REJECT",
+    "transaction": {"signature":"fixture-malformed-001","slot":1003,"metadata":{"aggregator":"jupiter","trade":null}}
+  }
+]
