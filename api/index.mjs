@@ -2,12 +2,21 @@ const json = (res, status, body) => res.status(status).json(body);
 const liveEnabled = process.env.LIVE_ENABLED === 'true' && process.env.EXECUTION_MODE === 'LIVE';
 const base = process.env.API_SERVICE_URL || 'https://aether-social-v3-api.onrender.com';
 
+async function readBody(req) {
+  if (req.body !== undefined) return typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+  if (['GET', 'HEAD'].includes(req.method)) return undefined;
+  let raw = '';
+  for await (const chunk of req) raw += chunk;
+  return raw || undefined;
+}
+
 async function proxyUpstream(path, req, res) {
   const url = new URL(req.url || '/', 'https://aether.local');
   const target = new URL(path + (url.search || ''), base.endsWith('/') ? base : `${base}/`);
   const headers = { 'content-type': req.headers['content-type'] || 'application/json' };
   if (process.env.API_SERVICE_TOKEN) headers.authorization = `Bearer ${process.env.API_SERVICE_TOKEN}`;
-  const upstream = await fetch(target, { method: req.method, headers });
+  const body = await readBody(req);
+  const upstream = await fetch(target, { method: req.method, headers, body });
   const text = await upstream.text();
   res.status(upstream.status);
   res.setHeader('content-type', upstream.headers.get('content-type') || 'application/json');
@@ -28,7 +37,6 @@ export default async function handler(req, res) {
     });
   }
 
-  // Database readiness must come from the real API service, not a hard-coded gateway response.
   if (req.method === 'GET' && path === '/api/readiness') {
     try {
       return await proxyUpstream('/api/readiness', req, res);
