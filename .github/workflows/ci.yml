@@ -1,0 +1,37 @@
+name: Aether V3 CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: services/api/package-lock.json
+      - name: Install API dependencies
+        working-directory: services/api
+        run: npm ci
+      - name: Syntax check
+        run: |
+          node --check services/api/src/server.mjs
+          node --check services/api/src/migration-runner.mjs
+          node --check services/api/src/service.mjs
+          node --check services/api/src/repositories/core.mjs
+          node --check services/api/src/repositories/admin.mjs
+          node --check services/api/src/repositories/marketplace.mjs
+          node --check services/api/src/repositories/trade-events.mjs
+          node --check services/api/src/repositories/execution-requests.mjs
+      - name: Docker build
+        run: docker build -t aether-social-v3:ci .
+      - name: Docker smoke start
+        run: |
+          docker run -d --name aether-ci -p 18080:8080 -e EXECUTION_MODE=SHADOW -e LIVE_ENABLED=false aether-social-v3:ci
+          sleep 3
+          curl --fail http://127.0.0.1:18080/api/health
+          docker rm -f aether-ci
