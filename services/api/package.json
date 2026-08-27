@@ -3,5 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {"start": "node src/server.mjs"},
-  "engines": {"node": ">=20"}
+  "engines": {"node": ">=20"},
+  "dependencies": {"pg": "^8.16.3"}
 }
