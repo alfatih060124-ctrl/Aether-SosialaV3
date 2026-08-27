@@ -1,0 +1,46 @@
+name: Aether V3 Integration
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  postgres-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: aether_test
+          POSTGRES_USER: aether
+          POSTGRES_PASSWORD: aether_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U aether -d aether_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: services/api/package-lock.json
+      - name: Install
+        working-directory: services/api
+        run: npm ci
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql://aether:aether_test@localhost:5432/aether_test
+        run: node --input-type=module -e "import {Pool} from 'pg'; import {runMigrations} from './services/api/src/migration-runner.mjs'; const p=new Pool({connectionString:process.env.DATABASE_URL}); await runMigrations(p); const r=await p.query(\"SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name\"); console.log(r.rows.map(x=>x.table_name).join('\\n')); await p.end();"
+      - name: API health smoke
+        env:
+          DATABASE_URL: postgresql://aether:aether_test@localhost:5432/aether_test
+          EXECUTION_MODE: SHADOW
+          LIVE_ENABLED: "false"
+        run: |
+          node services/api/src/server.mjs > /tmp/aether.log 2>&1 &
+          pid=$!
+          trap 'kill $pid || true' EXIT
+          for i in {1..20}; do curl -fsS http://127.0.0.1:8080/api/health && break || sleep 1; done
+          curl --fail http://127.0.0.1:8080/api/readiness
+          curl --fail http://127.0.0.1:8080/api/execution/status | grep -q '"live_enabled":false'
