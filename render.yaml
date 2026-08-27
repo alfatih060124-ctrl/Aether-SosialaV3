@@ -18,6 +18,22 @@ services:
       - key: OPERATOR_APPROVED
         value: "false"
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: aether-postgres
+          property: connectionString
       - key: API_TOKEN
+        sync: false
+
+  - type: pserv
+    name: aether-postgres
+    env: docker
+    plan: starter
+    image:
+      url: postgres:16-alpine
+    envVars:
+      - key: POSTGRES_DB
+        value: aether
+      - key: POSTGRES_USER
+        value: aether
+      - key: POSTGRES_PASSWORD
         sync: false
