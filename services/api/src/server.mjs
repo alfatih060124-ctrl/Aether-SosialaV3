@@ -8,6 +8,7 @@ import { createCoreRepositories } from './repositories/core.mjs';
 import { createAdminRepository } from './repositories/admin.mjs';
 import { createMarketplaceRepository } from './repositories/marketplace.mjs';
 import { runMigrations } from './migration-runner.mjs';
+import { runShadowSimulation } from './shadow-simulator.mjs';
 
 const PORT = Number(process.env.PORT || 8080);
 const executionMode = process.env.EXECUTION_MODE || 'SHADOW';
@@ -23,6 +24,13 @@ const server=http.createServer(async(req,res)=>{try{
  if(req.method==='GET'&&req.url==='/api/health')return send(res,200,{status:'ok',service:'aether-api',execution_mode:executionMode,live_enabled:liveEnabled});
  if(req.method==='GET'&&req.url==='/api/readiness'){if(!pool)return send(res,503,{status:'not_ready',database:'unconfigured'});try{await pool.query('SELECT 1');return send(res,200,{status:'ready',database:'ok'});}catch{return send(res,503,{status:'not_ready',database:'unavailable'});}}
  if(req.method==='GET'&&req.url==='/api/execution/status')return send(res,200,{mode:executionMode,live_enabled:liveEnabled,fail_closed:!liveEnabled,signer_exposed_to_api:false});
+ if(req.method==='POST'&&req.url==='/api/shadow/simulate'){
+   if(!auth(req))return send(res,401,{error:'unauthorized'});
+   if(!repos)return send(res,503,{error:'database_unconfigured'});
+   if(liveEnabled||executionMode!=='SHADOW')return send(res,409,{error:'shadow_simulation_locked',reason:'execution_mode_not_shadow'});
+   const result=await runShadowSimulation({repos,pool,body:await jsonBody(req)});
+   return send(res,result.status,result.body);
+ }
  if(!auth(req)&&req.url.startsWith('/api/'))return send(res,401,{error:'unauthorized'});
  if(!repos&&req.url.startsWith('/api/'))return send(res,503,{error:'database_unconfigured'});
  const p=parts(req.url);
