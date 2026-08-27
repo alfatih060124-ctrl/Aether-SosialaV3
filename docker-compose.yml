@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: aether
+      POSTGRES_USER: aether
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build: .
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgresql://aether:${POSTGRES_PASSWORD}@postgres:5432/aether
+      API_TOKEN: ${API_TOKEN:?set API_TOKEN}
+      EXECUTION_MODE: ${EXECUTION_MODE:-SHADOW}
+      LIVE_ENABLED: ${LIVE_ENABLED:-false}
+      FIXTURE_GATE_PASSED: ${FIXTURE_GATE_PASSED:-false}
+      OPERATOR_APPROVED: ${OPERATOR_APPROVED:-false}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
