@@ -19,15 +19,6 @@ services:
       - key: OPERATOR_APPROVED
         value: "false"
       - key: DATABASE_URL
-        fromDatabase:
-          name: aether-social-v3-db
-          property: connectionString
+        sync: false
       - key: API_TOKEN
         sync: false
-
-databases:
-  - name: aether-social-v3-db
-    databaseName: aether
-    user: aether
-    postgresMajorVersion: "16"
-    plan: free
