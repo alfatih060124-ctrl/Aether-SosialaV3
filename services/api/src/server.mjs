@@ -27,7 +27,8 @@ const server=http.createServer(async(req,res)=>{try{
  if(!repos&&req.url.startsWith('/api/'))return send(res,503,{error:'database_unconfigured'});
  const p=parts(req.url);
  if(req.method==='GET'&&p[1]==='trades')return send(res,200,{items:await repos.tradeEvents.recent(new URL(req.url,'http://localhost').searchParams.get('limit'))});
- if(req.method==='GET'&&p[1]==='traders'){if(p[2]){const t=await repos.marketplace.getTrader(p[2]);return t?send(res,200,t):send(res,404,{error:'trader_not_found'});}return send(res,200,{items:await repos.marketplace.listTraders()});}
+ if(req.method==='GET'&&p[1]==='traders'){if(p[2]){const t=await repos.marketplace.getTrader(p[2]);return t?send(res,200,t):send(res,404,{error:'trader_not_found'});}return send(res,200,{items:await repos.marketplace.listTraders(new URL(req.url,'http://localhost').searchParams.get('limit'))});}
+ if(req.method==='GET'&&req.url==='/api/marketplace/fees')return send(res,200,{config:await repos.marketplace.getFeeConfig()});
  if(req.method==='GET'&&req.url==='/api/executions')return send(res,200,{items:(await pool.query('SELECT * FROM execution_requests ORDER BY created_at DESC LIMIT 200')).rows});
  if(req.method==='GET'&&req.url==='/api/admin/risk')return send(res,200,{items:await repos.admin.recentRiskDecisions()});
  if(req.method==='GET'&&req.url==='/api/admin/audit')return send(res,200,{items:await repos.admin.recentAuditEvents()});
