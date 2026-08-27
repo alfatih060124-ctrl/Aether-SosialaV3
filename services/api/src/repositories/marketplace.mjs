@@ -19,6 +19,17 @@ export function createMarketplaceRepository(pool) {
       return (await pool.query(
         `SELECT config_id,performance_fee_bps,execution_fee_bps,currency,enabled,updated_at FROM platform_fee_config WHERE config_id=1`
       )).rows[0] ?? null;
+    },
+    async updateFeeConfig({ performance_fee_bps, execution_fee_bps, enabled }) {
+      const p = Number(performance_fee_bps);
+      const e = Number(execution_fee_bps);
+      if (!Number.isInteger(p) || p < 0 || p > 10000) throw new Error('invalid_performance_fee_bps');
+      if (!Number.isInteger(e) || e < 0 || e > 10000) throw new Error('invalid_execution_fee_bps');
+      if (typeof enabled !== 'boolean') throw new Error('invalid_fee_enabled');
+      return (await pool.query(
+        `UPDATE platform_fee_config SET performance_fee_bps=$1,execution_fee_bps=$2,enabled=$3,updated_at=now() WHERE config_id=1 RETURNING config_id,performance_fee_bps,execution_fee_bps,currency,enabled,updated_at`,
+        [p,e,enabled]
+      )).rows[0] ?? null;
     }
   };
 }
