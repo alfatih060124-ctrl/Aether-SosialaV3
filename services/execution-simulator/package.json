@@ -1,0 +1,7 @@
+{
+  "name": "@aether/execution-simulator",
+  "private": true,
+  "type": "module",
+  "scripts": {"test:e2e": "node test/e2e.test.mjs"},
+  "engines": {"node": ">=20"}
+}
