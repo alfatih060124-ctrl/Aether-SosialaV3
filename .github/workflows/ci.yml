@@ -19,6 +19,7 @@ jobs:
         run: npm ci
       - name: Syntax check
         run: |
+          node --check api/index.mjs
           node --check services/api/src/server.mjs
           node --check services/api/src/migration-runner.mjs
           node --check services/api/src/service.mjs
@@ -34,4 +35,5 @@ jobs:
           docker run -d --name aether-ci -p 18080:8080 -e EXECUTION_MODE=SHADOW -e LIVE_ENABLED=false aether-social-v3:ci
           sleep 3
           curl --fail http://127.0.0.1:18080/api/health
+          curl --fail http://127.0.0.1:18080/api/execution/status
           docker rm -f aether-ci
