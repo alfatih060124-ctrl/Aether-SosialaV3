@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: aether-social-v3
+    env: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: EXECUTION_MODE
+        value: SHADOW
+      - key: LIVE_ENABLED
+        value: "false"
+      - key: FIXTURE_GATE_PASSED
+        value: "false"
+      - key: OPERATOR_APPROVED
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: API_TOKEN
+        sync: false
+
+  - type: pserv
+    name: aether-postgres
+    env: docker
+    plan: starter
+    image:
+      url: postgres:16-alpine
+    envVars:
+      - key: POSTGRES_DB
+        value: aether
+      - key: POSTGRES_USER
+        value: aether
+      - key: POSTGRES_PASSWORD
+        sync: false
