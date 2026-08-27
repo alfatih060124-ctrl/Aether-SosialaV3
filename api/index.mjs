@@ -19,9 +19,11 @@ export default async function handler(req, res) {
   }
 
   // The Vercel deployment is the public web gateway. Database-backed operations
-  // must be proxied to the separately deployed API service via API_SERVICE_URL.
-  const base = process.env.API_SERVICE_URL;
-  if (base && path.startsWith('/api/')) {
+  // are proxied to the separately deployed API service. API_SERVICE_URL remains
+  // configurable, but the public Render service is a safe default so the gateway
+  // continues to work after a Vercel environment-variable sync is missed.
+  const base = process.env.API_SERVICE_URL || 'https://aether-social-v3-api.onrender.com';
+  if (path.startsWith('/api/')) {
     const target = new URL(path + (url.search || ''), base.endsWith('/') ? base : `${base}/`);
     const headers = { 'content-type': req.headers['content-type'] || 'application/json' };
     if (process.env.API_SERVICE_TOKEN) headers.authorization = `Bearer ${process.env.API_SERVICE_TOKEN}`;
@@ -32,5 +34,5 @@ export default async function handler(req, res) {
     return res.send(text);
   }
 
-  return json(res, 404, { error: 'route_not_configured', message: 'Configure API_SERVICE_URL for database-backed API routes.' });
+  return json(res, 404, { error: 'not_found' });
 }
