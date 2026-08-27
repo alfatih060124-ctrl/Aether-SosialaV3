@@ -21,6 +21,7 @@ jobs:
         run: |
           node --check api/index.mjs
           node --check services/api/src/server.mjs
+          node --check services/api/src/shadow-simulator.mjs
           node --check services/api/src/migration-runner.mjs
           node --check services/api/src/service.mjs
           node --check services/api/src/repositories/core.mjs
