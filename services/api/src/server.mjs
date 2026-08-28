@@ -23,59 +23,68 @@ const repos = pool ? {
   marketplace: createMarketplaceRepository(pool)
 } : null;
 
+const VERSION = '2026.08.28-rental-routing';
 const send = (res, status, body, type = 'application/json; charset=utf-8') => {
   res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store' });
   res.end(type.startsWith('text/') ? body : JSON.stringify(body));
 };
 const auth = req => !process.env.API_TOKEN || req.headers.authorization === `Bearer ${process.env.API_TOKEN}`;
 const jsonBody = async req => { let raw = ''; for await (const chunk of req) raw += chunk; return raw ? JSON.parse(raw) : {}; };
-const parts = url => new URL(url, 'http://localhost').pathname.split('/').filter(Boolean);
+const requestUrl = req => new URL(req.url || '/', 'http://localhost');
+const pathname = req => requestUrl(req).pathname.replace(/\/+$/, '') || '/';
+const parts = req => pathname(req).split('/').filter(Boolean);
 
 const server = http.createServer(async (req, res) => {
   try {
-    if (req.method === 'GET' && req.url === '/api/health') {
-      return send(res, 200, { status: 'ok', service: 'aether-api', execution_mode: executionMode, live_enabled: liveEnabled });
+    const route = pathname(req);
+    const p = parts(req);
+
+    if (req.method === 'GET' && route === '/api/health') {
+      return send(res, 200, { status: 'ok', service: 'aether-api', execution_mode: executionMode, live_enabled: liveEnabled, version: VERSION });
     }
-    if (req.method === 'GET' && req.url === '/api/readiness') {
+    if (req.method === 'GET' && route === '/api/readiness') {
       if (!pool) return send(res, 503, { status: 'not_ready', database: 'unconfigured' });
-      try { await pool.query('SELECT 1'); return send(res, 200, { status: 'ready', database: 'ok' }); }
-      catch { return send(res, 503, { status: 'not_ready', database: 'unavailable' }); }
+      try { await pool.query('SELECT 1'); return send(res, 200, { status: 'ready', database: 'ok', version: VERSION }); }
+      catch { return send(res, 503, { status: 'not_ready', database: 'unavailable', version: VERSION }); }
     }
-    if (req.method === 'GET' && req.url === '/api/execution/status') {
+    if (req.method === 'GET' && route === '/api/version') {
+      return send(res, 200, { version: VERSION, execution_mode: executionMode, live_enabled: liveEnabled });
+    }
+    if (req.method === 'GET' && route === '/api/execution/status') {
       return send(res, 200, { mode: executionMode, live_enabled: liveEnabled, fail_closed: !liveEnabled, signer_exposed_to_api: false });
     }
-    if (req.method === 'POST' && req.url === '/api/shadow/simulate') {
+    if (req.method === 'POST' && route === '/api/shadow/simulate') {
       if (!auth(req)) return send(res, 401, { error: 'unauthorized' });
       if (!repos) return send(res, 503, { error: 'database_unconfigured' });
       if (liveEnabled || executionMode !== 'SHADOW') return send(res, 409, { error: 'shadow_simulation_locked', reason: 'execution_mode_not_shadow' });
       const result = await runShadowSimulation({ repos, pool, body: await jsonBody(req) });
       return send(res, result.status, result.body);
     }
-    if (!auth(req) && req.url.startsWith('/api/')) return send(res, 401, { error: 'unauthorized' });
-    if (!repos && req.url.startsWith('/api/')) return send(res, 503, { error: 'database_unconfigured' });
+    if (!auth(req) && route.startsWith('/api/')) return send(res, 401, { error: 'unauthorized' });
+    if (!repos && route.startsWith('/api/')) return send(res, 503, { error: 'database_unconfigured' });
 
-    const p = parts(req.url);
     if (req.method === 'GET' && p[1] === 'trades') {
-      return send(res, 200, { items: await repos.tradeEvents.recent(new URL(req.url, 'http://localhost').searchParams.get('limit')) });
+      return send(res, 200, { items: await repos.tradeEvents.recent(requestUrl(req).searchParams.get('limit')) });
     }
     if (req.method === 'GET' && p[1] === 'traders') {
       if (p[2]) {
         const t = await repos.marketplace.getTrader(p[2]);
         return t ? send(res, 200, t) : send(res, 404, { error: 'trader_not_found' });
       }
-      return send(res, 200, { items: await repos.marketplace.listTraders(new URL(req.url, 'http://localhost').searchParams.get('limit')) });
+      return send(res, 200, { items: await repos.marketplace.listTraders(requestUrl(req).searchParams.get('limit')) });
     }
-    if (req.method === 'GET' && req.url === '/api/marketplace/fees') {
+    if (req.method === 'GET' && route === '/api/marketplace/fees') {
       return send(res, 200, { config: await repos.marketplace.getFeeConfig() });
     }
 
-    if (req.method === 'GET' && req.url === '/api/execution/rental/status') {
-      const traderId = new URL(req.url, 'http://localhost').searchParams.get('trader_id');
+    if (req.method === 'GET' && route === '/api/execution/rental/status') {
+      const traderId = requestUrl(req).searchParams.get('trader_id');
+      if (!traderId) return send(res, 400, { error: 'trader_id_required' });
       const access = await checkExecutionEngineRental(pool, traderId);
       return send(res, 200, access);
     }
 
-    if (req.method === 'POST' && req.url === '/api/execution/rental') {
+    if (req.method === 'POST' && route === '/api/execution/rental') {
       const body = await jsonBody(req);
       if (!body.trader_id) return send(res, 400, { error: 'trader_id_required' });
       const start = new Date(body.period_start || Date.now());
@@ -95,7 +104,7 @@ const server = http.createServer(async (req, res) => {
       return q.rows[0] ? send(res, 201, { rental: q.rows[0] }) : send(res, 409, { error: 'active_rental_exists' });
     }
 
-    if (req.method === 'POST' && req.url === '/api/executions') {
+    if (req.method === 'POST' && route === '/api/executions') {
       const body = await jsonBody(req);
       const mode = body.mode || 'SHADOW';
       if (mode === 'LIVE') return send(res, 423, { error: 'live_execution_blocked' });
@@ -105,19 +114,19 @@ const server = http.createServer(async (req, res) => {
       return send(res, 201, saved);
     }
 
-    if (req.method === 'GET' && req.url === '/api/executions') {
+    if (req.method === 'GET' && route === '/api/executions') {
       return send(res, 200, { items: (await pool.query('SELECT * FROM execution_requests ORDER BY created_at DESC LIMIT 200')).rows });
     }
-    if (req.method === 'GET' && req.url === '/api/admin/risk') return send(res, 200, { items: await repos.admin.recentRiskDecisions() });
-    if (req.method === 'GET' && req.url === '/api/admin/audit') return send(res, 200, { items: await repos.admin.recentAuditEvents() });
-    if (req.method === 'GET' && req.url === '/api/admin/rentals') {
+    if (req.method === 'GET' && route === '/api/admin/risk') return send(res, 200, { items: await repos.admin.recentRiskDecisions() });
+    if (req.method === 'GET' && route === '/api/admin/audit') return send(res, 200, { items: await repos.admin.recentAuditEvents() });
+    if (req.method === 'GET' && route === '/api/admin/rentals') {
       return send(res, 200, { items: (await pool.query(`SELECT rental_id,trader_id,status,monthly_rate_bps,amount_due_usd,currency,period_start,period_end,paid_at,created_at,updated_at FROM execution_engine_rentals ORDER BY created_at DESC LIMIT 200`)).rows });
     }
     if (req.method === 'PATCH' && p[1] === 'admin' && p[2] === 'copy-policies' && p[3]) {
       const updated = await repos.admin.updateCopyPolicy(p[3], await jsonBody(req));
       return updated ? send(res, 200, updated) : send(res, 404, { error: 'copy_policy_not_found' });
     }
-    if (req.method === 'PATCH' && req.url === '/api/admin/fees') {
+    if (req.method === 'PATCH' && route === '/api/admin/fees') {
       const config = await repos.marketplace.updateFeeConfig(await jsonBody(req));
       await repos.auditEvents.append({
         event_type: 'PLATFORM_FEE_CONFIG_UPDATED',
@@ -133,9 +142,9 @@ const server = http.createServer(async (req, res) => {
       });
       return send(res, 200, { config });
     }
-    if (req.method === 'GET' && (req.url === '/' || req.url === '/dashboard')) return send(res, 200, fs.readFileSync(path.resolve(process.cwd(), 'web/dashboard.html'), 'utf8'), 'text/html; charset=utf-8');
-    if (req.method === 'GET' && req.url === '/admin') return send(res, 200, fs.readFileSync(path.resolve(process.cwd(), 'web/admin.html'), 'utf8'), 'text/html; charset=utf-8');
-    return send(res, 404, { error: 'not_found' });
+    if (req.method === 'GET' && (route === '/' || route === '/dashboard')) return send(res, 200, fs.readFileSync(path.resolve(process.cwd(), 'web/dashboard.html'), 'utf8'), 'text/html; charset=utf-8');
+    if (req.method === 'GET' && route === '/admin') return send(res, 200, fs.readFileSync(path.resolve(process.cwd(), 'web/admin.html'), 'utf8'), 'text/html; charset=utf-8');
+    return send(res, 404, { error: 'not_found', path: route, method: req.method });
   } catch (e) {
     console.error(e);
     return send(res, e.message?.startsWith('invalid_') || e.message?.endsWith('_required') ? 400 : 500, { error: e.message });
