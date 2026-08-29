@@ -59,7 +59,7 @@ ON CONFLICT (follower_user_id, trader_id) DO UPDATE SET
   updated_at = now();
 
 INSERT INTO audit_events (event_type, actor, entity_type, entity_id, payload)
-VALUES (
+SELECT
   'SHADOW_WALLET_FIXTURE_REGISTERED', 'system', 'trader',
   '10000000-0000-0000-0000-000000000002',
   jsonb_build_object(
@@ -68,7 +68,6 @@ VALUES (
     'mode', 'SHADOW',
     'live_enabled', false
   )
-)
 WHERE NOT EXISTS (
   SELECT 1 FROM audit_events
   WHERE event_type='SHADOW_WALLET_FIXTURE_REGISTERED'
