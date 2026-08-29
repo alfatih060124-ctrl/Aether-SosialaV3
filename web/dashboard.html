@@ -1,1 +1,69 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aether Social V3 Marketplace</title><style>body{font-family:system-ui;background:#0b1020;color:#eef;margin:0}.wrap{max-width:1180px;margin:auto;padding:24px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}.card{background:#151d33;border:1px solid #2b3858;border-radius:14px;padding:18px}table{width:100%;border-collapse:collapse;display:block;overflow:auto}td,th{text-align:left;padding:9px;border-bottom:1px solid #2b3858;white-space:nowrap}.muted{opacity:.7}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#24304d}.ok{color:#65d6a1}.warn{color:#ffd166}.locked{font-weight:700}</style></head><body><main class="wrap"><h1>Aether Social V3</h1><p class="muted">Public Marketplace • Shadow execution</p><div class="grid"><div class="card"><h2>Runtime</h2><div id="runtime">Loading…</div></div><div class="card"><h2>Database</h2><div id="database">Checking…</div></div><div class="card"><h2>Traders</h2><div id="traders">Loading…</div></div><div class="card"><h2>Platform Fees</h2><div id="fees">Loading…</div></div><div class="card"><h2>Execution Gate</h2><div id="execution">Checking…</div></div><div class="card"><h2>Safety</h2><div class="locked">LIVE EXECUTION LOCKED</div><p class="muted">Public deployment is SHADOW/SIMULATION only.</p></div></div><section class="card" style="margin-top:16px"><h2>Active Marketplace Traders</h2><table><thead><tr><th>Trader</th><th>Verified</th><th>Return</th><th>Win Rate</th><th>Drawdown</th><th>Trades</th><th>Followers</th><th>Performance Fee</th><th>Execution Fee</th><th>Mode</th></tr></thead><tbody id="rows"></tbody></table></section></main><script>const j=u=>fetch(u).then(async r=>{const body=await r.json();if(!r.ok)throw Object.assign(Error(r.status),{body});return body});const pctBps=b=>((Number(b)||0)/100).toFixed(2)+'%';async function load(){const [h,r,t,f,e]=await Promise.allSettled([j('/api/health'),j('/api/readiness'),j('/api/traders?limit=50'),j('/api/marketplace/fees'),j('/api/execution/status')]);if(h.status==='fulfilled'){const x=h.value;document.querySelector('#runtime').innerHTML='<span class="ok">'+x.status+'</span> • '+x.execution_mode+' • live='+x.live_enabled}if(r.status==='fulfilled'){document.querySelector('#database').innerHTML='<span class="ok">'+r.value.database+'</span>'}else{document.querySelector('#database').innerHTML='<span class="warn">not ready</span>'}if(t.status==='fulfilled'){const x=t.value;document.querySelector('#traders').textContent=x.items.length+' active records';document.querySelector('#rows').innerHTML=x.items.map(x=>`<tr><td>${x.display_name}<br><span class="muted">${x.wallet_address}</span></td><td>${x.verified?'✓':'—'}</td><td>${pctBps(x.total_return_bps)}</td><td>${pctBps(x.win_rate_bps)}</td><td>${pctBps(x.drawdown_bps)}</td><td>${x.trades_count}</td><td>${x.followers_count}</td><td>${pctBps(x.performance_fee_bps)}</td><td>${pctBps(x.execution_fee_bps)}</td><td><span class="pill">${x.mode}</span></td></tr>`).join('')}else document.querySelector('#traders').textContent='API unavailable';if(f.status==='fulfilled'){const c=f.value.config;document.querySelector('#fees').textContent=pctBps(c.performance_fee_bps)+' performance • '+pctBps(c.execution_fee_bps)+' execution'}else document.querySelector('#fees').textContent='Unavailable';if(e.status==='fulfilled'){const x=e.value;document.querySelector('#execution').innerHTML='<span class="ok">'+x.mode+'</span> • live='+x.live_enabled+' • fail-closed='+x.fail_closed}else document.querySelector('#execution').textContent='Unavailable'}load();setInterval(load,10000)</script></body></html>
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aether Social V3</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#070b14;color:#eef2ff;margin:0}.wrap{max-width:1180px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}.brand{font-size:22px;font-weight:800}.badge{border:1px solid #31405f;border-radius:999px;padding:7px 12px;font-size:13px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}.card{background:#111827;border:1px solid #263451;border-radius:16px;padding:18px;box-shadow:0 8px 30px #0004}.card h2{font-size:16px;margin:0 0 12px}.hero{margin-bottom:16px;padding:24px}.hero h1{margin:0 0 8px;font-size:32px}.muted{color:#9aa8c2}.ok{color:#6ee7b7}.warn{color:#fbbf24}.locked{font-weight:800}.form{display:grid;gap:12px}.form label{font-size:13px;color:#aab6cc}.form input{width:100%;padding:12px 13px;border-radius:10px;border:1px solid #33415f;background:#0a1020;color:#fff;outline:none}.form input:focus{border-color:#7183aa}.btn{border:0;border-radius:10px;padding:12px 16px;background:#e8edf7;color:#0a1020;font-weight:800;cursor:pointer}.btn:disabled{opacity:.55;cursor:not-allowed}.result{white-space:pre-wrap;background:#0a1020;border:1px solid #263451;border-radius:10px;padding:12px;font-size:12px;overflow:auto;min-height:48px}table{width:100%;border-collapse:collapse;display:block;overflow:auto}td,th{text-align:left;padding:9px;border-bottom:1px solid #263451;white-space:nowrap;font-size:13px}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#202d48}.safety{border-color:#5a4320}.section{margin-top:16px}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="top"><div class="brand">AETHER SOCIAL V3</div><div class="badge">PUBLIC • SHADOW ONLY</div></header>
+
+  <section class="card hero">
+    <h1>Social Trading Infrastructure</h1>
+    <p class="muted">Public dashboard, trader marketplace, and safe shadow execution.</p>
+  </section>
+
+  <section class="grid">
+    <div class="card"><h2>Runtime</h2><div id="runtime">Checking…</div></div>
+    <div class="card"><h2>Database</h2><div id="database">Checking…</div></div>
+    <div class="card"><h2>Traders</h2><div id="traders">Checking…</div></div>
+    <div class="card"><h2>Execution</h2><div id="execution">Checking…</div></div>
+    <div class="card safety"><h2>Safety</h2><div class="locked">🔒 LIVE EXECUTION LOCKED</div><p class="muted">This public deployment performs simulation only.</p></div>
+  </section>
+
+  <section class="card section">
+    <h2>Shadow Simulation</h2>
+    <p class="muted">Public wallet addresses are identifiers only. Never enter a private key or seed phrase.</p>
+    <form id="simulation" class="form">
+      <label>Trader public wallet</label>
+      <input id="trader_wallet" autocomplete="off" placeholder="Trader wallet address" required>
+      <label>Follower public wallet</label>
+      <input id="follower_wallet" autocomplete="off" placeholder="Follower wallet address" required>
+      <label>Amount (USD)</label>
+      <input id="amount_usd" type="number" min="0.01" step="0.01" value="100" required>
+      <button class="btn" id="run" type="submit">RUN SHADOW SIMULATION</button>
+    </form>
+    <div id="simResult" class="result" style="margin-top:12px">Ready.</div>
+  </section>
+
+  <section class="card section"><h2>Active Marketplace Traders</h2><table><thead><tr><th>Trader</th><th>Verified</th><th>Return</th><th>Win Rate</th><th>Drawdown</th><th>Trades</th><th>Followers</th><th>Performance Fee</th><th>Execution Fee</th><th>Mode</th></tr></thead><tbody id="rows"></tbody></table></section>
+</main>
+<script>
+const j=async(u,o)=>{const r=await fetch(u,o);const b=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(String(r.status)),{body:b});return b};
+const pctBps=b=>((Number(b)||0)/100).toFixed(2)+'%';
+async function load(){
+ const [h,r,t,e]=await Promise.allSettled([j('/api/health'),j('/api/readiness'),j('/api/traders?limit=50'),j('/api/execution/status')]);
+ if(h.status==='fulfilled'){const x=h.value;document.querySelector('#runtime').innerHTML='<span class="ok">'+x.status+'</span> • '+x.execution_mode+' • live='+x.live_enabled}
+ else document.querySelector('#runtime').innerHTML='<span class="warn">unavailable</span>';
+ if(r.status==='fulfilled')document.querySelector('#database').innerHTML='<span class="ok">'+r.value.database+'</span>';else document.querySelector('#database').innerHTML='<span class="warn">not ready</span>';
+ if(t.status==='fulfilled'){const x=t.value;document.querySelector('#traders').textContent=(x.items||[]).length+' active records';document.querySelector('#rows').innerHTML=(x.items||[]).map(x=>`<tr><td>${x.display_name}<br><span class="muted">${x.wallet_address}</span></td><td>${x.verified?'✓':'—'}</td><td>${pctBps(x.total_return_bps)}</td><td>${pctBps(x.win_rate_bps)}</td><td>${pctBps(x.drawdown_bps)}</td><td>${x.trades_count}</td><td>${x.followers_count}</td><td>${pctBps(x.performance_fee_bps)}</td><td>${pctBps(x.execution_fee_bps)}</td><td><span class="pill">${x.mode}</span></td></tr>`).join('')}
+ else document.querySelector('#traders').textContent='API unavailable';
+ if(e.status==='fulfilled'){const x=e.value;document.querySelector('#execution').innerHTML='<span class="ok">'+x.mode+'</span> • live='+x.live_enabled+' • fail-closed='+x.fail_closed}else document.querySelector('#execution').textContent='Unavailable';
+}
+
+document.querySelector('#simulation').addEventListener('submit',async ev=>{
+ ev.preventDefault();const btn=document.querySelector('#run'),out=document.querySelector('#simResult');btn.disabled=true;out.textContent='Running shadow simulation…';
+ try{
+  const body={trader_wallet:document.querySelector('#trader_wallet').value.trim(),follower_wallet:document.querySelector('#follower_wallet').value.trim(),amount_usd:Number(document.querySelector('#amount_usd').value)};
+  const x=await j('/api/shadow/simulate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  out.textContent=JSON.stringify(x,null,2);
+ }catch(e){out.textContent=JSON.stringify(e.body||{error:e.message},null,2)}finally{btn.disabled=false}
+});
+load();setInterval(load,10000);
+</script>
+</body>
+</html>
