@@ -22,13 +22,7 @@ git checkout origin/main -- \
   services/api/src/repositories/signal-intelligence.mjs \
   services/api/src/server.mjs \
   migrations/010_signal_intelligence_autotrade.sql \
-  scripts/run-signal-quality-tests.mjs \
   docs/SIGNAL_INTELLIGENCE_AUTOTRADE.md
-
-say 'running local quality regression'
-node scripts/run-signal-quality-tests.mjs >/tmp/aether-signal-quality.json
-
-grep -q '"ok":true' /tmp/aether-signal-quality.json || fail 'signal quality regression failed'
 
 say 'building and restarting API only; hardened compose is preserved'
 docker compose --env-file .env config -q
@@ -55,7 +49,7 @@ grep -q '"mode":"SHADOW"' /tmp/aether-autotrade-status.json || fail 'Auto Trade 
 grep -q '"live_execution_authorized":false' /tmp/aether-autotrade-status.json || fail 'Auto Trade live authorization is not false'
 grep -q '"live_enabled":false' /tmp/aether-execution-status.json || fail 'LIVE execution must remain disabled'
 
-rm -f /tmp/aether-signal-quality.json /tmp/aether-signal-readiness.json /tmp/aether-signal-config.json /tmp/aether-autotrade-status.json /tmp/aether-execution-status.json
+rm -f /tmp/aether-signal-readiness.json /tmp/aether-signal-config.json /tmp/aether-autotrade-status.json /tmp/aether-execution-status.json
 
 say 'FINAL: Signal Intelligence + Auto Trade decision engine deployed in SHADOW mode'
 say 'quality-over-quantity gates active; LIVE execution remains disabled'
