@@ -1,6 +1,6 @@
 const json = (res, status, body) => res.status(status).json(body);
 const liveEnabled = process.env.LIVE_ENABLED === 'true' && process.env.EXECUTION_MODE === 'LIVE';
-const base = process.env.API_SERVICE_URL || 'https://aether-social-v3-api.onrender.com';
+const base = process.env.API_SERVICE_URL || 'https://api.aether.boats';
 
 async function readBody(req) {
   if (req.body !== undefined) return typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
