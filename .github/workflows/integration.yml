@@ -31,11 +31,12 @@ jobs:
         env:
           DATABASE_URL: postgresql://aether:aether_test@localhost:5432/aether_test
         run: node --input-type=module -e "import {Pool} from 'pg'; import {runMigrations} from './src/migration-runner.mjs'; const p=new Pool({connectionString:process.env.DATABASE_URL}); await runMigrations(p, '../../migrations'); const r=await p.query(\"SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name\"); console.log(r.rows.map(x=>x.table_name).join('\\n')); await p.end();"
-      - name: API health smoke
+      - name: API health and wallet infrastructure smoke
         env:
           DATABASE_URL: postgresql://aether:aether_test@localhost:5432/aether_test
           EXECUTION_MODE: SHADOW
           LIVE_ENABLED: "false"
+          ADMIN_API_TOKEN: integration_admin_token
         run: |
           node services/api/src/server.mjs > /tmp/aether.log 2>&1 &
           pid=$!
@@ -45,3 +46,8 @@ jobs:
           curl --fail http://127.0.0.1:8080/api/execution/status | grep -q '"live_enabled":false'
           curl --fail http://127.0.0.1:8080/api/autotrade/status | grep -q '"live_execution_authorized":false'
           curl --fail http://127.0.0.1:8080/api/signals/config | grep -q '"quality_first":true'
+          curl --fail -H 'Authorization: Bearer integration_admin_token' http://127.0.0.1:8080/api/admin/wallets | grep -q '"TREASURY_MULTISIG"'
+          curl --fail -X PUT -H 'Authorization: Bearer integration_admin_token' -H 'Content-Type: application/json' \
+            --data '{"public_address":"11111111111111111111111111111111","enabled":true}' \
+            http://127.0.0.1:8080/api/admin/wallets/TREASURY_MULTISIG | grep -q '"private_keys_stored":false'
+          curl --fail -H 'Authorization: Bearer integration_admin_token' http://127.0.0.1:8080/api/admin/wallets/readiness | grep -q '"live_execution_authorized":false'
