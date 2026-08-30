@@ -1,1 +1,79 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aether Social V3 Admin</title><style>body{font-family:system-ui;background:#090d18;color:#eef;margin:0}.wrap{max-width:900px;margin:auto;padding:20px}.card{background:#121a2b;border:1px solid #293650;border-radius:14px;padding:18px;margin:14px 0}input,button{font:inherit;padding:10px;border-radius:9px;border:1px solid #3b4b6d;background:#0c1220;color:#eef}button{cursor:pointer}label{display:block;margin:10px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.ok{color:#62d6a1}.warn{color:#ffd166}.note{opacity:.7;font-size:.9rem}@media(max-width:650px){.grid{grid-template-columns:1fr}}</style></head><body><main class="wrap"><h1>Aether Social V3 — Admin Control Panel</h1><p>Revenue Configuration • SHADOW execution • LIVE remains locked</p><section class="card"><h2>Admin Authentication</h2><input id="token" type="password" placeholder="API token" style="width:100%;box-sizing:border-box"><button onclick="load()" style="margin-top:10px">Connect</button><div id="status" style="margin-top:10px"></div></section><section class="card"><h2>Revenue & Rental</h2><div id="current">Loading…</div><div class="grid"><label>Performance Fee (%)<input id="perf" type="number" min="0" max="100" step="0.01"><span class="note">Fee atas performance/profit yang ditetapkan platform.</span></label><label>Execution Fee (%)<input id="exec" type="number" min="0" max="100" step="0.01"><span class="note">Biaya per execution.</span></label><label>Execution Rental (%) / month<input id="rental" type="number" min="0" max="100" step="0.01"><span class="note">Rental akses Execution Engine per bulan.</span></label></div><label><input id="enabled" type="checkbox"> Revenue & fee system enabled</label><button onclick="saveFees()">Save Configuration</button></section><section class="card"><h2>Execution Engine Rental</h2><p>Rental mengontrol hak akses ke Execution Engine. Jika subscription/rental tidak aktif atau kedaluwarsa, akses execution harus ditolak secara fail-closed.</p><div id="rentalState" class="warn">Rental enforcement: configuration ready; billing enforcement belum diaktifkan.</div></section><section class="card"><h2>Risk / Audit</h2><button onclick="loadLogs()">Refresh</button><pre id="logs" style="white-space:pre-wrap;max-height:420px;overflow:auto"></pre></section></main><script>let token='';const $=id=>document.querySelector(id);const hdr=()=>token?{'Authorization':'Bearer '+token,'Content-Type':'application/json'}:{};const bps=p=>Math.round(Number(p)*100);const pct=b=>((Number(b)||0)/100).toFixed(2);async function api(url,opt={}){const r=await fetch(url,{...opt,headers:{...hdr(),...(opt.headers||{})}});const b=await r.json();if(!r.ok)throw Error(b.error||r.status);return b}async function load(){token=$('#token').value.trim();try{const [f,e]=await Promise.all([api('/api/marketplace/fees'),api('/api/execution/status')]);$('#perf').value=pct(f.config.performance_fee_bps);$('#exec').value=pct(f.config.execution_fee_bps);$('#rental').value=pct(f.config.execution_rental_fee_bps);$('#enabled').checked=f.config.enabled;$('#current').innerHTML='<span class="ok">Connected</span> • '+(e.mode||'SHADOW')+' • live='+e.live_enabled+' • fail-closed='+e.fail_closed;await loadLogs()}catch(err){$('#status').innerHTML='<span class="warn">'+err.message+'</span>'}}async function saveFees(){try{const b=await api('/api/admin/fees',{method:'PATCH',body:JSON.stringify({performance_fee_bps:bps($('#perf').value),execution_fee_bps:bps($('#exec').value),execution_rental_fee_bps:bps($('#rental').value),enabled:$('#enabled').checked})});$('#current').innerHTML='<span class="ok">Saved</span> • Performance '+pct(b.config.performance_fee_bps)+'% • Execution '+pct(b.config.execution_fee_bps)+'% • Rental '+pct(b.config.execution_rental_fee_bps)+'%/month';await loadLogs()}catch(err){$('#status').innerHTML='<span class="warn">'+err.message+'</span>'}}async function loadLogs(){try{const [r,a]=await Promise.all([api('/api/admin/risk'),api('/api/admin/audit')]);$('#logs').textContent=JSON.stringify({risk:r.items,audit:a.items},null,2)}catch(err){$('#logs').textContent=err.message}}load();</script></body></html>
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aether Social V3 Admin</title>
+<style>
+body{font-family:system-ui;background:#090d18;color:#eef;margin:0}.wrap{max-width:980px;margin:auto;padding:20px}.card{background:#121a2b;border:1px solid #293650;border-radius:14px;padding:18px;margin:14px 0}input,button{font:inherit;padding:10px;border-radius:9px;border:1px solid #3b4b6d;background:#0c1220;color:#eef}button{cursor:pointer}label{display:block;margin:10px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.wallet{padding:12px;border:1px solid #293650;border-radius:12px;background:#0d1424}.wallet input[type=text]{width:100%;box-sizing:border-box;margin-top:8px}.ok{color:#62d6a1}.warn{color:#ffd166}.danger{color:#ff7b7b}.note{opacity:.72;font-size:.9rem}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#1b2942;font-size:.82rem;margin-left:6px}pre{white-space:pre-wrap;max-height:420px;overflow:auto}@media(max-width:650px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<h1>Aether Social V3 — Admin Control Panel</h1>
+<p>SHADOW execution • wallet public-address setup • LIVE remains locked</p>
+
+<section class="card">
+<h2>Admin Authentication</h2>
+<input id="token" type="password" placeholder="ADMIN_API_TOKEN" style="width:100%;box-sizing:border-box">
+<button onclick="loadAdmin()" style="margin-top:10px">Connect Admin</button>
+<div id="status" style="margin-top:10px"></div>
+</section>
+
+<section class="card">
+<h2>Wallet Infrastructure</h2>
+<p class="danger"><strong>PUBLIC ADDRESS / PUBLIC KEY ONLY.</strong> Jangan pernah masukkan seed phrase, private key, hardware-wallet secret, atau recovery phrase ke Aether Admin.</p>
+<p>Untuk user/follower dan trader, wallet tetap milik mereka sendiri dan tidak diisi di halaman ini.</p>
+<div id="walletReadiness" class="warn">Connect Admin untuk melihat readiness.</div>
+<div class="grid" id="walletGrid" style="margin-top:12px">
+  <div class="wallet"><strong>Main Treasury Multisig</strong><span class="pill">Required</span><div class="note">Menyimpan pendapatan milik Aether saja. Bukan dana user.</div><input id="w_TREASURY_MULTISIG" type="text" placeholder="Solana public address"></div>
+  <div class="wallet"><strong>Platform Fee Collector</strong><span class="pill">Required</span><div class="note">Penerima execution fee dan bagian performance fee Aether.</div><input id="w_FEE_COLLECTOR" type="text" placeholder="Solana public address"></div>
+  <div class="wallet"><strong>Execution Authority</strong><span class="pill">Required</span><div class="note">Public key signer terisolasi. Private key tidak pernah masuk Admin/API.</div><input id="w_EXECUTION_AUTHORITY" type="text" placeholder="Signer public key"></div>
+  <div class="wallet"><strong>Emergency / Pause Multisig</strong><span class="pill">Required</span><div class="note">Otoritas emergency pause dan kontrol keselamatan kritis.</div><input id="w_EMERGENCY_MULTISIG" type="text" placeholder="Solana multisig public address"></div>
+  <div class="wallet"><strong>Operations / Fee Payer</strong><span class="pill">Optional</span><div class="note">Saldo terbatas untuk sponsored network / priority fee bila Aether mensponsori fee.</div><input id="w_OPERATIONS_FEE_PAYER" type="text" placeholder="Solana public address"></div>
+  <div class="wallet"><strong>Program Upgrade Authority</strong><span class="pill">Optional</span><div class="note">Multisig untuk upgrade program on-chain di masa depan.</div><input id="w_PROGRAM_UPGRADE_AUTHORITY" type="text" placeholder="Solana multisig public address"></div>
+</div>
+<button onclick="saveWallets()" style="margin-top:14px">Save Wallet Addresses</button>
+<div id="walletStatus" style="margin-top:10px"></div>
+</section>
+
+<section class="card">
+<h2>Revenue & Rental</h2>
+<div id="current">Connect Admin untuk memuat konfigurasi.</div>
+<div class="grid">
+<label>Performance Fee (%)<input id="perf" type="number" min="0" max="100" step="0.01"><span class="note">Fee atas net realized profit.</span></label>
+<label>Execution Fee (%)<input id="exec" type="number" min="0" max="100" step="0.01"><span class="note">Biaya per execution yang berhasil.</span></label>
+<label>Execution Rental (%) / month<input id="rental" type="number" min="0" max="100" step="0.01"><span class="note">Rental akses Execution Engine per bulan.</span></label>
+</div>
+<label><input id="enabled" type="checkbox"> Revenue & fee system enabled</label>
+<button onclick="saveFees()">Save Configuration</button>
+</section>
+
+<section class="card">
+<h2>Execution Engine Rental</h2>
+<p>Jika subscription/rental tidak aktif atau kedaluwarsa, akses execution harus ditolak secara fail-closed.</p>
+<div class="warn">Rental enforcement: configuration ready; LIVE tetap terkunci.</div>
+</section>
+
+<section class="card">
+<h2>Risk / Audit</h2>
+<button onclick="loadLogs()">Refresh</button>
+<pre id="logs"></pre>
+</section>
+</main>
+<script>
+let token='';
+const $=id=>document.querySelector(id);
+const hdr=()=>token?{'Authorization':'Bearer '+token,'Content-Type':'application/json'}:{};
+const bps=p=>Math.round(Number(p)*100);
+const pct=b=>((Number(b)||0)/100).toFixed(2);
+const walletRoles=['TREASURY_MULTISIG','FEE_COLLECTOR','EXECUTION_AUTHORITY','EMERGENCY_MULTISIG','OPERATIONS_FEE_PAYER','PROGRAM_UPGRADE_AUTHORITY'];
+async function api(url,opt={}){const r=await fetch(url,{...opt,headers:{...hdr(),...(opt.headers||{})}});const b=await r.json();if(!r.ok)throw Error(b.error||r.status);return b}
+function showReadiness(r){const ok=r.wallet_layer_ready_for_live;$('#walletReadiness').className=ok?'ok':'warn';$('#walletReadiness').textContent=(ok?'Wallet layer complete':'Wallet layer incomplete')+' • '+r.required_configured+'/'+r.required_total+' required configured'+(r.missing_roles?.length?' • missing: '+r.missing_roles.join(', '):'')+' • LIVE authorized=false';}
+async function loadAdmin(){token=$('#token').value.trim();if(!token){$('#status').innerHTML='<span class="warn">Masukkan ADMIN_API_TOKEN.</span>';return}try{const [f,e,w]=await Promise.all([api('/api/marketplace/fees'),api('/api/execution/status'),api('/api/admin/wallets')]);$('#perf').value=pct(f.config.performance_fee_bps);$('#exec').value=pct(f.config.execution_fee_bps);$('#rental').value=pct(f.config.execution_rental_fee_bps);$('#enabled').checked=f.config.enabled;$('#current').innerHTML='<span class="ok">Connected</span> • '+(e.mode||'SHADOW')+' • live='+e.live_enabled+' • fail-closed='+e.fail_closed;for(const item of w.items){const el=$('#w_'+item.role);if(el)el.value=item.public_address||''}showReadiness(w.readiness);$('#status').innerHTML='<span class="ok">Admin connected.</span>';await loadLogs()}catch(err){$('#status').innerHTML='<span class="warn">'+err.message+'</span>'}}
+async function saveWallets(){if(!token){$('#walletStatus').innerHTML='<span class="warn">Connect Admin terlebih dahulu.</span>';return}try{let saved=0,lastReadiness=null;for(const role of walletRoles){const address=$('#w_'+role).value.trim();if(!address)continue;const b=await api('/api/admin/wallets/'+role,{method:'PUT',body:JSON.stringify({public_address:address,enabled:true})});lastReadiness=b.readiness;saved++}if(!saved){$('#walletStatus').innerHTML='<span class="warn">Tidak ada public address yang diisi.</span>';return}if(lastReadiness)showReadiness(lastReadiness);$('#walletStatus').innerHTML='<span class="ok">Saved '+saved+' wallet role(s). No private keys stored.</span>';await loadLogs()}catch(err){$('#walletStatus').innerHTML='<span class="warn">'+err.message+'</span>'}}
+async function saveFees(){try{const b=await api('/api/admin/fees',{method:'PATCH',body:JSON.stringify({performance_fee_bps:bps($('#perf').value),execution_fee_bps:bps($('#exec').value),execution_rental_fee_bps:bps($('#rental').value),enabled:$('#enabled').checked})});$('#current').innerHTML='<span class="ok">Saved</span> • Performance '+pct(b.config.performance_fee_bps)+'% • Execution '+pct(b.config.execution_fee_bps)+'% • Rental '+pct(b.config.execution_rental_fee_bps)+'%/month';await loadLogs()}catch(err){$('#status').innerHTML='<span class="warn">'+err.message+'</span>'}}
+async function loadLogs(){if(!token)return;try{const [r,a]=await Promise.all([api('/api/admin/risk'),api('/api/admin/audit')]);$('#logs').textContent=JSON.stringify({risk:r.items,audit:a.items},null,2)}catch(err){$('#logs').textContent=err.message}}
+</script>
+</body>
+</html>
