@@ -68,8 +68,9 @@ export async function runShadowSimulation({ repos, pool, body }) {
         idempotency_key: `shadow:${event.event_id}:${policy.follower_user_id}`,
         event_id: event.event_id,
         follower_user_id: policy.follower_user_id,
+        trader_id: trader.trader_id,
         requested_amount_usd: amountUsd,
-        mode: 'SIMULATION',
+        mode: 'SHADOW',
         status: 'SIMULATED'
       });
     }
