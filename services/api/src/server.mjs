@@ -7,16 +7,19 @@ import { createExecutionRequestRepository } from './repositories/execution-reque
 import { createCoreRepositories } from './repositories/core.mjs';
 import { createAdminRepository } from './repositories/admin.mjs';
 import { createMarketplaceRepository } from './repositories/marketplace.mjs';
+import { createSignalIntelligenceRepository } from './repositories/signal-intelligence.mjs';
 import { runMigrations } from './migration-runner.mjs';
 import { runShadowSimulation } from './shadow-simulator.mjs';
 import { checkExecutionEngineRental } from './execution-rental-gate.mjs';
+import { evaluateSignalQuality, getSignalQualityConfig } from './signal-intelligence.mjs';
+import { evaluateAutoTrade } from './auto-trade-engine.mjs';
 
 const PORT = Number(process.env.PORT || 8080);
 const executionMode = process.env.EXECUTION_MODE || 'SHADOW';
 const liveEnabled = process.env.LIVE_ENABLED === 'true' && executionMode === 'LIVE';
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
-const repos = pool ? { tradeEvents:createTradeEventRepository(pool), executionRequests:createExecutionRequestRepository(pool), ...createCoreRepositories(pool), admin:createAdminRepository(pool), marketplace:createMarketplaceRepository(pool) } : null;
-const VERSION = '2026.08.29-public-shadow-audit';
+const repos = pool ? { tradeEvents:createTradeEventRepository(pool), executionRequests:createExecutionRequestRepository(pool), ...createCoreRepositories(pool), admin:createAdminRepository(pool), marketplace:createMarketplaceRepository(pool), signalIntelligence:createSignalIntelligenceRepository(pool) } : null;
+const VERSION = '2026.08.30-signal-intelligence-shadow';
 const send=(res,status,body,type='application/json; charset=utf-8')=>{res.writeHead(status,{'content-type':type,'cache-control':'no-store'});res.end(type.startsWith('text/')?body:JSON.stringify(body));};
 const auth=req=>Boolean(process.env.API_TOKEN)&&req.headers.authorization===`Bearer ${process.env.API_TOKEN}`;
 const adminAuth=req=>Boolean(process.env.ADMIN_API_TOKEN)&&req.headers.authorization===`Bearer ${process.env.ADMIN_API_TOKEN}`;
@@ -25,6 +28,7 @@ const requestUrl=req=>new URL(req.url||'/','http://localhost');
 const pathname=req=>requestUrl(req).pathname.replace(/\/+$/,'')||'/';
 const parts=req=>pathname(req).split('/').filter(Boolean);
 const rentalProjection=r=>r?({rental_id:r.rental_id,trader_id:r.trader_id,status:r.status,monthly_rate_bps:r.monthly_rate_bps,amount_due_usd:r.amount_due_usd,currency:r.currency,period_start:r.period_start,period_end:r.period_end,paid_at:r.paid_at,payment_status:r.payment_status,payment_reference:r.payment_reference,created_at:r.created_at,updated_at:r.updated_at}):null;
+const assessmentProjection=r=>r?({source_type:r.source_type,token_mint:r.token_mint,quote_mint:r.quote_mint,quality_score:Number(r.quality_score),verdict:r.verdict,hard_rejects:r.hard_rejects||[],components:r.components||{},snapshot:r.snapshot||{},observed_at:r.observed_at,live_execution_authorized:false,quality_first:true}):null;
 
 const server=http.createServer(async(req,res)=>{try{
  const route=pathname(req),p=parts(req);
@@ -32,6 +36,12 @@ const server=http.createServer(async(req,res)=>{try{
  if(req.method==='GET'&&route==='/api/readiness'){if(!pool)return send(res,503,{status:'not_ready',database:'unconfigured',version:VERSION});try{await pool.query('SELECT 1');return send(res,200,{status:'ready',database:'ok',version:VERSION});}catch{return send(res,503,{status:'not_ready',database:'unavailable',version:VERSION});}}
  if(req.method==='GET'&&route==='/api/version')return send(res,200,{version:VERSION,execution_mode:executionMode,live_enabled:liveEnabled});
  if(req.method==='GET'&&route==='/api/execution/status')return send(res,200,{mode:executionMode,live_enabled:liveEnabled,fail_closed:!liveEnabled,signer_exposed_to_api:false});
+ if(req.method==='GET'&&route==='/api/signals/config')return send(res,200,{source_type:'MACHINE_INTELLIGENCE',quality_first:true,live_execution_authorized:false,config:getSignalQualityConfig()});
+ if(req.method==='GET'&&route==='/api/autotrade/status')return send(res,200,{source_type:'ALGORITHMIC_STRATEGY',mode:'SHADOW',quality_first:true,live_execution_authorized:false,execution_dispatched:false,fail_closed:true});
+ if(req.method==='POST'&&route==='/api/signals/evaluate'){if(!auth(req))return send(res,401,{error:'unauthorized'});if(!repos)return send(res,503,{error:'database_unconfigured'});const assessment=evaluateSignalQuality(await jsonBody(req));const stored=await repos.signalIntelligence.recordAssessment(assessment);await repos.auditEvents.append({event_type:'MACHINE_SIGNAL_ASSESSED',actor:'signal-intelligence',entity_type:'signal_assessment',entity_id:String(stored.assessment_id),payload:{token_mint:assessment.token_mint,quality_score:assessment.quality_score,verdict:assessment.verdict,hard_rejects:assessment.hard_rejects,live_execution_authorized:false}});return send(res,200,{assessment_id:stored.assessment_id,assessment});}
+ if(req.method==='GET'&&route==='/api/signals/recent'){if(!auth(req))return send(res,401,{error:'unauthorized'});if(!repos)return send(res,503,{error:'database_unconfigured'});return send(res,200,{items:await repos.signalIntelligence.recentAssessments(requestUrl(req).searchParams.get('limit'))});}
+ if(req.method==='POST'&&route==='/api/autotrade/evaluate'){if(!auth(req))return send(res,401,{error:'unauthorized'});if(!repos)return send(res,503,{error:'database_unconfigured'});if(liveEnabled||executionMode!=='SHADOW')return send(res,423,{error:'autotrade_live_blocked',reason:'shadow_only_foundation'});const body=await jsonBody(req);let assessment,assessmentId=null;if(body.assessment_id){const row=await repos.signalIntelligence.getAssessment(body.assessment_id);if(!row)return send(res,404,{error:'signal_assessment_not_found'});assessment=assessmentProjection(row);assessmentId=row.assessment_id;}else{if(!body.snapshot)return send(res,400,{error:'signal_snapshot_required'});assessment=evaluateSignalQuality(body.snapshot);const row=await repos.signalIntelligence.recordAssessment(assessment);assessmentId=row.assessment_id;}const decision=evaluateAutoTrade({assessment,mandate:body.mandate||{},position:body.position||{},runtime:{liveEnabled}});const storedDecision=await repos.signalIntelligence.recordDecision({assessmentId,decision,mandate:body.mandate||{},position:body.position||{}});await repos.auditEvents.append({event_type:'AUTOTRADE_SHADOW_DECISION',actor:'auto-trade-engine',entity_type:'auto_trade_decision',entity_id:String(storedDecision.decision_id),payload:{assessment_id:assessmentId,token_mint:decision.token_mint,action:decision.action,reason_codes:decision.reason_codes,requested_amount_usd:decision.requested_amount_usd,live_execution_authorized:false}});return send(res,200,{assessment_id:assessmentId,decision_id:storedDecision.decision_id,assessment,decision,execution_dispatched:false});}
+ if(req.method==='GET'&&route==='/api/autotrade/decisions'){if(!auth(req))return send(res,401,{error:'unauthorized'});if(!repos)return send(res,503,{error:'database_unconfigured'});return send(res,200,{items:await repos.signalIntelligence.recentDecisions(requestUrl(req).searchParams.get('limit'))});}
  if(req.method==='POST'&&route==='/api/shadow/simulate'){if(!repos)return send(res,503,{error:'database_unconfigured'});if(liveEnabled||executionMode!=='SHADOW')return send(res,409,{error:'shadow_simulation_locked',reason:'execution_mode_not_shadow'});const result=await runShadowSimulation({repos,pool,body:await jsonBody(req)});return send(res,result.status,result.body);}
  if(req.method==='GET'&&p[1]==='trades')return send(res,200,{items:await repos.tradeEvents.recent(requestUrl(req).searchParams.get('limit'))});
  if(req.method==='GET'&&p[1]==='traders'){if(p[2]){const t=await repos.marketplace.getTrader(p[2]);return t?send(res,200,t):send(res,404,{error:'trader_not_found'});}return send(res,200,{items:await repos.marketplace.listTraders(requestUrl(req).searchParams.get('limit'))});}
