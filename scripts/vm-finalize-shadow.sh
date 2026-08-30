@@ -47,9 +47,18 @@ findtime = 10m
 bantime = 1h
 EOF
 fail2ban-client -t >/dev/null
-systemctl enable --now fail2ban >/dev/null
+systemctl enable fail2ban >/dev/null 2>&1 || true
 systemctl restart fail2ban
-fail2ban-client status sshd >/dev/null
+READY=0
+for i in $(seq 1 20); do
+  if fail2ban-client ping >/dev/null 2>&1; then
+    READY=1
+    break
+  fi
+  sleep 1
+done
+[ "$READY" -eq 1 ] || { systemctl --no-pager --full status fail2ban || true; fail "fail2ban socket did not become ready"; }
+fail2ban-client status sshd >/dev/null || fail "fail2ban sshd jail is not active"
 
 say "ensuring firewall rules"
 ufw allow "$SSH_PORT/tcp" >/dev/null
