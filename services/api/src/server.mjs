@@ -8,6 +8,7 @@ import { createCoreRepositories } from './repositories/core.mjs';
 import { createAdminRepository } from './repositories/admin.mjs';
 import { createMarketplaceRepository } from './repositories/marketplace.mjs';
 import { createSignalIntelligenceRepository } from './repositories/signal-intelligence.mjs';
+import { createWalletInfrastructureRepository } from './repositories/wallet-infrastructure.mjs';
 import { runMigrations } from './migration-runner.mjs';
 import { runShadowSimulation } from './shadow-simulator.mjs';
 import { checkExecutionEngineRental } from './execution-rental-gate.mjs';
@@ -18,8 +19,8 @@ const PORT = Number(process.env.PORT || 8080);
 const executionMode = process.env.EXECUTION_MODE || 'SHADOW';
 const liveEnabled = process.env.LIVE_ENABLED === 'true' && executionMode === 'LIVE';
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
-const repos = pool ? { tradeEvents:createTradeEventRepository(pool), executionRequests:createExecutionRequestRepository(pool), ...createCoreRepositories(pool), admin:createAdminRepository(pool), marketplace:createMarketplaceRepository(pool), signalIntelligence:createSignalIntelligenceRepository(pool) } : null;
-const VERSION = '2026.08.30-signal-intelligence-shadow';
+const repos = pool ? { tradeEvents:createTradeEventRepository(pool), executionRequests:createExecutionRequestRepository(pool), ...createCoreRepositories(pool), admin:createAdminRepository(pool), marketplace:createMarketplaceRepository(pool), signalIntelligence:createSignalIntelligenceRepository(pool), walletInfrastructure:createWalletInfrastructureRepository(pool) } : null;
+const VERSION = '2026.08.31-wallet-infrastructure-shadow';
 const send=(res,status,body,type='application/json; charset=utf-8')=>{res.writeHead(status,{'content-type':type,'cache-control':'no-store'});res.end(type.startsWith('text/')?body:JSON.stringify(body));};
 const auth=req=>Boolean(process.env.API_TOKEN)&&req.headers.authorization===`Bearer ${process.env.API_TOKEN}`;
 const adminAuth=req=>Boolean(process.env.ADMIN_API_TOKEN)&&req.headers.authorization===`Bearer ${process.env.ADMIN_API_TOKEN}`;
@@ -53,6 +54,9 @@ const server=http.createServer(async(req,res)=>{try{
  if(req.method==='POST'&&route==='/api/executions'){if(!auth(req))return send(res,401,{error:'unauthorized'});const body=await jsonBody(req),mode=body.mode||'SHADOW';if(mode==='LIVE')return send(res,423,{error:'live_execution_blocked'});const access=await checkExecutionEngineRental(pool,body.trader_id);if(!access.allowed)return send(res,403,{error:'execution_engine_rental_required',reason:access.reason,rental:access.rental??null});return send(res,201,await repos.executionRequests.create({...body,mode}));}
  if(req.method==='GET'&&route==='/api/executions'){if(!auth(req))return send(res,401,{error:'unauthorized'});return send(res,200,{items:(await pool.query('SELECT * FROM execution_requests ORDER BY created_at DESC LIMIT 200')).rows});}
  if(route.startsWith('/api/admin/')){if(!adminAuth(req))return send(res,401,{error:'admin_unauthorized'});if(!repos)return send(res,503,{error:'database_unconfigured'});}
+ if(req.method==='GET'&&route==='/api/admin/wallets'){const [items,readiness]=await Promise.all([repos.walletInfrastructure.list(),repos.walletInfrastructure.readiness()]);return send(res,200,{items,readiness});}
+ if(req.method==='GET'&&route==='/api/admin/wallets/readiness')return send(res,200,await repos.walletInfrastructure.readiness());
+ if(req.method==='PUT'&&p[1]==='admin'&&p[2]==='wallets'&&p[3]){const wallet=await repos.walletInfrastructure.upsert(p[3],await jsonBody(req));await repos.auditEvents.append({event_type:'PLATFORM_WALLET_CONFIG_UPDATED',actor:'admin',entity_type:'platform_wallet',entity_id:wallet.role,payload:{role:wallet.role,network:wallet.network,public_address:wallet.public_address,custody_model:wallet.custody_model,enabled:wallet.enabled,verification_status:wallet.verification_status,private_key_stored:false}});return send(res,200,{wallet,readiness:await repos.walletInfrastructure.readiness()});}
  if(req.method==='GET'&&route==='/api/admin/risk')return send(res,200,{items:await repos.admin.recentRiskDecisions()});
  if(req.method==='GET'&&route==='/api/admin/audit')return send(res,200,{items:await repos.admin.recentAuditEvents()});
  if(req.method==='GET'&&route==='/api/admin/rentals')return send(res,200,{items:(await pool.query(`SELECT rental_id,trader_id,status,monthly_rate_bps,amount_due_usd,currency,period_start,period_end,paid_at,payment_status,payment_reference,created_at,updated_at FROM execution_engine_rentals ORDER BY created_at DESC LIMIT 200`)).rows.map(rentalProjection)});
@@ -60,7 +64,7 @@ const server=http.createServer(async(req,res)=>{try{
  if(req.method==='PATCH'&&p[1]==='admin'&&p[2]==='copy-policies'&&p[3]){const updated=await repos.admin.updateCopyPolicy(p[3],await jsonBody(req));return updated?send(res,200,updated):send(res,404,{error:'copy_policy_not_found'});}
  if(req.method==='PATCH'&&route==='/api/admin/fees'){const config=await repos.marketplace.updateFeeConfig(await jsonBody(req));await repos.auditEvents.append({event_type:'PLATFORM_FEE_CONFIG_UPDATED',actor:'admin',entity_type:'platform_fee_config',entity_id:String(config.config_id),payload:{performance_fee_bps:config.performance_fee_bps,execution_fee_bps:config.execution_fee_bps,execution_rental_fee_bps:config.execution_rental_fee_bps,enabled:config.enabled}});return send(res,200,{config});}
  if(req.method==='GET'&&(route==='/'||route==='/dashboard'))return send(res,200,fs.readFileSync(path.resolve(process.cwd(),'web/dashboard.html'),'utf8'),'text/html; charset=utf-8');
- if(req.method==='GET'&&route==='/admin'){if(!adminAuth(req))return send(res,404,{error:'not_found'});return send(res,200,fs.readFileSync(path.resolve(process.cwd(),'web/admin.html'),'utf8'),'text/html; charset=utf-8');}
+ if(req.method==='GET'&&route==='/admin')return send(res,200,fs.readFileSync(path.resolve(process.cwd(),'web/admin.html'),'utf8'),'text/html; charset=utf-8');
  return send(res,404,{error:'not_found',path:route,method:req.method});
  }catch(e){console.error(e);return send(res,e.message?.startsWith('invalid_')||e.message?.endsWith('_required')?400:500,{error:e.message});}});
 async function start(){if(pool)await runMigrations(pool,path.resolve(process.cwd(),'migrations'));server.listen(PORT,'0.0.0.0',()=>console.log(`Aether API listening on ${PORT}`));}
