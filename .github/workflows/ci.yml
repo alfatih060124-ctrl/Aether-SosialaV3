@@ -24,6 +24,7 @@ jobs:
           node --check services/api/src/service.mjs
           node --check services/api/src/signal-intelligence.mjs
           node --check services/api/src/auto-trade-engine.mjs
+          node --check services/api/src/wallet-auth.mjs
           node --check services/api/src/repositories/signal-intelligence.mjs
           node --check services/api/src/repositories/core.mjs
           node --check services/api/src/repositories/admin.mjs
@@ -31,8 +32,11 @@ jobs:
           node --check services/api/src/repositories/trade-events.mjs
           node --check services/api/src/repositories/execution-requests.mjs
           node --check scripts/run-signal-quality-tests.mjs
+          node --check scripts/run-wallet-auth-tests.mjs
       - name: Signal quality regression
         run: node scripts/run-signal-quality-tests.mjs
+      - name: Wallet authentication regression
+        run: node scripts/run-wallet-auth-tests.mjs
       - name: Docker build
         run: docker build -t aether-social-v3:ci .
       - name: Docker smoke start
