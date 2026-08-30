@@ -1,0 +1,23 @@
+name: Aether Signal Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        run: |
+          node --check services/api/src/signal-intelligence.mjs
+          node --check services/api/src/auto-trade-engine.mjs
+          node --check services/api/src/repositories/signal-intelligence.mjs
+          node --check scripts/run-signal-quality-tests.mjs
+      - name: Run strict quality regression
+        run: node scripts/run-signal-quality-tests.mjs
