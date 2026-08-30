@@ -12,11 +12,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: services/api/package-lock.json
       - name: Install API dependencies
         working-directory: services/api
-        run: npm ci
+        run: npm install --omit=dev
       - name: Syntax check
         run: |
           node --check api/index.mjs
