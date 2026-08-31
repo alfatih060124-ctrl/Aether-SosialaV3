@@ -48,9 +48,14 @@ a.aether.boats {
     respond "admin API route not available" 404
   }
 
-  handle {
+  @admin_ui path / /admin /admin.html
+  handle @admin_ui {
     root * /opt/aether-v3/web
-    try_files {path} /admin.html
+    rewrite * /admin.html
     file_server
+  }
+
+  handle {
+    respond "admin route not available" 404
   }
 }
