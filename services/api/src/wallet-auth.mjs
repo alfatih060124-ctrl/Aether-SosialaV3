@@ -24,7 +24,7 @@ export function decodeBase58(value) {
       carry >>= 8;
     }
     while (carry > 0) {
-      bytes.push(carry & 0xff);
+      bytes.push(carry & 0xff;
       carry >>= 8;
     }
   }
@@ -222,6 +222,41 @@ export function createWalletAuthService(pool, options = {}) {
             token: sessionToken,
             expires_at: expiresAt.toISOString()
           }
+        };
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async verifyOwnership({ challengeId, walletAddress, purpose, signature, signatureEncoding = 'base64' }) {
+      validateSolanaWallet(walletAddress);
+      const normalizedPurpose = normalizePurpose(purpose);
+      if (normalizedPurpose === 'LOGIN') throw new Error('invalid_auth_purpose');
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const q = await client.query(`SELECT * FROM wallet_auth_challenges WHERE challenge_id=$1 FOR UPDATE`, [challengeId]);
+        const challenge = q.rows[0];
+        if (!challenge) throw new Error('auth_challenge_not_found');
+        if (challenge.purpose !== normalizedPurpose) throw new Error('invalid_auth_purpose');
+        if (challenge.wallet_address !== walletAddress) throw new Error('wallet_mismatch');
+        if (challenge.used_at) throw new Error('auth_challenge_used');
+        if (new Date(challenge.expires_at).getTime() <= Date.now()) throw new Error('auth_challenge_expired');
+        if (!verifySolanaMessageSignature({ walletAddress, message: challenge.message, signature, signatureEncoding })) {
+          throw new Error('invalid_wallet_signature');
+        }
+        await client.query(`UPDATE wallet_auth_challenges SET used_at=now() WHERE challenge_id=$1`, [challengeId]);
+        await client.query('COMMIT');
+        return {
+          verified: true,
+          wallet_address: walletAddress,
+          purpose: normalizedPurpose,
+          verified_at: new Date().toISOString(),
+          transaction_authorized: false,
+          funds_authorized: false
         };
       } catch (error) {
         await client.query('ROLLBACK').catch(() => {});
