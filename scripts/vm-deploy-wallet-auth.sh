@@ -65,7 +65,11 @@ done
 [ "$ready" -eq 1 ] || fail "API readiness timeout"
 
 say "verifying wallet account migrations"
-migration_tables="$(docker compose --env-file .env exec -T postgres psql -U aether -d aether -Atqc \"SELECT to_regclass('public.user_accounts'),to_regclass('public.user_wallets'),to_regclass('public.wallet_auth_challenges'),to_regclass('public.wallet_auth_sessions'),to_regclass('public.user_consents');\")"
+migration_tables="$(
+  docker compose --env-file .env exec -T postgres \
+    psql -U aether -d aether -Atqc \
+    "SELECT to_regclass('public.user_accounts'),to_regclass('public.user_wallets'),to_regclass('public.wallet_auth_challenges'),to_regclass('public.wallet_auth_sessions'),to_regclass('public.user_consents');"
+)"
 case "$migration_tables" in
   *user_accounts*user_wallets*wallet_auth_challenges*wallet_auth_sessions*user_consents*) ;;
   *) fail "wallet auth tables are missing" ;;
