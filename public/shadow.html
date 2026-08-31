@@ -1,24 +1,20 @@
 <!doctype html>
 <html lang="id">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Aether Social — Public Shadow Dashboard</title>
-<style>
-:root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eef2ff;background:#080d18}*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#080d18,#10182a);min-height:100vh}.wrap{max-width:1100px;margin:auto;padding:28px 18px 50px}.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.65}h1{margin:6px 0;font-size:32px}.sub{margin:0;color:#aeb9d5}.lock{border:1px solid #5b6b91;border-radius:999px;padding:9px 13px;font-size:12px;white-space:nowrap}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}.card{background:rgba(18,27,46,.82);border:1px solid #293754;border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.18)}.wide{grid-column:1/-1}.label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;opacity:.65}.value{font-size:22px;font-weight:700;margin-top:7px}.ok{font-size:13px;margin-top:5px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#69e09a;margin-right:7px}.field{width:100%;margin-top:8px;padding:11px 12px;border-radius:10px;border:1px solid #344565;background:#0b1323;color:#fff}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{margin-top:12px;width:100%;padding:12px;border:0;border-radius:10px;background:#e8edff;color:#0a1020;font-weight:700;cursor:pointer}.btn:disabled{opacity:.55;cursor:not-allowed}pre{white-space:pre-wrap;word-break:break-word;background:#080e1b;border-radius:10px;padding:12px;min-height:90px;overflow:auto}.notice{font-size:13px;color:#b9c5df;line-height:1.55}.footer{margin-top:18px;font-size:12px;opacity:.55}@media(max-width:760px){.grid,.row{grid-template-columns:1fr}.top{display:block}.lock{display:inline-block;margin-top:12px}}
-</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="refresh" content="0;url=/dashboard">
+<title>AETHER — Dashboard moved</title>
+<style>body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#070b14;color:#eef2ff;margin:0;min-height:100vh;display:grid;place-items:center}.card{max-width:620px;margin:24px;padding:24px;border:1px solid #263451;border-radius:16px;background:#111827}.muted{color:#9aa8c2;line-height:1.6}a{color:#8de6cf}</style>
 </head>
-<body><main class="wrap">
-<header class="top"><div><div class="eyebrow">Aether Social</div><h1>Public Shadow Dashboard</h1><p class="sub">Runtime, safety, dan simulasi — LIVE tetap terkunci.</p></div><div class="lock">🔒 LIVE EXECUTION LOCKED</div></header>
-<section class="grid">
-<div class="card"><div class="label">API Gateway</div><div id="apiStatus" class="value">Checking…</div><div class="ok">Public gateway</div></div>
-<div class="card"><div class="label">Execution Mode</div><div id="mode" class="value">—</div><div class="ok">Simulation only</div></div>
-<div class="card"><div class="label">Live Execution</div><div id="live" class="value">—</div><div class="ok">Fail-closed safety</div></div>
-<div class="card wide"><div class="label">Trader / Follower</div><div class="row"><div><div class="notice">Trader public address</div><input id="trader" class="field" placeholder="Public wallet address"></div><div><div class="notice">Follower public address</div><input id="follower" class="field" placeholder="Public wallet address"></div></div><div class="notice" style="margin-top:10px">Wallet address hanya digunakan sebagai identifier publik. Jangan masukkan private key atau seed phrase.</div></div>
-<div class="card wide"><div class="label">Shadow Simulation</div><div class="row"><div><div class="notice">Amount (USD)</div><input id="amount" class="field" value="100" inputmode="decimal"></div><div><div class="notice">Endpoint</div><div class="value" style="font-size:16px">/api/shadow/simulate</div></div></div><button id="simulate" class="btn">RUN SHADOW SIMULATION</button><pre id="result">Ready. Simulation tidak mengirim transaksi blockchain.</pre></div>
-</section><div class="footer">AETHER • Public SHADOW release • LIVE disabled</div></main>
-<script>
-const $=id=>document.getElementById(id);
-async function runtime(){try{const r=await fetch('/api/health',{cache:'no-store'});const d=await r.json();$('apiStatus').innerHTML='<span class="dot"></span>'+(d.status||'OK').toUpperCase();$('mode').textContent=d.execution_mode||'SHADOW';$('live').textContent=String(d.live_enabled===true?'ENABLED':'LOCKED');}catch(e){$('apiStatus').textContent='UNAVAILABLE';$('mode').textContent='—';$('live').textContent='LOCKED';$('result').textContent='API unavailable: '+e.message}}
-$('simulate').onclick=async()=>{const trader=$('trader').value.trim(),follower=$('follower').value.trim(),amount=Number($('amount').value);if(!trader){$('result').textContent='Masukkan public Trader wallet terlebih dahulu.';return}if(!follower){$('result').textContent='Masukkan public Follower wallet terlebih dahulu.';return}if(!Number.isFinite(amount)||amount<=0){$('result').textContent='Amount USD harus lebih besar dari 0.';return}$('simulate').disabled=true;$('result').textContent='Running SHADOW simulation…';try{const r=await fetch('/api/shadow/simulate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({trader_wallet:trader,follower_wallet:follower,amount_usd:amount})});const text=await r.text();let data;try{data=JSON.parse(text)}catch{data=text}$('result').textContent=JSON.stringify(data,null,2)}catch(e){$('result').textContent='Simulation request failed: '+e.message}finally{$('simulate').disabled=false}};
-runtime();
-</script></body></html>
+<body>
+<main class="card">
+  <strong>AETHER</strong>
+  <h1>Public SHADOW view has one canonical route.</h1>
+  <p class="muted">Untuk mencegah fungsi ganda dan jalur traffic yang tumpang tindih, halaman ini tidak lagi menjalankan API atau simulasi. Gunakan dashboard publik read-only.</p>
+  <p><a href="/dashboard">Open /dashboard</a></p>
+</main>
+<script>location.replace('/dashboard');</script>
+</body>
+</html>
