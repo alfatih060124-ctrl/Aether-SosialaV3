@@ -34,6 +34,7 @@ jobs:
           node --check services/api/src/repositories/execution-requests.mjs
           node --check scripts/run-signal-quality-tests.mjs
           node --check scripts/run-wallet-auth-tests.mjs
+          node --check scripts/run-wallet-auth-http-tests.mjs
           node --check scripts/infrastructure-contract.mjs
           bash -n scripts/vm-apply-routing.sh
           bash -n scripts/vm-apply-infrastructure-topology.sh
