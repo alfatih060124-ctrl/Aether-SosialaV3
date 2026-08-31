@@ -9,12 +9,25 @@ fail(){ printf '[aether-uuid-hardening] ERROR: %s\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || fail "run as root"
 [ -s .env ] || fail ".env is missing"
-for cmd in git docker curl node; do command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not installed"; done
+for cmd in git docker curl; do command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not installed"; done
 
 grep -Eq '^EXECUTION_MODE=SHADOW$' .env || fail "EXECUTION_MODE must remain SHADOW"
 grep -Eq '^LIVE_ENABLED=false$' .env || fail "LIVE_ENABLED must remain false"
 grep -Eq '^FIXTURE_GATE_PASSED=false$' .env || fail "FIXTURE_GATE_PASSED must remain false"
 grep -Eq '^OPERATOR_APPROVED=false$' .env || fail "OPERATOR_APPROVED must remain false"
+
+VALIDATOR_IMAGE="$(docker inspect -f '{{.Image}}' aether-v3-api-1 2>/dev/null || true)"
+[ -n "$VALIDATOR_IMAGE" ] || fail "running PRIMARY_VM API image could not be resolved"
+docker image inspect "$VALIDATOR_IMAGE" >/dev/null 2>&1 || fail "PRIMARY_VM API image is unavailable"
+run_node(){
+  docker run --rm \
+    --network none \
+    --read-only \
+    --security-opt no-new-privileges:true \
+    -v "$APP_DIR:/workspace:ro" \
+    -w /workspace \
+    "$VALIDATOR_IMAGE" node "$@"
+}
 
 say "creating pre-deploy database backup"
 if [ -x /usr/local/sbin/aether-db-backup ]; then
@@ -64,12 +77,12 @@ git checkout origin/main -- \
   scripts/execution-uuid-regression.mjs
 changed=1
 
-say "validating fetched fail-closed source"
-node --check services/api/src/repositories/execution-requests.mjs
-node --check scripts/execution-uuid-regression.mjs
+say "validating fetched fail-closed source with current API Node runtime"
+run_node --check services/api/src/repositories/execution-requests.mjs
+run_node --check scripts/execution-uuid-regression.mjs
 grep -q 'invalid_follower_user_id_uuid' scripts/execution-uuid-regression.mjs || fail "UUID regression fixture missing"
 grep -q 'assertUUID' services/api/src/repositories/execution-requests.mjs || fail "UUID validation missing from repository"
-node scripts/execution-uuid-regression.mjs
+run_node scripts/execution-uuid-regression.mjs
 
 say "validating SHADOW compose isolation"
 docker compose --env-file .env config -q
