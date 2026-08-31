@@ -1,7 +1,3 @@
-{
-  email off
-}
-
 # Public API ingress. This host is deliberately read-only.
 # All state-changing operations remain inside the PRIMARY_VM control plane.
 api.aether.boats {
