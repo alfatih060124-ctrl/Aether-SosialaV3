@@ -24,7 +24,7 @@ export function decodeBase58(value) {
       carry >>= 8;
     }
     while (carry > 0) {
-      bytes.push(carry & 0xff;
+      bytes.push(carry & 0xff);
       carry >>= 8;
     }
   }
