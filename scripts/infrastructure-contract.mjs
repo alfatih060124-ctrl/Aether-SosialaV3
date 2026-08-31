@@ -54,6 +54,8 @@ requireText('gateway', gateway, '/api/auth/logout');
 requireText('gateway', gateway, '/api/account/trader');
 requireText('gateway', gateway, '/api/account/trader/challenge');
 requireText('gateway', gateway, '/api/account/trader/apply');
+requireText('gateway', gateway, '/api/account/copy-mandates');
+requireText('gateway', gateway, 'isSessionPatchRoute');
 requireText('gateway', gateway, 'HTTP_ONLY_COOKIE');
 requireText('gateway', gateway, 'public_gateway_route_blocked');
 forbidText('gateway', gateway, 'API_SERVICE_TOKEN');
@@ -79,10 +81,13 @@ requireText('caddy', caddy, 'api.aether.boats');
 requireText('caddy', caddy, 'a.aether.boats');
 requireText('caddy', caddy, 'method GET');
 requireText('caddy', caddy, '@wallet_auth_write');
+requireText('caddy', caddy, '@account_patch');
 requireText('caddy', caddy, 'method POST');
+requireText('caddy', caddy, 'method PATCH');
 requireText('caddy', caddy, '/api/auth/challenge /api/auth/verify /api/auth/logout');
 requireText('caddy', caddy, '/api/auth/session /api/account/trader');
 requireText('caddy', caddy, '/api/account/trader/challenge /api/account/trader/apply');
+requireText('caddy', caddy, '/api/account/copy-mandates');
 requireText('caddy', caddy, 'respond "public API route not available" 404');
 requireText('caddy', caddy, '@admin_api path /api/admin /api/admin/*');
 requireText('caddy', caddy, '@admin_ui path / /admin /admin.html');
@@ -101,8 +106,13 @@ requireText('primary server', server, "route==='/api/account/trader'");
 requireText('primary server', server, "route==='/api/account/trader/challenge'");
 requireText('primary server', server, "route==='/api/account/trader/apply'");
 requireText('primary server', server, "purpose:'BECOME_TRADER'");
+requireText('primary server', server, "route==='/api/account/copy-mandates'");
+requireText('primary server', server, "p[2]==='copy-mandates'");
 requireText('primary server', server, "route==='/api/admin/traders/applications'");
-requireText('primary server', server, "p[2]==='traders'");
+requireText('primary server', server, "p[4]==='evidence'");
+requireText('primary server', server, "p[4]==='verification'");
+requireText('primary server', server, "p[4]==='publication'");
+requireText('primary server', server, "route==='/api/admin/copy-policies'");
 requireText('primary server', server, 'publication_authorized:false');
 requireText('primary server', server, 'live_execution_authorized:false');
 
@@ -112,12 +122,30 @@ requireText('marketplace', marketplace, "verification_status='VERIFIED'");
 requireText('marketplace', marketplace, 'published=true');
 requireText('marketplace', marketplace, 'createTraderApplication');
 requireText('marketplace', marketplace, 'reviewTraderApplication');
+requireText('marketplace', marketplace, 'recordTraderVerificationEvidence');
+requireText('marketplace', marketplace, 'reviewTraderVerification');
+requireText('marketplace', marketplace, 'setTraderPublished');
+requireText('marketplace', marketplace, 'ALLOWED_EVIDENCE_SOURCES');
+
+const core = read('services/api/src/repositories/core.mjs');
+requireText('copy repository', core, 'createForFollower');
+requireText('copy repository', core, 'updateForFollower');
+requireText('copy repository', core, "mode='SHADOW'");
+requireText('copy repository', core, 'live_execution_authorized=false');
+requireText('copy repository', core, 'self_copy_not_allowed');
 
 const traderMigration = read('migrations/013_trader_onboarding.sql');
 requireText('trader migration', traderMigration, 'onboarding_status');
 requireText('trader migration', traderMigration, 'verification_status');
 requireText('trader migration', traderMigration, 'published');
 requireText('trader migration', traderMigration, 'strategy_summary');
+
+const verificationMigration = read('migrations/014_trader_verification_copy_mandates.sql');
+requireText('verification/copy migration', verificationMigration, 'trader_verification_evidence');
+requireText('verification/copy migration', verificationMigration, 'source_reference');
+requireText('verification/copy migration', verificationMigration, 'allocation_bps');
+requireText('verification/copy migration', verificationMigration, 'max_slippage_bps');
+requireText('verification/copy migration', verificationMigration, 'live_execution_authorized');
 
 const dashboard = read('public/dashboard.html');
 const shadow = read('public/shadow.html');
@@ -139,6 +167,8 @@ requireText('account', account, '/api/auth/logout');
 requireText('account', account, '/api/account/trader');
 requireText('account', account, '/api/account/trader/challenge');
 requireText('account', account, '/api/account/trader/apply');
+requireText('account', account, '/api/account/copy-mandates');
+requireText('account', account, 'Create SHADOW Copy Mandate');
 requireText('account', account, 'provider.signMessage');
 requireText('account', account, 'Purpose: BECOME_TRADER');
 requireText('account', account, 'LIVE EXECUTION LOCKED');
@@ -148,8 +178,11 @@ forbidText('account', account, 'localStorage.getItem');
 
 const admin = read('web/admin.html');
 requireText('admin', admin, '/api/admin/traders/applications');
-requireText('admin', admin, '/review');
-requireText('admin', admin, 'verifiable history');
+requireText('admin', admin, '/evidence');
+requireText('admin', admin, '/verification');
+requireText('admin', admin, '/publication');
+requireText('admin', admin, '/api/admin/copy-policies');
+requireText('admin', admin, 'Verifiable Data Evidence');
 
 const traderDeploy = read('scripts/vm-deploy-trader-onboarding.sh');
 requireText('trader deploy', traderDeploy, '/usr/local/sbin/aether-db-backup');
@@ -157,6 +190,14 @@ requireText('trader deploy', traderDeploy, 'EXECUTION_MODE=SHADOW');
 requireText('trader deploy', traderDeploy, 'LIVE_ENABLED=false');
 requireText('trader deploy', traderDeploy, 'migrations/013_trader_onboarding.sql');
 requireText('trader deploy', traderDeploy, 'PostgreSQL host publishing is forbidden');
+
+const productDeploy = read('scripts/vm-deploy-verification-copy-mandates.sh');
+requireText('verification/copy deploy', productDeploy, '/usr/local/sbin/aether-db-backup');
+requireText('verification/copy deploy', productDeploy, 'EXECUTION_MODE=SHADOW');
+requireText('verification/copy deploy', productDeploy, 'LIVE_ENABLED=false');
+requireText('verification/copy deploy', productDeploy, 'migrations/014_trader_verification_copy_mandates.sql');
+requireText('verification/copy deploy', productDeploy, 'PostgreSQL host publishing is forbidden');
+requireText('verification/copy deploy', productDeploy, 'live_execution_authorized');
 
 requireMissing('apps/web/index.html');
 requireMissing('apps/web/app.js');
@@ -170,4 +211,4 @@ if (failures.length) {
 }
 
 console.log('Infrastructure topology contract: PASS');
-console.log('GitHub=source, public/=Vercel UI, Vercel API=read+wallet-auth/account BFF, VM=PRIMARY_VM, web/admin.html=Admin UI, Render=STANDBY_RENDER');
+console.log('GitHub=source, public/=Vercel UI, Vercel API=session-safe BFF, VM=PRIMARY_VM, Admin=verification/control plane, Render=STANDBY_RENDER, LIVE=false');
