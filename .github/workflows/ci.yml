@@ -40,6 +40,7 @@ jobs:
           bash -n scripts/vm-apply-infrastructure-topology.sh
           bash -n scripts/vm-deploy-wallet-auth.sh
           bash -n scripts/vm-deploy-trader-onboarding.sh
+          bash -n scripts/vm-deploy-verification-copy-mandates.sh
           bash -n scripts/vm-finalize-shadow.sh
       - name: Infrastructure topology regression
         run: node scripts/infrastructure-contract.mjs
