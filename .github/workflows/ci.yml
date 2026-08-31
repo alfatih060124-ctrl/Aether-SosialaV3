@@ -38,6 +38,7 @@ jobs:
           node --check scripts/infrastructure-contract.mjs
           bash -n scripts/vm-apply-routing.sh
           bash -n scripts/vm-apply-infrastructure-topology.sh
+          bash -n scripts/vm-deploy-wallet-auth.sh
           bash -n scripts/vm-finalize-shadow.sh
       - name: Infrastructure topology regression
         run: node scripts/infrastructure-contract.mjs
