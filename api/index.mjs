@@ -1,73 +1,74 @@
-const json = (res, status, body) => res.status(status).json(body);
-const liveEnabled = process.env.LIVE_ENABLED === 'true' && process.env.EXECUTION_MODE === 'LIVE';
-const base = process.env.API_SERVICE_URL || 'https://api.aether.boats';
+const PRIMARY_API_ORIGIN = 'https://api.aether.boats';
+const PUBLIC_GET_ROUTES = new Set([
+  '/api/health',
+  '/api/readiness',
+  '/api/version',
+  '/api/execution/status',
+  '/api/signals/config',
+  '/api/autotrade/status',
+  '/api/trades',
+  '/api/traders',
+  '/api/marketplace/fees',
+]);
 
-async function readBody(req) {
-  if (req.body !== undefined) return typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-  if (['GET', 'HEAD'].includes(req.method)) return undefined;
-  let raw = '';
-  for await (const chunk of req) raw += chunk;
-  return raw || undefined;
+const json = (res, status, body) => res.status(status).json(body);
+
+function isPublicReadRoute(path) {
+  if (PUBLIC_GET_ROUTES.has(path)) return true;
+  return /^\/api\/traders\/[^/]+$/.test(path);
 }
 
-async function proxyUpstream(path, req, res) {
-  const url = new URL(req.url || '/', 'https://aether.local');
-  const target = new URL(path + (url.search || ''), base.endsWith('/') ? base : `${base}/`);
-  const headers = { 'content-type': req.headers['content-type'] || 'application/json' };
-  if (process.env.API_SERVICE_TOKEN) headers.authorization = `Bearer ${process.env.API_SERVICE_TOKEN}`;
-  const body = await readBody(req);
-  const upstream = await fetch(target, { method: req.method, headers, body });
+async function proxyPublicGet(req, res, path) {
+  const requestUrl = new URL(req.url || '/', 'https://aether.local');
+  const target = new URL(path + requestUrl.search, PRIMARY_API_ORIGIN);
+
+  if (target.protocol !== 'https:' || target.hostname !== 'api.aether.boats') {
+    return json(res, 503, {
+      error: 'primary_upstream_invalid',
+      deployment_role: 'PUBLIC_EDGE',
+    });
+  }
+
+  const upstream = await fetch(target, {
+    method: 'GET',
+    headers: { accept: req.headers.accept || 'application/json' },
+    redirect: 'error',
+    signal: AbortSignal.timeout(5000),
+  });
   const text = await upstream.text();
+
   res.status(upstream.status);
-  res.setHeader('content-type', upstream.headers.get('content-type') || 'application/json');
+  res.setHeader('content-type', upstream.headers.get('content-type') || 'application/json; charset=utf-8');
+  res.setHeader('cache-control', 'no-store');
+  res.setHeader('x-aether-deployment-role', 'PUBLIC_EDGE');
   return res.send(text);
 }
 
 export default async function handler(req, res) {
-  const url = new URL(req.url || '/', 'https://aether.local');
-  const path = url.pathname;
+  const requestUrl = new URL(req.url || '/', 'https://aether.local');
+  const path = requestUrl.pathname.replace(/\/+$/, '') || '/';
 
-  if (req.method === 'GET' && path === '/api/health') {
-    return json(res, 200, {
-      status: 'ok',
-      service: 'aether-api-gateway',
-      execution_mode: process.env.EXECUTION_MODE || 'SHADOW',
-      live_enabled: liveEnabled,
-      upstream: base,
+  if (!path.startsWith('/api/')) {
+    return json(res, 404, { error: 'not_found' });
+  }
+
+  // Vercel is a public edge/read layer only. It never carries admin,
+  // execution, simulation, billing, signal-mutation, or service credentials.
+  if (req.method !== 'GET' || !isPublicReadRoute(path)) {
+    return json(res, 403, {
+      error: 'public_gateway_route_blocked',
+      deployment_role: 'PUBLIC_EDGE',
+      primary_runtime: 'PRIMARY_VM',
     });
   }
 
-  if (req.method === 'GET' && path === '/api/readiness') {
-    try {
-      return await proxyUpstream('/api/readiness', req, res);
-    } catch (error) {
-      return json(res, 503, {
-        status: 'not_ready',
-        database: 'upstream_unavailable',
-        error: error instanceof Error ? error.message : 'upstream_request_failed',
-      });
-    }
-  }
-
-  if (req.method === 'GET' && path === '/api/execution/status') {
-    return json(res, 200, {
-      mode: process.env.EXECUTION_MODE || 'SHADOW',
-      live_enabled: liveEnabled,
-      fail_closed: !liveEnabled,
-      signer_exposed_to_api: false,
+  try {
+    return await proxyPublicGet(req, res, path);
+  } catch (error) {
+    return json(res, 503, {
+      error: 'primary_upstream_unavailable',
+      deployment_role: 'PUBLIC_EDGE',
+      message: error instanceof Error ? error.message : 'upstream_request_failed',
     });
   }
-
-  if (path.startsWith('/api/')) {
-    try {
-      return await proxyUpstream(path, req, res);
-    } catch (error) {
-      return json(res, 503, {
-        error: 'upstream_unavailable',
-        message: error instanceof Error ? error.message : 'upstream_request_failed',
-      });
-    }
-  }
-
-  return json(res, 404, { error: 'not_found' });
 }
