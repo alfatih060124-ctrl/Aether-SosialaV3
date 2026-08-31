@@ -55,17 +55,29 @@ export function buildRecordedEvidence({ sourceType, reference, observedAt, trade
   const observed = new Date(observedAt || '');
   if (Number.isNaN(observed.getTime()) || observed.getTime() > Date.now() + 5 * 60 * 1000) throw new Error('invalid_verification_observed_at');
   const metrics = calculateReconciledMetrics(trades);
-  const canonicalTradeIds = trades.map(t => String(t.trade_id)).sort();
-  const calculationHash = crypto.createHash('sha256').update(JSON.stringify({ v: 1, trade_ids: canonicalTradeIds, metrics })).digest('hex');
+  const canonicalCalculationRows = trades.map(t => ({
+    trade_id: String(t.trade_id),
+    realized_pnl_minor: Number(t.realized_pnl_minor),
+    capital_minor: Number(t.capital_minor),
+    equity_after_minor: Number(t.equity_after_minor)
+  }));
+  const calculationHash = crypto.createHash('sha256').update(JSON.stringify({
+    v: 2,
+    rows: canonicalCalculationRows,
+    metrics
+  })).digest('hex');
+  const sourceHash = String(provenance.source_hash || '').trim();
+  if (sourceHash && !/^[a-f0-9]{64}$/.test(sourceHash)) throw new Error('invalid_source_hash');
   return {
     ...normalized,
     observed_at: observed.toISOString(),
     ...metrics,
     evidence_status: 'RECORDED',
     provenance: {
-      schema_version: 1,
+      schema_version: 2,
       collector: 'AETHER_TRADER_EVIDENCE',
       calculation_hash: calculationHash,
+      source_hash: sourceHash || null,
       rpc_endpoint_label: String(provenance.rpc_endpoint_label || '').trim() || null,
       indexer_batch_id: String(provenance.indexer_batch_id || '').trim() || null,
       reconciliation_batch_id: String(provenance.reconciliation_batch_id || '').trim() || null
