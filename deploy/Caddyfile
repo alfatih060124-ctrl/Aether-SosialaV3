@@ -1,5 +1,6 @@
-# Public API ingress. This host is deliberately read-only.
-# All state-changing operations remain inside the PRIMARY_VM control plane.
+# Public API ingress. Read-only product data plus the narrowly-scoped
+# wallet-authentication lane are exposed here. Execution, simulation,
+# billing, signal mutation, and Admin remain fenced inside PRIMARY_VM.
 api.aether.boats {
   encode zstd gzip
 
@@ -12,10 +13,19 @@ api.aether.boats {
 
   @public_read {
     method GET
-    path /api/health /api/readiness /api/version /api/execution/status /api/signals/config /api/autotrade/status /api/trades /api/traders /api/traders/* /api/marketplace/fees
+    path /api/health /api/readiness /api/version /api/execution/status /api/signals/config /api/autotrade/status /api/trades /api/traders /api/traders/* /api/marketplace/fees /api/auth/session
   }
 
   handle @public_read {
+    reverse_proxy 127.0.0.1:8080
+  }
+
+  @wallet_auth_write {
+    method POST
+    path /api/auth/challenge /api/auth/verify /api/auth/logout
+  }
+
+  handle @wallet_auth_write {
     reverse_proxy 127.0.0.1:8080
   }
 
