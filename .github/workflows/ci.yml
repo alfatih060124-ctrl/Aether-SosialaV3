@@ -19,6 +19,7 @@ jobs:
         run: |
           node --check api/index.mjs
           node --check services/api/src/server.mjs
+          node --check services/api/src/standby-server.mjs
           node --check services/api/src/shadow-simulator.mjs
           node --check services/api/src/migration-runner.mjs
           node --check services/api/src/service.mjs
@@ -33,16 +34,29 @@ jobs:
           node --check services/api/src/repositories/execution-requests.mjs
           node --check scripts/run-signal-quality-tests.mjs
           node --check scripts/run-wallet-auth-tests.mjs
+          node --check scripts/infrastructure-contract.mjs
+          bash -n scripts/vm-apply-routing.sh
+          bash -n scripts/vm-finalize-shadow.sh
+      - name: Infrastructure topology regression
+        run: node scripts/infrastructure-contract.mjs
       - name: Signal quality regression
         run: node scripts/run-signal-quality-tests.mjs
       - name: Wallet authentication regression
         run: node scripts/run-wallet-auth-tests.mjs
       - name: Docker build
         run: docker build -t aether-social-v3:ci .
-      - name: Docker smoke start
+      - name: Primary API smoke start
         run: |
           docker run -d --name aether-ci -p 18080:8080 -e EXECUTION_MODE=SHADOW -e LIVE_ENABLED=false aether-social-v3:ci
           sleep 3
           curl --fail http://127.0.0.1:18080/api/health
           curl --fail http://127.0.0.1:18080/api/execution/status
           docker rm -f aether-ci
+      - name: Render standby smoke start
+        run: |
+          docker run -d --name aether-standby-ci -p 18081:8080 aether-social-v3:ci node services/api/src/standby-server.mjs
+          sleep 2
+          curl --fail http://127.0.0.1:18081/api/health
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18081/api/readiness)" = "503"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:18081/api/executions)" = "503"
+          docker rm -f aether-standby-ci
