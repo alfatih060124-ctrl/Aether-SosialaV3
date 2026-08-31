@@ -36,6 +36,7 @@ jobs:
           node --check scripts/run-wallet-auth-tests.mjs
           node --check scripts/run-wallet-auth-http-tests.mjs
           node --check scripts/run-trader-copy-http-tests.mjs
+          node --check scripts/admin-safety-regression.mjs
           node --check scripts/infrastructure-contract.mjs
           bash -n scripts/vm-apply-routing.sh
           bash -n scripts/vm-apply-infrastructure-topology.sh
@@ -45,6 +46,8 @@ jobs:
           bash -n scripts/vm-finalize-shadow.sh
       - name: Infrastructure topology regression
         run: node scripts/infrastructure-contract.mjs
+      - name: Admin fail-closed safety regression
+        run: node scripts/admin-safety-regression.mjs
       - name: Caddy ingress validation
         run: docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Signal quality regression
