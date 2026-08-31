@@ -14,6 +14,7 @@ const recorded = collectInternalReconciliationEvidence({
     {
       trade_id: 'synthetic-trade-b',
       reconciliation_status: 'RECONCILED',
+      executed_at: '2026-08-31T19:20:00.000Z',
       source_signature: signatureB,
       realized_pnl_minor: -1000,
       capital_minor: 10000,
@@ -22,6 +23,7 @@ const recorded = collectInternalReconciliationEvidence({
     {
       trade_id: 'synthetic-trade-a',
       reconciliation_status: 'RECONCILED',
+      executed_at: '2026-08-31T19:10:00.000Z',
       source_signature: signatureA,
       realized_pnl_minor: 2000,
       capital_minor: 10000,
@@ -30,6 +32,7 @@ const recorded = collectInternalReconciliationEvidence({
     {
       trade_id: 'ignored-unreconciled',
       reconciliation_status: 'PENDING',
+      executed_at: '2026-08-31T19:15:00.000Z',
       source_signature: '7'.repeat(64),
       realized_pnl_minor: 999999,
       capital_minor: 1,
@@ -49,7 +52,37 @@ assert.equal(recorded.total_return_bps, 500);
 assert.equal(recorded.win_rate_bps, 5000);
 assert.equal(recorded.drawdown_bps, 870);
 assert.equal(recorded.provenance.reconciliation_batch_id, 'synthetic-reconciliation-batch-001');
+assert.match(recorded.provenance.source_hash, /^[a-f0-9]{64}$/);
 assert.match(recorded.provenance.calculation_hash, /^[a-f0-9]{64}$/);
+
+const reversedInput = collectInternalReconciliationEvidence({
+  walletAddress: wallet,
+  reconciliationBatchId: 'synthetic-reconciliation-batch-001',
+  observedAt: '2026-08-31T19:30:00.000Z',
+  trades: [
+    {
+      trade_id: 'synthetic-trade-a',
+      reconciliation_status: 'RECONCILED',
+      executed_at: '2026-08-31T19:10:00.000Z',
+      source_signature: signatureA,
+      realized_pnl_minor: 2000,
+      capital_minor: 10000,
+      equity_after_minor: 11500
+    },
+    {
+      trade_id: 'synthetic-trade-b',
+      reconciliation_status: 'RECONCILED',
+      executed_at: '2026-08-31T19:20:00.000Z',
+      source_signature: signatureB,
+      realized_pnl_minor: -1000,
+      capital_minor: 10000,
+      equity_after_minor: 10500
+    }
+  ]
+});
+assert.equal(reversedInput.drawdown_bps, recorded.drawdown_bps);
+assert.equal(reversedInput.provenance.source_hash, recorded.provenance.source_hash);
+assert.equal(reversedInput.provenance.calculation_hash, recorded.provenance.calculation_hash);
 
 const pending = collectInternalReconciliationEvidence({
   walletAddress: wallet,
@@ -78,11 +111,26 @@ assert.throws(() => collectInternalReconciliationEvidence({
   trades: [{
     trade_id: 'missing-economic-data',
     reconciliation_status: 'RECONCILED',
+    executed_at: '2026-08-31T19:25:00.000Z',
     source_signature: signatureA,
     realized_pnl_minor: null,
     capital_minor: null,
     equity_after_minor: null
   }]
 }), /invalid_trade_0_capital_minor|invalid_trade_0_equity_after_minor/);
+
+assert.throws(() => collectInternalReconciliationEvidence({
+  walletAddress: wallet,
+  reconciliationBatchId: 'synthetic-reconciliation-batch-004',
+  observedAt: '2026-08-31T19:30:00.000Z',
+  trades: [{
+    trade_id: 'missing-time-order',
+    reconciliation_status: 'RECONCILED',
+    source_signature: signatureA,
+    realized_pnl_minor: 100,
+    capital_minor: 10000,
+    equity_after_minor: 10100
+  }]
+}), /invalid_trade_0_executed_at/);
 
 console.log('internal reconciliation evidence regression: PASS');
