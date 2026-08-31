@@ -46,6 +46,12 @@ jobs:
           bash -n scripts/vm-deploy-verification-copy-mandates.sh
           bash -n scripts/vm-deploy-execution-uuid-hardening.sh
           bash -n scripts/vm-finalize-shadow.sh
+      - name: PRIMARY_VM rollout host-node independence
+        run: |
+          ! grep -Eq 'command -v node|for cmd in .*node' scripts/vm-deploy-execution-uuid-hardening.sh
+          grep -q 'VALIDATOR_IMAGE=.*docker inspect' scripts/vm-deploy-execution-uuid-hardening.sh
+          grep -q -- '--network none' scripts/vm-deploy-execution-uuid-hardening.sh
+          grep -q -- '--read-only' scripts/vm-deploy-execution-uuid-hardening.sh
       - name: Infrastructure topology regression
         run: node scripts/infrastructure-contract.mjs
       - name: Admin fail-closed safety regression
