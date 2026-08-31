@@ -13,6 +13,7 @@ for (const required of [
   'TRADER_PUBLICATION_CHANGED',
   'COPY_MANDATE_CREATED',
   'COPY_MANDATE_CHANGED',
+  'PLATFORM_FEE_CONFIG_CREATED',
   'PLATFORM_FEE_CONFIG_CHANGED',
   "'live_execution_authorized', false",
 ]) assert(migration.includes(required), `missing audit/separation invariant: ${required}`);
@@ -26,6 +27,8 @@ assert(/TG_OP\s*=\s*'INSERT'/i.test(migration), 'trader creation requires explic
 assert(/NEW\.verification_status IS DISTINCT FROM 'PENDING_DATA'/i.test(migration), 'new trader must start PENDING_DATA');
 assert(/NEW\.verified IS DISTINCT FROM false/i.test(migration), 'new trader must start unverified');
 assert(/NEW\.published IS DISTINCT FROM false/i.test(migration), 'new trader must start unpublished');
+assert(/CREATE TRIGGER trg_aether_guard_fee_config\s+BEFORE INSERT OR UPDATE ON platform_fee_config/i.test(migration), 'fee guard must cover INSERT and UPDATE');
+assert(/CREATE TRIGGER trg_aether_audit_fee_config\s+AFTER INSERT OR UPDATE ON platform_fee_config/i.test(migration), 'fee audit must cover INSERT and UPDATE');
 
 console.log('Product audit + separation regression: PASS');
-console.log('new trader fail-closed -> prior verification -> explicit publication; SHADOW copy mandate; fee/copy/trader changes audited; LIVE remains unauthorized');
+console.log('new trader fail-closed -> prior verification -> explicit publication; SHADOW copy mandate; fee inserts/updates bounded and audited; LIVE remains unauthorized');
