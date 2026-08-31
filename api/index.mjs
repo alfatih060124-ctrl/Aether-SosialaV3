@@ -23,11 +23,13 @@ const AUTH_POST_ROUTES = new Set([
 const SESSION_GET_ROUTES = new Set([
   '/api/auth/session',
   '/api/account/trader',
+  '/api/account/copy-mandates',
 ]);
 
 const SESSION_POST_ROUTES = new Set([
   '/api/account/trader/challenge',
   '/api/account/trader/apply',
+  '/api/account/copy-mandates',
 ]);
 
 const json = (res, status, body) => {
@@ -39,6 +41,9 @@ const json = (res, status, body) => {
 function isPublicReadRoute(path) {
   if (PUBLIC_GET_ROUTES.has(path)) return true;
   return /^\/api\/traders\/[^/]+$/.test(path);
+}
+function isSessionPatchRoute(path) {
+  return /^\/api\/account\/copy-mandates\/[^/]+$/.test(path);
 }
 
 function parseCookies(header = '') {
@@ -189,7 +194,16 @@ export default async function handler(req, res) {
       return sendUpstream(res, upstream);
     }
 
-    if (AUTH_POST_ROUTES.has(path) || SESSION_GET_ROUTES.has(path) || SESSION_POST_ROUTES.has(path)) {
+    if (req.method === 'PATCH' && isSessionPatchRoute(path)) {
+      const token = getSessionToken(req);
+      if (!token) return json(res, 401, { error: 'session_required' });
+      const body = await readBody(req);
+      const upstream = await requestPrimary(req, path, { method: 'PATCH', body, sessionToken: token });
+      if (upstream.status === 401) res.setHeader('Set-Cookie', clearSessionCookie());
+      return sendUpstream(res, upstream);
+    }
+
+    if (AUTH_POST_ROUTES.has(path) || SESSION_GET_ROUTES.has(path) || SESSION_POST_ROUTES.has(path) || isSessionPatchRoute(path)) {
       return json(res, 405, { error: 'method_not_allowed' });
     }
 
