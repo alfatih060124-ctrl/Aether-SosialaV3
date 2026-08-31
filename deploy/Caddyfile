@@ -43,6 +43,11 @@ a.aether.boats {
     reverse_proxy 127.0.0.1:8080
   }
 
+  @other_api path /api/*
+  handle @other_api {
+    respond "admin API route not available" 404
+  }
+
   handle {
     root * /opt/aether-v3/web
     try_files {path} /admin.html
