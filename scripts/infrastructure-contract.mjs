@@ -11,7 +11,7 @@ const forbidText = (name, text, needle) => {
   if (text.includes(needle)) failures.push(`${name}: forbidden ${JSON.stringify(needle)}`);
 };
 const requireMissing = path => {
-  if (exists(path)) failures.push(`legacy runtime source must remain removed: ${path}`);
+  if (exists(path)) failures.push(`legacy or duplicate runtime source must remain removed: ${path}`);
 };
 
 const compose = read('docker-compose.yml');
@@ -46,9 +46,14 @@ requireText('gateway', gateway, "PRIMARY_API_ORIGIN = 'https://api.aether.boats'
 requireText('gateway', gateway, "SESSION_COOKIE = 'aether_session'");
 requireText('gateway', gateway, 'PUBLIC_GET_ROUTES');
 requireText('gateway', gateway, 'AUTH_POST_ROUTES');
+requireText('gateway', gateway, 'SESSION_GET_ROUTES');
+requireText('gateway', gateway, 'SESSION_POST_ROUTES');
 requireText('gateway', gateway, '/api/auth/challenge');
 requireText('gateway', gateway, '/api/auth/verify');
 requireText('gateway', gateway, '/api/auth/logout');
+requireText('gateway', gateway, '/api/account/trader');
+requireText('gateway', gateway, '/api/account/trader/challenge');
+requireText('gateway', gateway, '/api/account/trader/apply');
 requireText('gateway', gateway, 'HTTP_ONLY_COOKIE');
 requireText('gateway', gateway, 'public_gateway_route_blocked');
 forbidText('gateway', gateway, 'API_SERVICE_TOKEN');
@@ -76,7 +81,8 @@ requireText('caddy', caddy, 'method GET');
 requireText('caddy', caddy, '@wallet_auth_write');
 requireText('caddy', caddy, 'method POST');
 requireText('caddy', caddy, '/api/auth/challenge /api/auth/verify /api/auth/logout');
-requireText('caddy', caddy, '/api/auth/session');
+requireText('caddy', caddy, '/api/auth/session /api/account/trader');
+requireText('caddy', caddy, '/api/account/trader/challenge /api/account/trader/apply');
 requireText('caddy', caddy, 'respond "public API route not available" 404');
 requireText('caddy', caddy, '@admin_api path /api/admin /api/admin/*');
 requireText('caddy', caddy, '@admin_ui path / /admin /admin.html');
@@ -89,6 +95,29 @@ forbidText('public caddy', publicCaddy, '/api/admin');
 forbidText('public caddy', publicCaddy, '/api/shadow');
 forbidText('public caddy', publicCaddy, '/api/executions');
 forbidText('public caddy', publicCaddy, '/api/signals/evaluate');
+
+const server = read('services/api/src/server.mjs');
+requireText('primary server', server, "route==='/api/account/trader'");
+requireText('primary server', server, "route==='/api/account/trader/challenge'");
+requireText('primary server', server, "route==='/api/account/trader/apply'");
+requireText('primary server', server, "purpose:'BECOME_TRADER'");
+requireText('primary server', server, "route==='/api/admin/traders/applications'");
+requireText('primary server', server, "p[2]==='traders'");
+requireText('primary server', server, 'publication_authorized:false');
+requireText('primary server', server, 'live_execution_authorized:false');
+
+const marketplace = read('services/api/src/repositories/marketplace.mjs');
+requireText('marketplace', marketplace, "onboarding_status='APPROVED'");
+requireText('marketplace', marketplace, "verification_status='VERIFIED'");
+requireText('marketplace', marketplace, 'published=true');
+requireText('marketplace', marketplace, 'createTraderApplication');
+requireText('marketplace', marketplace, 'reviewTraderApplication');
+
+const traderMigration = read('migrations/013_trader_onboarding.sql');
+requireText('trader migration', traderMigration, 'onboarding_status');
+requireText('trader migration', traderMigration, 'verification_status');
+requireText('trader migration', traderMigration, 'published');
+requireText('trader migration', traderMigration, 'strategy_summary');
 
 const dashboard = read('public/dashboard.html');
 const shadow = read('public/shadow.html');
@@ -107,11 +136,32 @@ forbidText('onboarding', onboarding, 'localStorage.setItem');
 forbidText('onboarding', onboarding, 'localStorage.getItem');
 requireText('account', account, '/api/auth/session');
 requireText('account', account, '/api/auth/logout');
+requireText('account', account, '/api/account/trader');
+requireText('account', account, '/api/account/trader/challenge');
+requireText('account', account, '/api/account/trader/apply');
+requireText('account', account, 'provider.signMessage');
+requireText('account', account, 'Purpose: BECOME_TRADER');
 requireText('account', account, 'LIVE EXECUTION LOCKED');
+forbidText('account', account, 'Become a Trader — next integration');
+forbidText('account', account, 'localStorage.setItem');
+forbidText('account', account, 'localStorage.getItem');
+
+const admin = read('web/admin.html');
+requireText('admin', admin, '/api/admin/traders/applications');
+requireText('admin', admin, '/review');
+requireText('admin', admin, 'verifiable history');
+
+const traderDeploy = read('scripts/vm-deploy-trader-onboarding.sh');
+requireText('trader deploy', traderDeploy, '/usr/local/sbin/aether-db-backup');
+requireText('trader deploy', traderDeploy, 'EXECUTION_MODE=SHADOW');
+requireText('trader deploy', traderDeploy, 'LIVE_ENABLED=false');
+requireText('trader deploy', traderDeploy, 'migrations/013_trader_onboarding.sql');
+requireText('trader deploy', traderDeploy, 'PostgreSQL host publishing is forbidden');
 
 requireMissing('apps/web/index.html');
 requireMissing('apps/web/app.js');
 requireMissing('apps/admin/index.html');
+requireMissing('services/api/src/trader-onboarding.mjs');
 
 if (failures.length) {
   console.error('Infrastructure topology regression failed:');
@@ -120,4 +170,4 @@ if (failures.length) {
 }
 
 console.log('Infrastructure topology contract: PASS');
-console.log('GitHub=source, public/=Vercel UI, Vercel API=read+wallet-auth BFF, VM=PRIMARY_VM, web/admin.html=Admin UI, Render=STANDBY_RENDER');
+console.log('GitHub=source, public/=Vercel UI, Vercel API=read+wallet-auth/account BFF, VM=PRIMARY_VM, web/admin.html=Admin UI, Render=STANDBY_RENDER');
