@@ -5,6 +5,7 @@ const BASE58_MAP = new Map([...BASE58_ALPHABET].map((c, i) => [c, i]));
 const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 const ALLOWED_PURPOSES = new Set(['LOGIN','LINK_WALLET','BECOME_TRADER','CHANGE_PRIMARY','RECOVERY']);
 const ALLOWED_CONSENTS = new Set(['TERMS','RISK_DISCLOSURE','FEE_DISCLOSURE']);
+const REQUIRED_INITIAL_CONSENTS = ['TERMS','RISK_DISCLOSURE','FEE_DISCLOSURE'];
 
 export function hashOpaqueToken(value) {
   return crypto.createHash('sha256').update(String(value)).digest('hex');
@@ -90,6 +91,11 @@ function sanitizeConsents(consents) {
   });
 }
 
+function hasRequiredInitialConsents(consents) {
+  const accepted = new Set(consents.map(item => item.type));
+  return REQUIRED_INITIAL_CONSENTS.every(type => accepted.has(type));
+}
+
 export function createWalletAuthService(pool, options = {}) {
   if (!pool) throw new Error('database_required');
   const domain = options.domain || process.env.AETHER_AUTH_DOMAIN || 'aether.boats';
@@ -164,6 +170,7 @@ export function createWalletAuthService(pool, options = {}) {
         let user = existing.rows[0];
         let created = false;
         if (!user) {
+          if (!hasRequiredInitialConsents(acceptedConsents)) throw new Error('required_consents_missing');
           const userId = crypto.randomUUID();
           user = (await client.query(
             `INSERT INTO user_accounts(user_id) VALUES($1) RETURNING *`,
