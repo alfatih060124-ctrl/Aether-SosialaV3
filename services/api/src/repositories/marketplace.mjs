@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
 const publicTraderFields = `trader_id,wallet_address,display_name,bio,strategy_summary,reputation_score,drawdown_bps,status,verified,mode,total_return_bps,win_rate_bps,trades_count,followers_count,performance_fee_bps,execution_fee_bps,ownership_verified_at,created_at,updated_at`;
-const accountTraderFields = `trader_id,wallet_address,display_name,bio,strategy_summary,reputation_score,drawdown_bps,status,verified,mode,total_return_bps,win_rate_bps,trades_count,followers_count,performance_fee_bps,execution_fee_bps,owner_user_id,ownership_verified_at,onboarding_status,published,applied_at,reviewed_at,review_note,created_at,updated_at`;
+const accountTraderFields = `trader_id,wallet_address,display_name,bio,strategy_summary,reputation_score,drawdown_bps,status,verified,mode,total_return_bps,win_rate_bps,trades_count,followers_count,performance_fee_bps,execution_fee_bps,owner_user_id,ownership_verified_at,onboarding_status,verification_status,published,applied_at,reviewed_at,review_note,created_at,updated_at`;
 
 function cleanText(value, { name, min = 0, max }) {
   const text = String(value ?? '').trim();
@@ -15,7 +15,7 @@ export function createMarketplaceRepository(pool) {
       const n = Math.min(Math.max(Number(limit) || 50, 1), 200);
       return (await pool.query(
         `SELECT ${publicTraderFields} FROM traders
-         WHERE status='ACTIVE' AND verified=true AND onboarding_status='APPROVED' AND published=true
+         WHERE status='ACTIVE' AND verified=true AND onboarding_status='APPROVED' AND verification_status='VERIFIED' AND published=true
          ORDER BY reputation_score DESC, created_at DESC LIMIT $1`,
         [n]
       )).rows;
@@ -24,7 +24,7 @@ export function createMarketplaceRepository(pool) {
     async getTrader(id) {
       return (await pool.query(
         `SELECT ${publicTraderFields} FROM traders
-         WHERE trader_id=$1 AND status='ACTIVE' AND verified=true AND onboarding_status='APPROVED' AND published=true`,
+         WHERE trader_id=$1 AND status='ACTIVE' AND verified=true AND onboarding_status='APPROVED' AND verification_status='VERIFIED' AND published=true`,
         [id]
       )).rows[0] ?? null;
     },
@@ -49,8 +49,8 @@ export function createMarketplaceRepository(pool) {
         `INSERT INTO traders(
            trader_id,wallet_address,display_name,bio,strategy_summary,reputation_score,drawdown_bps,status,
            verified,mode,total_return_bps,win_rate_bps,trades_count,followers_count,performance_fee_bps,
-           execution_fee_bps,owner_user_id,ownership_verified_at,onboarding_status,published,applied_at,reviewed_at,review_note
-         ) VALUES($1,$2,$3,$4,$5,0,0,'PENDING_REVIEW',false,'SHADOW',0,0,0,0,$6,$7,$8,now(),'PENDING',false,now(),NULL,'')
+           execution_fee_bps,owner_user_id,ownership_verified_at,onboarding_status,verification_status,published,applied_at,reviewed_at,review_note
+         ) VALUES($1,$2,$3,$4,$5,0,0,'PENDING_REVIEW',false,'SHADOW',0,0,0,0,$6,$7,$8,now(),'PENDING','PENDING_DATA',false,now(),NULL,'')
          RETURNING ${accountTraderFields}`,
         [traderId, walletAddress, name, safeBio, safeSummary, Number(fee.performance_fee_bps ?? 1000), Number(fee.execution_fee_bps ?? 25), userId]
       )).rows[0];
@@ -79,7 +79,7 @@ export function createMarketplaceRepository(pool) {
       if (action === 'APPROVE' && !['PENDING','REJECTED'].includes(current.onboarding_status)) throw new Error('trader_review_invalid_state');
 
       const next = action === 'APPROVE'
-        ? { onboarding: 'APPROVED', status: 'ACTIVE', verified: true, published: true }
+        ? { onboarding: 'APPROVED', status: 'PENDING_VERIFICATION', verified: false, published: false }
         : action === 'REJECT'
           ? { onboarding: 'REJECTED', status: 'REJECTED', verified: false, published: false }
           : { onboarding: 'SUSPENDED', status: 'SUSPENDED', verified: false, published: false };
