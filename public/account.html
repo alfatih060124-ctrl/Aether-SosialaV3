@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My AETHER Account</title>
+<meta name="description" content="Authenticated AETHER wallet account area. Non-custodial by design; LIVE execution remains disabled.">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#07111f">
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f4f7ff;background:#07111f}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 75% 8%,rgba(48,103,178,.18),transparent 30%),#07111f}.shell{max-width:1080px;margin:auto;padding:0 20px}.nav{height:70px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.07)}a{color:inherit;text-decoration:none}.brand{font-weight:850;letter-spacing:.16em}.navlinks{display:flex;align-items:center;gap:16px;color:#9fb0c8;font-size:14px}.main{padding:54px 0 70px}.eyebrow{font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:#8de6cf;font-weight:800}h1{font-size:clamp(38px,6vw,64px);letter-spacing:-.045em;margin:12px 0 10px}.lead{color:#9fb0c8;line-height:1.65;max-width:750px}.grid{display:grid;grid-template-columns:1.05fr .95fr;gap:16px;margin-top:28px}.card{border:1px solid #203451;background:rgba(13,26,45,.82);border-radius:18px;padding:22px}.card h2{margin:0 0 12px;font-size:19px}.label{font-size:11px;color:#8194b0;text-transform:uppercase;letter-spacing:.12em}.value{margin-top:6px;color:#edf4ff;line-height:1.55}.address{word-break:break-all;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}.rows{display:grid;gap:14px}.row{padding-bottom:13px;border-bottom:1px solid rgba(255,255,255,.07)}.row:last-child{border-bottom:0;padding-bottom:0}.status{padding:12px;border:1px solid rgba(141,230,207,.25);background:rgba(141,230,207,.06);border-radius:11px;color:#bce3d8;font-size:13px;line-height:1.55}.locked{padding:12px;border:1px solid rgba(247,211,122,.22);background:rgba(247,211,122,.05);border-radius:11px;color:#e8d69b;font-size:13px;line-height:1.55}.btn{width:100%;margin-top:13px;padding:12px 14px;border:1px solid #f5f8ff;border-radius:10px;background:#f5f8ff;color:#07111f;font-weight:800;cursor:pointer}.btn.secondary{background:#0c1829;border-color:#263c5b;color:#f5f8ff}.btn:disabled{opacity:.48;cursor:not-allowed}.muted{color:#9fb0c8;font-size:13px;line-height:1.55}.foot{padding:24px 0 38px;color:#7f91aa;font-size:12px}@media(max-width:760px){.grid{grid-template-columns:1fr}.navlinks a:first-child{display:none}.main{padding-top:38px}}
+</style>
+</head>
+<body>
+<div class="shell"><nav class="nav"><a class="brand" href="/">AETHER</a><div class="navlinks"><a href="/dashboard">Shadow status</a><a href="/">Public site</a></div></nav></div>
+<main class="main"><div class="shell">
+<div class="eyebrow">Authenticated wallet account</div>
+<h1>My AETHER</h1>
+<p class="lead">This account is tied to verified wallet ownership. Your private key stays in your wallet, and this web session does not authorize a trade or movement of funds.</p>
+<div class="grid">
+<section class="card"><h2>Account identity</h2><div id="loading" class="status">Checking your secure session…</div><div id="identity" class="rows" hidden><div class="row"><div class="label">Primary wallet</div><div id="wallet" class="value address">—</div></div><div class="row"><div class="label">Account status</div><div id="accountStatus" class="value">—</div></div><div class="row"><div class="label">User ID</div><div id="userId" class="value address">—</div></div><div class="row"><div class="label">Session expires</div><div id="expires" class="value">—</div></div></div><button id="logout" class="btn secondary" type="button">Sign Out</button></section>
+<aside class="card"><h2>Next account capabilities</h2><div class="status">Wallet ownership verified · Non-custodial session · No seed phrase stored.</div><p class="muted">Follower copy mandates and the Become a Trader flow will be attached to this authenticated account identity. They remain separate from wallet login authority.</p><button class="btn" type="button" disabled>Become a Trader — next integration</button><button class="btn secondary" type="button" disabled>Create Copy Mandate — SHADOW only</button><div class="locked" style="margin-top:14px"><strong>LIVE EXECUTION LOCKED.</strong><br>Wallet login is identity proof only. It does not grant execution authority.</div></aside>
+</div>
+</div></main>
+<div class="shell foot">AETHER · User sovereignty · Verifiable identity · SHADOW execution posture.</div>
+<script>
+const loading=document.getElementById('loading');
+const identity=document.getElementById('identity');
+const logout=document.getElementById('logout');
+async function load(){
+  try{
+    const response=await fetch('/api/auth/session',{cache:'no-store'});
+    if(response.status===401){location.replace('/onboarding');return;}
+    if(!response.ok)throw new Error('session_unavailable');
+    const data=await response.json();
+    document.getElementById('wallet').textContent=data.user?.primary_wallet||'—';
+    document.getElementById('accountStatus').textContent=data.user?.status||'—';
+    document.getElementById('userId').textContent=data.user?.user_id||'—';
+    document.getElementById('expires').textContent=data.session?.expires_at?new Date(data.session.expires_at).toLocaleString():'—';
+    loading.hidden=true;identity.hidden=false;
+  }catch{
+    loading.textContent='Account session is temporarily unavailable. No wallet authority has changed.';
+  }
+}
+logout.addEventListener('click',async()=>{logout.disabled=true;try{await fetch('/api/auth/logout',{method:'POST'});}catch{}location.replace('/onboarding');});
+load();
+</script>
+</body>
+</html>
