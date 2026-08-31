@@ -11,11 +11,20 @@ const base = {
   side:'BUY',requested_amount_usd:100,max_slippage_bps:100,mode:'SHADOW',created_at:'2026-09-01T00:00:00.000Z'
 };
 const a = buildExecutionIntent(base);
-const b = buildExecutionIntent({ ...base, intent_id:'different-intent-id' });
+const b = buildExecutionIntent({ ...base, intent_id:'10000000-0000-0000-0000-000000000099' });
 assert.equal(a.idempotency_key,b.idempotency_key,'idempotency must be stable for equivalent intent');
 assert.equal(a.live_execution_authorized,false);
 assert.throws(()=>buildExecutionIntent({ ...base, mode:'LIVE' }),/non_shadow_execution_intent_blocked/);
 assert.throws(()=>createLiveDispatcherBoundary(),/live_dispatcher_not_implemented/);
+
+for (const [field, value] of [
+  ['intent_id','different-intent-id'],
+  ['trader_id','trader-free-text'],
+  ['follower_user_id','follower-free-text'],
+  ['mandate_id','mandate-free-text']
+]) {
+  assert.throws(()=>buildExecutionIntent({ ...base, [field]:value }),new RegExp(`invalid_${field}`));
+}
 
 assert.equal(transitionExecution('CREATED','RISK_CHECKED').state,'RISK_CHECKED');
 assert.throws(()=>transitionExecution('CREATED','DISPATCHED'),/invalid_execution_transition/);
