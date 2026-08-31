@@ -1,6 +1,6 @@
-# Public API ingress. Read-only product data plus the narrowly-scoped
-# wallet-authentication lane are exposed here. Execution, simulation,
-# billing, signal mutation, and Admin remain fenced inside PRIMARY_VM.
+# Public API ingress. Read-only product data plus narrowly-scoped
+# wallet authentication/account lanes are exposed here. Execution,
+# simulation, billing, signal mutation, and Admin remain fenced inside PRIMARY_VM.
 api.aether.boats {
   encode zstd gzip
 
@@ -13,7 +13,7 @@ api.aether.boats {
 
   @public_read {
     method GET
-    path /api/health /api/readiness /api/version /api/execution/status /api/signals/config /api/autotrade/status /api/trades /api/traders /api/traders/* /api/marketplace/fees /api/auth/session
+    path /api/health /api/readiness /api/version /api/execution/status /api/signals/config /api/autotrade/status /api/trades /api/traders /api/traders/* /api/marketplace/fees /api/auth/session /api/account/trader
   }
 
   handle @public_read {
@@ -22,7 +22,7 @@ api.aether.boats {
 
   @wallet_auth_write {
     method POST
-    path /api/auth/challenge /api/auth/verify /api/auth/logout
+    path /api/auth/challenge /api/auth/verify /api/auth/logout /api/account/trader/challenge /api/account/trader/apply
   }
 
   handle @wallet_auth_write {
