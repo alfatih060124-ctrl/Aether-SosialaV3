@@ -66,7 +66,7 @@ export async function collectSolanaRpcEvidence({ walletAddress, rpcCall, limit =
   const safeLimit = Math.max(1, Math.min(1000, Number.isInteger(limit) ? limit : 100));
   const result = await rpcCall('getSignaturesForAddress', [wallet, { limit: safeLimit }]);
   const signatures = canonicalSignatures(result);
-  const provenance = buildSolanaRpcProvenance({ walletAddress: wallet, signatures, endpointLabel });
+  const provenance = buildSolanaRpcProvenance({ walletAddress: wallet, signatures: result, endpointLabel });
 
   // Signatures prove observable chain activity, not realized trading performance.
   // Never derive return/win-rate/drawdown from transaction count or token balance deltas.
