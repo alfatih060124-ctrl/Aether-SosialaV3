@@ -20,7 +20,9 @@ services:
     build: .
     restart: unless-stopped
     environment:
+      NODE_ENV: production
       PORT: 8080
+      AETHER_DEPLOYMENT_ROLE: PRIMARY_VM
       DATABASE_URL: postgresql://aether:${POSTGRES_PASSWORD}@postgres:5432/aether
       API_TOKEN: ${API_TOKEN:?set API_TOKEN}
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?set ADMIN_API_TOKEN}
