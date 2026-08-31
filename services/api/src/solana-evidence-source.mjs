@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { pendingData } from './trader-evidence-collector.mjs';
 
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const SIGNATURE_BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,100}$/;
 
 function assertWallet(value) {
   const wallet = String(value || '').trim();
@@ -11,24 +12,50 @@ function assertWallet(value) {
 
 function canonicalSignatures(rows = []) {
   if (!Array.isArray(rows)) throw new Error('invalid_rpc_signature_response');
-  return rows.map(row => ({
-    signature: String(row?.signature || '').trim(),
-    slot: Number.isSafeInteger(row?.slot) ? row.slot : null,
-    block_time: Number.isSafeInteger(row?.blockTime) ? row.blockTime : null,
-    err: row?.err ?? null
-  })).filter(row => /^[1-9A-HJ-NP-Za-km-z]{32,100}$/.test(row.signature));
+  const deduped = new Map();
+  for (const row of rows) {
+    const signature = String(row?.signature || '').trim();
+    if (!SIGNATURE_BASE58.test(signature)) continue;
+    const rawBlockTime = row?.blockTime ?? row?.block_time;
+    const rawConfirmationStatus = row?.confirmationStatus ?? row?.confirmation_status;
+    const normalized = {
+      signature,
+      slot: Number.isSafeInteger(row?.slot) && row.slot >= 0 ? row.slot : null,
+      block_time: Number.isSafeInteger(rawBlockTime) ? rawBlockTime : null,
+      err: row?.err ?? null,
+      confirmation_status: typeof rawConfirmationStatus === 'string' ? rawConfirmationStatus.trim() || null : null
+    };
+    const existing = deduped.get(signature);
+    if (!existing) {
+      deduped.set(signature, normalized);
+      continue;
+    }
+    const conflict = JSON.stringify(existing) !== JSON.stringify(normalized);
+    if (conflict) throw new Error('conflicting_duplicate_signature');
+  }
+  return [...deduped.values()].sort((a, b) => {
+    const slotA = a.slot ?? -1;
+    const slotB = b.slot ?? -1;
+    if (slotA !== slotB) return slotB - slotA;
+    const timeA = a.block_time ?? -1;
+    const timeB = b.block_time ?? -1;
+    if (timeA !== timeB) return timeB - timeA;
+    return a.signature.localeCompare(b.signature);
+  });
 }
 
 export function buildSolanaRpcProvenance({ walletAddress, signatures, endpointLabel = 'solana-rpc' }) {
   const wallet = assertWallet(walletAddress);
   const canonical = canonicalSignatures(signatures);
-  const sourceHash = crypto.createHash('sha256').update(JSON.stringify({ v: 1, wallet, signatures: canonical })).digest('hex');
+  const sourceHash = crypto.createHash('sha256').update(JSON.stringify({ v: 2, wallet, signatures: canonical })).digest('hex');
   return {
-    schema_version: 1,
+    schema_version: 2,
     source_type: 'SOLANA_RPC',
     wallet_address: wallet,
     rpc_endpoint_label: String(endpointLabel || '').trim() || 'solana-rpc',
     signatures_observed: canonical.length,
+    successful_signatures_observed: canonical.filter(row => row.err === null).length,
+    failed_signatures_observed: canonical.filter(row => row.err !== null).length,
     newest_signature: canonical[0]?.signature || null,
     oldest_signature: canonical.at(-1)?.signature || null,
     source_hash: sourceHash
