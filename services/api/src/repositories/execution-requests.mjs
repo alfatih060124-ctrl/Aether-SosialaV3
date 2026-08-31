@@ -2,6 +2,13 @@ import { randomUUID } from 'node:crypto';
 
 const EXECUTION_STATUSES = new Set(['PENDING', 'QUEUED', 'SIMULATED', 'EXECUTED', 'REJECTED', 'FAILED']);
 const EXECUTION_MODES = new Set(['SHADOW', 'PAPER', 'LIVE']);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const assertUUID = (value, field) => {
+  if (typeof value !== 'string' || !UUID_RE.test(value)) {
+    throw new Error(`invalid_${field}_uuid`);
+  }
+};
 
 export function createExecutionRequestRepository(pool) {
   return {
@@ -10,6 +17,10 @@ export function createExecutionRequestRepository(pool) {
       if (!request?.event_id) throw new Error('event_id_required');
       if (!request?.follower_user_id) throw new Error('follower_user_id_required');
       if (!request?.trader_id) throw new Error('trader_id_required');
+
+      assertUUID(request.follower_user_id, 'follower_user_id');
+      assertUUID(request.trader_id, 'trader_id');
+      if (request.execution_request_id != null) assertUUID(request.execution_request_id, 'execution_request_id');
 
       const amount = Number(request.requested_amount_usd);
       if (!Number.isFinite(amount) || amount <= 0) throw new Error('invalid_requested_amount');
@@ -40,12 +51,14 @@ export function createExecutionRequestRepository(pool) {
       return (await pool.query(q, v)).rows[0];
     },
     async getById(id) {
+      assertUUID(id, 'execution_request_id');
       return (await pool.query('SELECT * FROM execution_requests WHERE execution_request_id=$1', [id])).rows[0] ?? null;
     },
     async getByIdempotencyKey(key) {
       return (await pool.query('SELECT * FROM execution_requests WHERE idempotency_key=$1', [key])).rows[0] ?? null;
     },
     async updateStatus(id, status) {
+      assertUUID(id, 'execution_request_id');
       if (!EXECUTION_STATUSES.has(status)) throw new Error('invalid_execution_status');
       return (await pool.query(
         'UPDATE execution_requests SET status=$2,updated_at=now() WHERE execution_request_id=$1 RETURNING *',
