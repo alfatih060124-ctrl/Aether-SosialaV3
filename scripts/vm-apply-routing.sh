@@ -64,6 +64,14 @@ auth_code="$(curl -sS --max-time 12 -o /dev/null -w '%{http_code}' -X POST -H 'C
 session_code="$(curl -sS --max-time 12 -o /dev/null -w '%{http_code}' "$PUBLIC_API/api/auth/session")"
 [ "$session_code" = "401" ] || fail "wallet auth session without bearer expected HTTP 401, got $session_code"
 
+say "verifying trader account lane requires an authenticated wallet session"
+trader_status_code="$(curl -sS --max-time 12 -o /dev/null -w '%{http_code}' "$PUBLIC_API/api/account/trader")"
+[ "$trader_status_code" = "401" ] || fail "trader account status without bearer expected HTTP 401, got $trader_status_code"
+trader_challenge_code="$(curl -sS --max-time 12 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' "$PUBLIC_API/api/account/trader/challenge")"
+[ "$trader_challenge_code" = "401" ] || fail "trader ownership challenge without bearer expected HTTP 401, got $trader_challenge_code"
+trader_apply_code="$(curl -sS --max-time 12 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' "$PUBLIC_API/api/account/trader/apply")"
+[ "$trader_apply_code" = "401" ] || fail "trader application without bearer expected HTTP 401, got $trader_apply_code"
+
 say "verifying execution/control mutation paths remain fenced"
 expect_blocked POST /api/shadow/simulate
 expect_blocked GET /api/admin/wallets
@@ -72,5 +80,5 @@ expect_blocked POST /api/signals/evaluate
 
 ROLLBACK_REQUIRED=0
 trap - ERR INT TERM
-say "FINAL: public API exposes read + wallet-auth only; PRIMARY_VM remains the only writable runtime"
+say "FINAL: public API exposes read + wallet-auth + session-bound account lanes only; PRIMARY_VM remains the only writable runtime"
 say "previous Caddyfile backup: $BACKUP"
