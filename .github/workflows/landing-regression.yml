@@ -6,6 +6,7 @@ on:
     paths:
       - 'public/index.html'
       - 'public/onboarding.html'
+      - 'public/market.html'
       - 'vercel.json'
       - 'scripts/landing-regression.mjs'
       - '.github/workflows/landing-regression.yml'
@@ -13,6 +14,7 @@ on:
     paths:
       - 'public/index.html'
       - 'public/onboarding.html'
+      - 'public/market.html'
       - 'vercel.json'
       - 'scripts/landing-regression.mjs'
       - '.github/workflows/landing-regression.yml'
