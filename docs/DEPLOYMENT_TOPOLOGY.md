@@ -7,17 +7,24 @@ Status: canonical infrastructure contract for the current SHADOW release.
 | Layer | Role | May serve public traffic | May write production state | May execute/simulate operator flows | Production database |
 | --- | --- | --- | --- | --- | --- |
 | GitHub | Source of truth + CI | No | No | CI tests only | No |
-| Vercel | Public UI + read-only edge/BFF | Yes | No | No | No |
-| PRIMARY_VM | API + PostgreSQL + control plane + execution/signal runtime | Yes, through Caddy allowlist | Yes | Yes, protected/internal | Yes, sole authoritative DB |
+| Vercel | Public UI + constrained read/auth BFF | Yes | No authoritative writes | No | No |
+| PRIMARY_VM | API + PostgreSQL + wallet-auth authority + control plane + execution/signal runtime | Yes, through Caddy allowlist | Yes | Yes, protected/internal | Yes, sole authoritative DB |
 | Render | STANDBY_RENDER health-only placeholder | Health endpoint only | No | No | Detached |
 
-This topology intentionally avoids active-active API/database operation. There is one authoritative writer: `PRIMARY_VM`.
+This topology intentionally avoids active-active API/database operation. There is one authoritative state writer: `PRIMARY_VM`.
 
 ## Traffic contract
 
-Public browser traffic terminates at Vercel for the public site. Vercel may issue only explicit read-only GET requests to `https://api.aether.boats`. The Vercel gateway never receives or injects `API_TOKEN`, `ADMIN_API_TOKEN`, database credentials, or signer material.
+Public browser traffic terminates at Vercel for the public site. The Vercel API function has two narrowly defined responsibilities:
 
-`api.aether.boats` terminates at Caddy on the VM. Caddy allows only the public read endpoints defined in `deploy/Caddyfile`. Admin, SHADOW simulation, execution mutation, billing mutation, signal mutation, and other state-changing routes are not routable on the public API hostname.
+1. Proxy explicit public read-only GET endpoints to `https://api.aether.boats`.
+2. Act as a wallet-auth BFF for `/api/auth/challenge`, `/api/auth/verify`, `/api/auth/session`, and `/api/auth/logout`.
+
+The BFF does not receive or inject `API_TOKEN`, `ADMIN_API_TOKEN`, database credentials, or signer material. It never forwards a client-supplied Authorization header. After successful wallet signature verification, the opaque user session token returned by the PRIMARY_VM is converted into a host-only `HttpOnly; Secure; SameSite=Lax` cookie and removed from the browser-visible JSON response.
+
+`api.aether.boats` terminates at Caddy on the VM. Caddy allows public read endpoints plus only the four wallet-auth endpoints above. Admin, SHADOW simulation, execution mutation, billing mutation, signal mutation, and other state-changing control routes are not routable on the public API hostname.
+
+Wallet authentication is an identity function, not execution authority. A login signature proves control of a public wallet address only and does not authorize a trade, transfer, token approval, or movement of funds.
 
 `a.aether.boats` is the dedicated Admin control-plane hostname. Its `/api/admin/*` traffic is proxied only to the VM-local API on `127.0.0.1:8080`. Backend `ADMIN_API_TOKEN` authorization remains mandatory. The public Vercel project does not serve Admin.
 
@@ -51,10 +58,12 @@ Current production flags remain:
 - `FIXTURE_GATE_PASSED=false`
 - `OPERATOR_APPROVED=false`
 
-No deployment topology change is permission to enable LIVE. LIVE requires a separate explicit gate review and approval process.
+No deployment topology or wallet-auth change is permission to enable LIVE. LIVE requires a separate explicit gate review and approval process.
 
 ## Repository enforcement
 
-`scripts/infrastructure-contract.mjs` is run by CI and prevents regression to a dual-runtime topology. It checks VM role, localhost-only API publication, Render standby isolation, Vercel read-only routing, Caddy public/admin separation, and removal of public simulation controls.
+`scripts/infrastructure-contract.mjs` is run by CI and prevents regression to a dual-runtime topology. It checks VM role, localhost-only API publication, Render standby isolation, constrained Vercel read/auth routing, Caddy public/admin separation, session-cookie handling, canonical frontend sources, and removal of public simulation controls.
 
-`scripts/vm-apply-routing.sh` performs a transactional Caddy cutover on the VM: validate, backup, install, reload, verify read paths, verify blocked mutation paths, and roll back automatically if verification fails.
+`scripts/vm-apply-routing.sh` performs a transactional Caddy cutover on the VM: validate, backup, install, reload, verify public reads, verify the wallet-auth lane, verify blocked execution/control mutation paths, and roll back automatically if verification fails.
+
+`scripts/vm-deploy-wallet-auth.sh` performs the wallet-auth rollout with a pre-deploy database backup, SHADOW/LIVE gate checks, migration deployment, API rebuild, routing cutover, port-isolation checks, and final fail-closed verification.
