@@ -1,0 +1,55 @@
+{
+  email off
+}
+
+# Public API ingress. This host is deliberately read-only.
+# All state-changing operations remain inside the PRIMARY_VM control plane.
+api.aether.boats {
+  encode zstd gzip
+
+  header {
+    X-Content-Type-Options nosniff
+    Referrer-Policy no-referrer
+    Cache-Control "no-store"
+    -Server
+  }
+
+  @public_read {
+    method GET
+    path /api/health /api/readiness /api/version /api/execution/status /api/signals/config /api/autotrade/status /api/trades /api/traders /api/traders/* /api/marketplace/fees
+  }
+
+  handle @public_read {
+    reverse_proxy 127.0.0.1:8080
+  }
+
+  handle {
+    respond "public API route not available" 404
+  }
+}
+
+# Dedicated Admin control plane. It is intentionally NOT served by Vercel
+# and is not reachable through api.aether.boats. Backend ADMIN_API_TOKEN
+# authorization remains mandatory for every /api/admin/* request.
+a.aether.boats {
+  encode zstd gzip
+
+  header {
+    X-Content-Type-Options nosniff
+    Referrer-Policy same-origin
+    X-Frame-Options DENY
+    Cache-Control "no-store"
+    -Server
+  }
+
+  @admin_api path /api/admin /api/admin/*
+  handle @admin_api {
+    reverse_proxy 127.0.0.1:8080
+  }
+
+  handle {
+    root * /opt/aether-v3/web
+    try_files {path} /admin.html
+    file_server
+  }
+}
