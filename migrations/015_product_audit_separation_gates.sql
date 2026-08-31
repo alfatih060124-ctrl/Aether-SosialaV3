@@ -18,6 +18,18 @@ BEGIN
     RAISE EXCEPTION 'trader_mode_must_remain_shadow';
   END IF;
 
+  -- New trader rows must never inherit legacy VERIFIED/published defaults.
+  -- Creation is always fail-closed; verification and publication require later,
+  -- explicit and separately audited control-plane transitions.
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.verification_status IS DISTINCT FROM 'PENDING_DATA'
+       OR NEW.verified IS DISTINCT FROM false
+       OR NEW.published IS DISTINCT FROM false THEN
+      RAISE EXCEPTION 'trader_insert_must_start_unverified_unpublished';
+    END IF;
+    RETURN NEW;
+  END IF;
+
   IF NEW.published IS TRUE THEN
     IF OLD.verification_status IS DISTINCT FROM 'VERIFIED' THEN
       RAISE EXCEPTION 'trader_publication_requires_prior_verification';
@@ -40,7 +52,7 @@ $$;
 
 DROP TRIGGER IF EXISTS trg_aether_guard_trader_control_plane ON traders;
 CREATE TRIGGER trg_aether_guard_trader_control_plane
-BEFORE UPDATE ON traders
+BEFORE INSERT OR UPDATE ON traders
 FOR EACH ROW
 EXECUTE FUNCTION aether_guard_trader_control_plane();
 
