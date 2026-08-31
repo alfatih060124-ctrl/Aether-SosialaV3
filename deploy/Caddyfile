@@ -13,7 +13,7 @@ api.aether.boats {
 
   @public_read {
     method GET
-    path /api/health /api/readiness /api/version /api/execution/status /api/signals/config /api/autotrade/status /api/trades /api/traders /api/traders/* /api/marketplace/fees /api/auth/session /api/account/trader
+    path /api/health /api/readiness /api/version /api/execution/status /api/signals/config /api/autotrade/status /api/trades /api/traders /api/traders/* /api/marketplace/fees /api/auth/session /api/account/trader /api/account/copy-mandates
   }
 
   handle @public_read {
@@ -22,10 +22,19 @@ api.aether.boats {
 
   @wallet_auth_write {
     method POST
-    path /api/auth/challenge /api/auth/verify /api/auth/logout /api/account/trader/challenge /api/account/trader/apply
+    path /api/auth/challenge /api/auth/verify /api/auth/logout /api/account/trader/challenge /api/account/trader/apply /api/account/copy-mandates
   }
 
   handle @wallet_auth_write {
+    reverse_proxy 127.0.0.1:8080
+  }
+
+  @account_patch {
+    method PATCH
+    path /api/account/copy-mandates/*
+  }
+
+  handle @account_patch {
     reverse_proxy 127.0.0.1:8080
   }
 
