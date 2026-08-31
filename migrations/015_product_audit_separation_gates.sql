@@ -119,17 +119,19 @@ BEGIN
 END;
 $$;
 DROP TRIGGER IF EXISTS trg_aether_guard_fee_config ON platform_fee_config;
-CREATE TRIGGER trg_aether_guard_fee_config BEFORE UPDATE ON platform_fee_config FOR EACH ROW EXECUTE FUNCTION aether_guard_fee_config();
+CREATE TRIGGER trg_aether_guard_fee_config BEFORE INSERT OR UPDATE ON platform_fee_config FOR EACH ROW EXECUTE FUNCTION aether_guard_fee_config();
 
 CREATE OR REPLACE FUNCTION aether_audit_fee_config()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   INSERT INTO audit_events(event_type, actor, entity_type, entity_id, payload)
-  VALUES('PLATFORM_FEE_CONFIG_CHANGED', aether_audit_actor(), 'PLATFORM_FEE_CONFIG', NEW.config_id::text,
-    jsonb_build_object('before', jsonb_build_object('performance_fee_bps', OLD.performance_fee_bps,'execution_fee_bps', OLD.execution_fee_bps,'execution_rental_fee_bps', OLD.execution_rental_fee_bps,'enabled', OLD.enabled),
-                       'after', jsonb_build_object('performance_fee_bps', NEW.performance_fee_bps,'execution_fee_bps', NEW.execution_fee_bps,'execution_rental_fee_bps', NEW.execution_rental_fee_bps,'enabled', NEW.enabled)));
+  VALUES(CASE WHEN TG_OP = 'INSERT' THEN 'PLATFORM_FEE_CONFIG_CREATED' ELSE 'PLATFORM_FEE_CONFIG_CHANGED' END,
+    aether_audit_actor(), 'PLATFORM_FEE_CONFIG', NEW.config_id::text,
+    jsonb_build_object(
+      'before', CASE WHEN TG_OP = 'INSERT' THEN NULL ELSE jsonb_build_object('performance_fee_bps', OLD.performance_fee_bps,'execution_fee_bps', OLD.execution_fee_bps,'execution_rental_fee_bps', OLD.execution_rental_fee_bps,'enabled', OLD.enabled) END,
+      'after', jsonb_build_object('performance_fee_bps', NEW.performance_fee_bps,'execution_fee_bps', NEW.execution_fee_bps,'execution_rental_fee_bps', NEW.execution_rental_fee_bps,'enabled', NEW.enabled)));
   RETURN NEW;
 END;
 $$;
 DROP TRIGGER IF EXISTS trg_aether_audit_fee_config ON platform_fee_config;
-CREATE TRIGGER trg_aether_audit_fee_config AFTER UPDATE ON platform_fee_config FOR EACH ROW EXECUTE FUNCTION aether_audit_fee_config();
+CREATE TRIGGER trg_aether_audit_fee_config AFTER INSERT OR UPDATE ON platform_fee_config FOR EACH ROW EXECUTE FUNCTION aether_audit_fee_config();
