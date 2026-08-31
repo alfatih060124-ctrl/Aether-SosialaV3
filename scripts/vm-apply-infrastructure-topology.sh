@@ -11,6 +11,7 @@ fail(){ printf '[aether-topology] ERROR: %s\n' "$*" >&2; exit 1; }
 [ -s .env ] || fail ".env is missing"
 command -v git >/dev/null 2>&1 || fail "git is not installed"
 command -v docker >/dev/null 2>&1 || fail "docker is not installed"
+command -v curl >/dev/null 2>&1 || fail "curl is not installed"
 
 # Never allow this convergence script to alter the LIVE posture.
 grep -Eq '^EXECUTION_MODE=SHADOW$' .env || fail "EXECUTION_MODE must remain SHADOW"
@@ -20,6 +21,10 @@ grep -Eq '^OPERATOR_APPROVED=false$' .env || fail "OPERATOR_APPROVED must remain
 grep -Eq '^POSTGRES_PASSWORD=.+$' .env || fail "POSTGRES_PASSWORD is required"
 grep -Eq '^API_TOKEN=.+$' .env || fail "API_TOKEN is required"
 grep -Eq '^ADMIN_API_TOKEN=.+$' .env || fail "ADMIN_API_TOKEN is required"
+
+[ -x /usr/local/sbin/aether-db-backup ] || fail "verified database backup command is missing"
+say "creating verified pre-change database backup"
+/usr/local/sbin/aether-db-backup
 
 say "fetching canonical infrastructure contract"
 git fetch origin main
