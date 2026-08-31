@@ -42,6 +42,7 @@ jobs:
           node --check scripts/execution-uuid-regression.mjs
           node --check scripts/trader-evidence-collector-regression.mjs
           node --check scripts/solana-evidence-source-regression.mjs
+          node --check scripts/product-audit-separation-regression.mjs
           node --check scripts/infrastructure-contract.mjs
           bash -n scripts/vm-apply-routing.sh
           bash -n scripts/vm-apply-infrastructure-topology.sh
@@ -66,6 +67,8 @@ jobs:
         run: node scripts/trader-evidence-collector-regression.mjs
       - name: Solana RPC evidence source regression
         run: node scripts/solana-evidence-source-regression.mjs
+      - name: Product audit and separation regression
+        run: node scripts/product-audit-separation-regression.mjs
       - name: Caddy ingress validation
         run: docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Signal quality regression
