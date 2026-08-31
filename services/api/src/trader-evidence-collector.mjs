@@ -1,0 +1,84 @@
+import crypto from 'node:crypto';
+
+const SOURCES = new Set(['SOLANA_RPC','SOLSCAN','INDEXER','INTERNAL_RECONCILIATION']);
+
+function int(value, name, min, max) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < min || n > max) throw new Error(`invalid_${name}`);
+  return n;
+}
+
+function text(value, name, min, max) {
+  const s = String(value ?? '').trim();
+  if (s.length < min || s.length > max) throw new Error(`invalid_${name}`);
+  return s;
+}
+
+export function normalizeEvidenceReference({ sourceType, reference }) {
+  const source = String(sourceType || '').trim().toUpperCase();
+  if (!SOURCES.has(source)) throw new Error('invalid_verification_source');
+  const ref = text(reference, 'verification_reference', 8, 300);
+  if (source === 'SOLANA_RPC' && !/^[1-9A-HJ-NP-Za-km-z]{32,100}$/.test(ref)) throw new Error('invalid_solana_signature');
+  return { source_type: source, source_reference: ref };
+}
+
+export function calculateReconciledMetrics(trades = []) {
+  if (!Array.isArray(trades) || trades.length === 0) throw new Error('insufficient_reconciled_trades');
+  const rows = trades.map((trade, i) => ({
+    trade_id: text(trade.trade_id, `trade_${i}_id`, 1, 120),
+    realized_pnl_minor: int(trade.realized_pnl_minor, `trade_${i}_realized_pnl_minor`, -9_000_000_000_000_000, 9_000_000_000_000_000),
+    capital_minor: int(trade.capital_minor, `trade_${i}_capital_minor`, 1, 9_000_000_000_000_000),
+    equity_after_minor: int(trade.equity_after_minor, `trade_${i}_equity_after_minor`, 1, 9_000_000_000_000_000)
+  }));
+
+  const capital = rows.reduce((sum, row) => sum + row.capital_minor, 0);
+  const pnl = rows.reduce((sum, row) => sum + row.realized_pnl_minor, 0);
+  const wins = rows.filter(row => row.realized_pnl_minor > 0).length;
+  let peak = rows[0].equity_after_minor;
+  let maxDrawdownBps = 0;
+  for (const row of rows) {
+    peak = Math.max(peak, row.equity_after_minor);
+    const dd = Math.round(((peak - row.equity_after_minor) * 10_000) / peak);
+    maxDrawdownBps = Math.max(maxDrawdownBps, dd);
+  }
+
+  return {
+    trades_count: rows.length,
+    total_return_bps: Math.round((pnl * 10_000) / capital),
+    win_rate_bps: Math.round((wins * 10_000) / rows.length),
+    drawdown_bps: maxDrawdownBps
+  };
+}
+
+export function buildRecordedEvidence({ sourceType, reference, observedAt, trades, provenance = {} }) {
+  const normalized = normalizeEvidenceReference({ sourceType, reference });
+  const observed = new Date(observedAt || '');
+  if (Number.isNaN(observed.getTime()) || observed.getTime() > Date.now() + 5 * 60 * 1000) throw new Error('invalid_verification_observed_at');
+  const metrics = calculateReconciledMetrics(trades);
+  const canonicalTradeIds = trades.map(t => String(t.trade_id)).sort();
+  const calculationHash = crypto.createHash('sha256').update(JSON.stringify({ v: 1, trade_ids: canonicalTradeIds, metrics })).digest('hex');
+  return {
+    ...normalized,
+    observed_at: observed.toISOString(),
+    ...metrics,
+    evidence_status: 'RECORDED',
+    provenance: {
+      schema_version: 1,
+      collector: 'AETHER_TRADER_EVIDENCE',
+      calculation_hash: calculationHash,
+      rpc_endpoint_label: String(provenance.rpc_endpoint_label || '').trim() || null,
+      indexer_batch_id: String(provenance.indexer_batch_id || '').trim() || null,
+      reconciliation_batch_id: String(provenance.reconciliation_batch_id || '').trim() || null
+    }
+  };
+}
+
+export function pendingData(reason = 'insufficient_verifiable_data') {
+  return {
+    verification_status: 'PENDING_DATA',
+    verified: false,
+    published: false,
+    evidence_status: 'NOT_RECORDED',
+    reason: String(reason)
+  };
+}
