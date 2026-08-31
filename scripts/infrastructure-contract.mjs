@@ -51,7 +51,10 @@ requireText('caddy', caddy, 'a.aether.boats');
 requireText('caddy', caddy, 'method GET');
 requireText('caddy', caddy, 'respond "public API route not available" 404');
 requireText('caddy', caddy, '@admin_api path /api/admin /api/admin/*');
-const publicCaddy = caddy.split('a.aether.boats')[0];
+const publicCaddy = caddy.split('a.aether.boats {')[0]
+  .split('\n')
+  .filter(line => !line.trim().startsWith('#'))
+  .join('\n');
 forbidText('public caddy', publicCaddy, '/api/admin');
 forbidText('public caddy', publicCaddy, '/api/shadow');
 forbidText('public caddy', publicCaddy, '/api/executions');
