@@ -9,28 +9,30 @@ const failures = [];
 const requireMatch = (source, pattern, message) => {
   if (!pattern.test(source)) failures.push(message);
 };
+const visibleText = source => source.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 const exactPositioning = 'Social Trading + On-chain Intelligence + Verified Performance + Automated Risk + Non-Custodial Execution.';
+const landingText = visibleText(landing);
 
 requireMatch(landing, /<title>[^<]*AETHER/i, 'Landing page title must use AETHER branding.');
-requireMatch(landing, /Trade with proof\./i, 'Landing page must retain the Trade with proof headline.');
-if (!landing.includes(exactPositioning)) failures.push('Landing page must contain the exact AETHER core positioning statement.');
-requireMatch(landing, /Verifiable Social Trading/i, 'Landing page must contain the public value proposition.');
-requireMatch(landing, /Connect Wallet/i, 'Landing page must expose a Connect Wallet CTA shell.');
-requireMatch(landing, /non[- ]custodial/i, 'Landing page must explain non-custodial design.');
-requireMatch(landing, /verifiable|on-chain/i, 'Landing page must explain verifiability/on-chain transparency.');
-requireMatch(landing, /marketplace/i, 'Landing page must include marketplace/trader preview.');
-requireMatch(landing, /risk/i, 'Landing page must include risk transparency.');
-requireMatch(landing, /execution/i, 'Landing page must include execution transparency.');
-requireMatch(landing, /fee/i, 'Landing page must include fee transparency.');
-requireMatch(landing, /Become a Trader/i, 'Landing page must include Become a Trader path.');
-requireMatch(landing, /seed phrase|private key/i, 'Landing page wallet safety copy must explicitly reject secret collection.');
+requireMatch(landingText, /Trade with proof\./i, 'Landing page must retain the Trade with proof headline.');
+if (!landingText.includes(exactPositioning)) failures.push('Landing page must contain the exact AETHER core positioning statement in visible copy.');
+requireMatch(landingText, /Verifiable Social Trading/i, 'Landing page must contain the public value proposition.');
+requireMatch(landingText, /Connect Wallet/i, 'Landing page must expose a Connect Wallet CTA shell.');
+requireMatch(landingText, /non[- ]custodial/i, 'Landing page must explain non-custodial design.');
+requireMatch(landingText, /verifiable|on-chain/i, 'Landing page must explain verifiability/on-chain transparency.');
+requireMatch(landingText, /marketplace/i, 'Landing page must include marketplace/trader preview.');
+requireMatch(landingText, /risk/i, 'Landing page must include risk transparency.');
+requireMatch(landingText, /execution/i, 'Landing page must include execution transparency.');
+requireMatch(landingText, /fee/i, 'Landing page must include fee transparency.');
+requireMatch(landingText, /Become a Trader/i, 'Landing page must include Become a Trader path.');
+requireMatch(landingText, /seed phrase|private key/i, 'Landing page wallet safety copy must explicitly reject secret collection.');
 requireMatch(landing, /viewport/i, 'Landing page must include a responsive viewport meta tag.');
 requireMatch(landing, /description/i, 'Landing page must include SEO description metadata.');
 requireMatch(landing, /favicon\.svg/i, 'Landing page must expose the AETHER favicon.');
 requireMatch(landing, /og-aether\.svg/i, 'Landing page must expose AETHER social preview branding.');
 
-if (/AETHER\s*V3|Execution Engine V3/i.test(landing)) {
+if (/AETHER\s*V3|Execution Engine V3/i.test(landingText)) {
   failures.push('Public landing page must not expose internal V3 branding.');
 }
 
