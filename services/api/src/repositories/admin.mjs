@@ -35,6 +35,7 @@ export function createAdminRepository(pool) {
     async updateCopyPolicy(policyId, patch) {
       const current = (await pool.query('SELECT * FROM copy_policies WHERE policy_id=$1',[policyId])).rows[0];
       if (!current) return null;
+      if (current.status === 'CANCELLED') throw new Error('copy_mandate_cancelled');
       let enabled = current.enabled;
       let status = current.status;
       if (patch.enabled !== undefined) {
