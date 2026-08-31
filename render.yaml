@@ -5,11 +5,14 @@ services:
     plan: starter
     dockerfilePath: ./Dockerfile
     dockerContext: .
+    dockerCommand: node services/api/src/standby-server.mjs
     healthCheckPath: /api/health
-    autoDeploy: true
+    autoDeployTrigger: off
     envVars:
       - key: NODE_ENV
         value: production
+      - key: AETHER_DEPLOYMENT_ROLE
+        value: STANDBY_RENDER
       - key: EXECUTION_MODE
         value: SHADOW
       - key: LIVE_ENABLED
@@ -18,7 +21,3 @@ services:
         value: "false"
       - key: OPERATOR_APPROVED
         value: "false"
-      - key: DATABASE_URL
-        sync: false
-      - key: API_TOKEN
-        sync: false
