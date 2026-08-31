@@ -16,12 +16,14 @@ function canonicalSignatures(rows = []) {
   for (const row of rows) {
     const signature = String(row?.signature || '').trim();
     if (!SIGNATURE_BASE58.test(signature)) continue;
+    const rawBlockTime = row?.blockTime ?? row?.block_time;
+    const rawConfirmationStatus = row?.confirmationStatus ?? row?.confirmation_status;
     const normalized = {
       signature,
       slot: Number.isSafeInteger(row?.slot) && row.slot >= 0 ? row.slot : null,
-      block_time: Number.isSafeInteger(row?.blockTime) ? row.blockTime : null,
+      block_time: Number.isSafeInteger(rawBlockTime) ? rawBlockTime : null,
       err: row?.err ?? null,
-      confirmation_status: typeof row?.confirmationStatus === 'string' ? row.confirmationStatus.trim() || null : null
+      confirmation_status: typeof rawConfirmationStatus === 'string' ? rawConfirmationStatus.trim() || null : null
     };
     const existing = deduped.get(signature);
     if (!existing) {
