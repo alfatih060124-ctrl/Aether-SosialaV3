@@ -14,10 +14,16 @@ const TRANSITIONS = Object.freeze({
   RECONCILED: new Set(), REJECTED: new Set(), FAILED: new Set()
 });
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const text = (value, name, min=1, max=200) => {
   const s = String(value ?? '').trim();
   if (s.length < min || s.length > max) throw new Error(`invalid_${name}`);
   return s;
+};
+const uuid = (value, name) => {
+  const s = text(value, name, 36, 36);
+  if (!UUID_PATTERN.test(s)) throw new Error(`invalid_${name}`);
+  return s.toLowerCase();
 };
 const money = (value, name) => {
   const n = Number(value);
@@ -43,10 +49,10 @@ export function buildExecutionIntent(input = {}) {
   if (mode !== 'SHADOW') throw new Error('non_shadow_execution_intent_blocked');
   const intent = {
     schema_version: 1,
-    intent_id: String(input.intent_id || crypto.randomUUID()),
-    trader_id: text(input.trader_id, 'trader_id'),
-    follower_user_id: input.follower_user_id ? text(input.follower_user_id, 'follower_user_id') : null,
-    mandate_id: input.mandate_id ? text(input.mandate_id, 'mandate_id') : null,
+    intent_id: uuid(input.intent_id || crypto.randomUUID(), 'intent_id'),
+    trader_id: uuid(input.trader_id, 'trader_id'),
+    follower_user_id: input.follower_user_id ? uuid(input.follower_user_id, 'follower_user_id') : null,
+    mandate_id: input.mandate_id ? uuid(input.mandate_id, 'mandate_id') : null,
     signal_assessment_id: input.signal_assessment_id ? text(input.signal_assessment_id, 'signal_assessment_id') : null,
     token_mint: text(input.token_mint, 'token_mint', 8, 100),
     quote_mint: text(input.quote_mint || 'USDC', 'quote_mint', 2, 100),
