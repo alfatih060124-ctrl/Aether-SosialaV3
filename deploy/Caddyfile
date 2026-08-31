@@ -57,6 +57,16 @@ a.aether.boats {
     -Server
   }
 
+  # The Admin UI reads these two already-public, read-only status/config endpoints
+  # from the same origin. No mutation or Admin authorization is delegated here.
+  @admin_support_read {
+    method GET
+    path /api/marketplace/fees /api/execution/status
+  }
+  handle @admin_support_read {
+    reverse_proxy 127.0.0.1:8080
+  }
+
   @admin_api path /api/admin /api/admin/*
   handle @admin_api {
     reverse_proxy 127.0.0.1:8080
