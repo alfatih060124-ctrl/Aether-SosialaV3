@@ -20,6 +20,16 @@ const AUTH_POST_ROUTES = new Set([
   '/api/auth/logout',
 ]);
 
+const SESSION_GET_ROUTES = new Set([
+  '/api/auth/session',
+  '/api/account/trader',
+]);
+
+const SESSION_POST_ROUTES = new Set([
+  '/api/account/trader/challenge',
+  '/api/account/trader/apply',
+]);
+
 const json = (res, status, body) => {
   res.setHeader('cache-control', 'no-store');
   res.setHeader('x-aether-deployment-role', 'PUBLIC_EDGE');
@@ -124,7 +134,7 @@ export default async function handler(req, res) {
       return sendUpstream(res, await requestPrimary(req, path, { method: 'GET' }));
     }
 
-    if (req.method === 'GET' && path === '/api/auth/session') {
+    if (req.method === 'GET' && SESSION_GET_ROUTES.has(path)) {
       const token = getSessionToken(req);
       if (!token) return json(res, 401, { error: 'session_required' });
       const upstream = await requestPrimary(req, path, { method: 'GET', sessionToken: token });
@@ -170,7 +180,16 @@ export default async function handler(req, res) {
       return sendUpstream(res, upstream);
     }
 
-    if (AUTH_POST_ROUTES.has(path)) {
+    if (req.method === 'POST' && SESSION_POST_ROUTES.has(path)) {
+      const token = getSessionToken(req);
+      if (!token) return json(res, 401, { error: 'session_required' });
+      const body = await readBody(req);
+      const upstream = await requestPrimary(req, path, { method: 'POST', body, sessionToken: token });
+      if (upstream.status === 401) res.setHeader('Set-Cookie', clearSessionCookie());
+      return sendUpstream(res, upstream);
+    }
+
+    if (AUTH_POST_ROUTES.has(path) || SESSION_GET_ROUTES.has(path) || SESSION_POST_ROUTES.has(path)) {
       return json(res, 405, { error: 'method_not_allowed' });
     }
 
