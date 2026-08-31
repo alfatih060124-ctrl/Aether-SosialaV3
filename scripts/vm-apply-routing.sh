@@ -58,7 +58,13 @@ expect_blocked(){
   esac
 }
 
-say "verifying public mutation/control paths are fenced"
+say "verifying wallet-auth lane is reachable but validation remains fail-closed"
+auth_code="$(curl -sS --max-time 12 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' "$PUBLIC_API/api/auth/challenge")"
+[ "$auth_code" = "400" ] || fail "wallet auth challenge lane expected HTTP 400 for invalid input, got $auth_code"
+session_code="$(curl -sS --max-time 12 -o /dev/null -w '%{http_code}' "$PUBLIC_API/api/auth/session")"
+[ "$session_code" = "401" ] || fail "wallet auth session without bearer expected HTTP 401, got $session_code"
+
+say "verifying execution/control mutation paths remain fenced"
 expect_blocked POST /api/shadow/simulate
 expect_blocked GET /api/admin/wallets
 expect_blocked POST /api/executions
@@ -66,5 +72,5 @@ expect_blocked POST /api/signals/evaluate
 
 ROLLBACK_REQUIRED=0
 trap - ERR INT TERM
-say "FINAL: public API is read-only; PRIMARY_VM remains the only writable runtime"
+say "FINAL: public API exposes read + wallet-auth only; PRIMARY_VM remains the only writable runtime"
 say "previous Caddyfile backup: $BACKUP"
