@@ -44,15 +44,37 @@ function canonicalSignatures(rows = []) {
   });
 }
 
-export function buildSolanaRpcProvenance({ walletAddress, signatures, endpointLabel = 'solana-rpc' }) {
+export function buildSolanaRpcProvenance({
+  walletAddress,
+  signatures,
+  endpointLabel = 'solana-rpc',
+  pagesFetched = 1,
+  pageSize = 100,
+  collectionComplete = true
+}) {
   const wallet = assertWallet(walletAddress);
   const canonical = canonicalSignatures(signatures);
-  const sourceHash = crypto.createHash('sha256').update(JSON.stringify({ v: 2, wallet, signatures: canonical })).digest('hex');
+  const normalizedPagesFetched = Number.isInteger(pagesFetched) && pagesFetched >= 0 ? pagesFetched : 0;
+  const normalizedPageSize = Number.isInteger(pageSize) && pageSize > 0 ? pageSize : 100;
+  const complete = collectionComplete === true;
+  const sourceHash = crypto.createHash('sha256').update(JSON.stringify({
+    v: 3,
+    wallet,
+    signatures: canonical,
+    collection: {
+      pages_fetched: normalizedPagesFetched,
+      page_size: normalizedPageSize,
+      complete
+    }
+  })).digest('hex');
   return {
-    schema_version: 2,
+    schema_version: 3,
     source_type: 'SOLANA_RPC',
     wallet_address: wallet,
     rpc_endpoint_label: String(endpointLabel || '').trim() || 'solana-rpc',
+    pages_fetched: normalizedPagesFetched,
+    page_size: normalizedPageSize,
+    collection_complete: complete,
     signatures_observed: canonical.length,
     successful_signatures_observed: canonical.filter(row => row.err === null).length,
     failed_signatures_observed: canonical.filter(row => row.err !== null).length,
@@ -62,13 +84,51 @@ export function buildSolanaRpcProvenance({ walletAddress, signatures, endpointLa
   };
 }
 
-export async function collectSolanaRpcEvidence({ walletAddress, rpcCall, limit = 100, endpointLabel } = {}) {
+export async function collectSolanaRpcEvidence({
+  walletAddress,
+  rpcCall,
+  limit = 100,
+  maxPages = 3,
+  endpointLabel
+} = {}) {
   const wallet = assertWallet(walletAddress);
   if (typeof rpcCall !== 'function') throw new Error('solana_rpc_call_required');
   const safeLimit = Math.max(1, Math.min(1000, Number.isInteger(limit) ? limit : 100));
-  const result = await rpcCall('getSignaturesForAddress', [wallet, { limit: safeLimit }]);
-  const signatures = canonicalSignatures(result);
-  const provenance = buildSolanaRpcProvenance({ walletAddress: wallet, signatures, endpointLabel });
+  const safeMaxPages = Math.max(1, Math.min(20, Number.isInteger(maxPages) ? maxPages : 3));
+  const rows = [];
+  let before;
+  let pagesFetched = 0;
+  let collectionComplete = false;
+
+  for (let page = 0; page < safeMaxPages; page += 1) {
+    const options = { limit: safeLimit };
+    if (before) options.before = before;
+    const pageResult = await rpcCall('getSignaturesForAddress', [wallet, options]);
+    if (!Array.isArray(pageResult)) throw new Error('invalid_rpc_signature_response');
+    pagesFetched += 1;
+    rows.push(...pageResult);
+
+    if (pageResult.length < safeLimit) {
+      collectionComplete = true;
+      break;
+    }
+
+    const canonicalPage = canonicalSignatures(pageResult);
+    const nextBefore = canonicalPage.at(-1)?.signature || null;
+    if (!nextBefore) throw new Error('rpc_pagination_cursor_missing');
+    if (nextBefore === before) throw new Error('rpc_pagination_stalled');
+    before = nextBefore;
+  }
+
+  const signatures = canonicalSignatures(rows);
+  const provenance = buildSolanaRpcProvenance({
+    walletAddress: wallet,
+    signatures,
+    endpointLabel,
+    pagesFetched,
+    pageSize: safeLimit,
+    collectionComplete
+  });
 
   // Signatures prove observable chain activity, not realized trading performance.
   // Never derive return/win-rate/drawdown from transaction count or token balance deltas.
