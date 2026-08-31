@@ -1,12 +1,17 @@
 import fs from 'node:fs';
 
-const read = path => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+const fileUrl = path => new URL(`../${path}`, import.meta.url);
+const read = path => fs.readFileSync(fileUrl(path), 'utf8');
+const exists = path => fs.existsSync(fileUrl(path));
 const failures = [];
 const requireText = (name, text, needle) => {
   if (!text.includes(needle)) failures.push(`${name}: missing ${JSON.stringify(needle)}`);
 };
 const forbidText = (name, text, needle) => {
   if (text.includes(needle)) failures.push(`${name}: forbidden ${JSON.stringify(needle)}`);
+};
+const requireMissing = path => {
+  if (exists(path)) failures.push(`legacy runtime source must remain removed: ${path}`);
 };
 
 const compose = read('docker-compose.yml');
@@ -45,12 +50,24 @@ forbidText('gateway', gateway, 'API_SERVICE_TOKEN');
 forbidText('gateway', gateway, 'API_SERVICE_URL');
 forbidText('gateway', gateway, 'authorization =');
 
+const vercel = read('vercel.json');
+requireText('vercel', vercel, '"src": "api/index.mjs"');
+requireText('vercel', vercel, '"src": "public/**"');
+requireText('vercel', vercel, '"dest": "/public/dashboard.html"');
+requireText('vercel', vercel, '"dest": "/public/onboarding.html"');
+requireText('vercel', vercel, '"dest": "/public/index.html"');
+forbidText('vercel', vercel, 'apps/web');
+forbidText('vercel', vercel, 'apps/admin');
+forbidText('vercel', vercel, 'web/admin.html');
+
 const caddy = read('deploy/Caddyfile');
 requireText('caddy', caddy, 'api.aether.boats');
 requireText('caddy', caddy, 'a.aether.boats');
 requireText('caddy', caddy, 'method GET');
 requireText('caddy', caddy, 'respond "public API route not available" 404');
 requireText('caddy', caddy, '@admin_api path /api/admin /api/admin/*');
+requireText('caddy', caddy, '@admin_ui path / /admin /admin.html');
+requireText('caddy', caddy, 'respond "admin route not available" 404');
 const publicCaddy = caddy.split('a.aether.boats {')[0]
   .split('\n')
   .filter(line => !line.trim().startsWith('#'))
@@ -66,6 +83,10 @@ forbidText('public shadow page', shadow, '/api/shadow/simulate');
 requireText('public dashboard', dashboard, 'PUBLIC • READ ONLY • SHADOW');
 requireText('public shadow page', shadow, "location.replace('/dashboard')");
 
+requireMissing('apps/web/index.html');
+requireMissing('apps/web/app.js');
+requireMissing('apps/admin/index.html');
+
 if (failures.length) {
   console.error('Infrastructure topology regression failed:');
   for (const failure of failures) console.error(`- ${failure}`);
@@ -73,4 +94,4 @@ if (failures.length) {
 }
 
 console.log('Infrastructure topology contract: PASS');
-console.log('GitHub=source, Vercel=read-only edge, VM=PRIMARY_VM, Render=STANDBY_RENDER');
+console.log('GitHub=source, public/=Vercel UI, Vercel API=read-only edge, VM=PRIMARY_VM, web/admin.html=Admin UI, Render=STANDBY_RENDER');
