@@ -35,6 +35,17 @@ function assertCanonicalShadowDispatcher(dispatcher) {
   return dispatcher;
 }
 
+function assertDispatcherOptions(options) {
+  if (options === undefined) return {};
+  if (!options || typeof options !== 'object' || Array.isArray(options)) throw new Error('invalid_shadow_dispatcher_options');
+  const allowed = new Set(['quoteHook','simulationHook','authorizationHook','confirmationHook','reconciliationHook']);
+  for (const [key, value] of Object.entries(options)) {
+    if (!allowed.has(key)) throw new Error('invalid_shadow_dispatcher_options');
+    if (value !== undefined && typeof value !== 'function') throw new Error('invalid_shadow_dispatcher_options');
+  }
+  return { ...options };
+}
+
 export function buildExecutionAuditEnvelope({ intent, result, started_at, completed_at, dispatcher = CANONICAL_SHADOW_DISPATCHER } = {}) {
   assertCanonicalExecutionIntent(intent);
   assertShadowResult(result);
@@ -100,9 +111,13 @@ export function buildExecutionAuditEnvelope({ intent, result, started_at, comple
 }
 
 export class AuditedShadowDispatcher {
-  constructor({ dispatcher, clock = () => Date.now() } = {}) {
-    if (dispatcher && !(dispatcher instanceof ShadowDispatcher)) throw new Error('invalid_shadow_dispatcher');
-    this.dispatcher = dispatcher || new ShadowDispatcher();
+  constructor({ dispatcher, dispatcherOptions, clock = () => Date.now() } = {}) {
+    // Never accept a dispatcher instance here. Even a ShadowDispatcher subclass can
+    // override dispatch() while still passing instanceof checks and then be falsely
+    // recorded as the canonical ShadowDispatcher. Accept only hook options and
+    // construct the concrete boundary implementation inside this trust boundary.
+    if (dispatcher !== undefined) throw new Error('shadow_dispatcher_injection_forbidden');
+    this.dispatcher = new ShadowDispatcher(assertDispatcherOptions(dispatcherOptions));
     this.clock = clock;
   }
 
