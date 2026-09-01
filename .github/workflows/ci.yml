@@ -34,6 +34,7 @@ jobs:
           node --check services/api/src/automatic-evidence-service.mjs
           node --check services/api/src/reconciled-performance-service.mjs
           node --check packages/reconciliation-accounting/fifo.mjs
+          node --check packages/reconciliation-accounting/promoter.mjs
           node --check services/api/src/repositories/signal-intelligence.mjs
           node --check services/api/src/repositories/core.mjs
           node --check services/api/src/repositories/admin.mjs
@@ -53,6 +54,7 @@ jobs:
           node --check scripts/reconciled-performance-regression.mjs
           node --check scripts/reconciled-performance-contract-regression.mjs
           node --check scripts/fifo-accounting-regression.mjs
+          node --check scripts/reconciliation-promoter-regression.mjs
           node --check scripts/product-audit-separation-regression.mjs
           node --check scripts/execution-boundary-regression.mjs
           node --check scripts/market-intelligence-regression.mjs
@@ -92,6 +94,8 @@ jobs:
         run: node scripts/reconciled-performance-contract-regression.mjs
       - name: FIFO accounting candidate regression
         run: node scripts/fifo-accounting-regression.mjs
+      - name: Fee equity reconciliation promoter regression
+        run: node scripts/reconciliation-promoter-regression.mjs
       - name: Product audit separation regression
         run: node scripts/product-audit-separation-regression.mjs
       - name: Execution boundary regression
