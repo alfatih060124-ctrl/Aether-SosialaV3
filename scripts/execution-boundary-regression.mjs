@@ -15,7 +15,7 @@ const base = {
 };
 
 const a = buildExecutionIntent(base);
-const b = buildExecutionIntent({ ...base, intent_id:'different-intent-id' });
+const b = buildExecutionIntent({ ...base, intent_id:'10000000-0000-0000-0000-000000000099' });
 assert.equal(a.schema_version,2);
 assert.equal(a.chain,'SOLANA');
 assert.equal(a.network,'mainnet-beta');
