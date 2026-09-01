@@ -16,6 +16,7 @@
       "negative_false_positives": 0,
       "regression_pass_rate": 0.0,
       "exact_token_amount_reconciliation": false,
+      "evidence_file": "evidence/REPLACE_WITH_JUPITER_VERIFIED_BUNDLE.json",
       "evidence_sha256": ""
     },
     {
@@ -27,6 +28,7 @@
       "negative_false_positives": 0,
       "regression_pass_rate": 0.0,
       "exact_token_amount_reconciliation": false,
+      "evidence_file": "evidence/REPLACE_WITH_RAYDIUM_VERIFIED_BUNDLE.json",
       "evidence_sha256": ""
     },
     {
@@ -38,6 +40,7 @@
       "negative_false_positives": 0,
       "regression_pass_rate": 0.0,
       "exact_token_amount_reconciliation": false,
+      "evidence_file": "evidence/REPLACE_WITH_ORCA_VERIFIED_BUNDLE.json",
       "evidence_sha256": ""
     }
   ],
