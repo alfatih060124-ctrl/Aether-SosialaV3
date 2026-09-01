@@ -15,3 +15,5 @@ jobs:
           node-version: 20
       - name: Run decoder fixture gate
         run: node scripts/run-decoder-fixtures.mjs
+      - name: Run FIFO accounting candidate gate
+        run: node scripts/fifo-accounting-regression.mjs
