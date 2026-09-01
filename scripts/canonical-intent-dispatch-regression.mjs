@@ -22,8 +22,13 @@ const base = {
 const intent = buildExecutionIntent(base);
 assert.equal(assertCanonicalExecutionIntent(intent), intent);
 assert.throws(() => buildExecutionIntent({ ...base, mode:undefined }), /non_shadow_execution_intent_blocked/);
+assert.throws(() => buildExecutionIntent({ ...base, trader_id:'not-a-uuid' }), /invalid_trader_id/);
+assert.throws(() => buildExecutionIntent({ ...base, follower_user_id:'not-a-uuid' }), /invalid_follower_user_id/);
+assert.throws(() => buildExecutionIntent({ ...base, mandate_id:'not-a-uuid' }), /invalid_mandate_id/);
+assert.throws(() => buildExecutionIntent({ ...base, intent_id:'not-a-uuid' }), /invalid_intent_id/);
 assert.throws(() => assertCanonicalExecutionIntent({ ...intent, network:'devnet' }), /invalid_execution_network/);
 assert.throws(() => assertCanonicalExecutionIntent({ ...intent, live_execution_authorized:true }), /execution_intent_fail_closed/);
+assert.throws(() => assertCanonicalExecutionIntent({ ...intent, trader_id:'not-a-uuid' }), /invalid_trader_id/);
 assert.throws(() => assertCanonicalExecutionIntent({ ...intent, idempotency_key:'0'.repeat(64) }), /execution_idempotency_mismatch/);
 assert.throws(() => assertCanonicalExecutionIntent({ ...intent, requested_amount_usd:'100' }), /invalid_requested_amount_usd/);
 assert.throws(() => assertCanonicalExecutionIntent({ ...intent, signer:{ publicKey:'forbidden' } }), /signing_material_forbidden/);
