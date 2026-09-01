@@ -1,0 +1,36 @@
+name: Reconciliation Source Coordinator Regression
+on:
+  pull_request:
+    paths:
+      - 'packages/reconciliation-accounting/coordinator.mjs'
+      - 'packages/reconciliation-accounting/additional-fees.mjs'
+      - 'packages/reconciliation-accounting/wallet-equity.mjs'
+      - 'packages/reconciliation-accounting/promoter.mjs'
+      - 'packages/reconciliation-accounting/fifo.mjs'
+      - 'scripts/reconciliation-source-coordinator-regression.mjs'
+      - '.github/workflows/reconciliation-source-coordinator.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/reconciliation-accounting/coordinator.mjs'
+      - 'packages/reconciliation-accounting/additional-fees.mjs'
+      - 'packages/reconciliation-accounting/wallet-equity.mjs'
+      - 'packages/reconciliation-accounting/promoter.mjs'
+      - 'packages/reconciliation-accounting/fifo.mjs'
+      - 'scripts/reconciliation-source-coordinator-regression.mjs'
+      - '.github/workflows/reconciliation-source-coordinator.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        run: |
+          node --check packages/reconciliation-accounting/coordinator.mjs
+          node --check scripts/reconciliation-source-coordinator-regression.mjs
+      - name: Reconciliation source coordinator regression
+        run: node scripts/reconciliation-source-coordinator-regression.mjs
