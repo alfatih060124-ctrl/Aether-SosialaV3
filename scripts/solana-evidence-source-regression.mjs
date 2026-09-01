@@ -113,6 +113,19 @@ assert.throws(() => buildSolanaRpcProvenance({
   ]
 }), /conflicting_duplicate_signature/);
 
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [{ signature: 'not-a-solana-signature', slot: 125, blockTime: 1788190002, err: null }]
+}), /invalid_rpc_signature/);
+
+await assert.rejects(
+  collectSolanaRpcEvidence({
+    walletAddress: wallet,
+    rpcCall: async () => [{ signature: '', slot: 126, blockTime: 1788190003, err: null }]
+  }),
+  /invalid_rpc_signature/
+);
+
 const empty = await collectSolanaRpcEvidence({ walletAddress: wallet, rpcCall: async () => [] });
 assert.equal(empty.reason, 'no_verifiable_chain_activity');
 assert.equal(empty.source_reference, null);
