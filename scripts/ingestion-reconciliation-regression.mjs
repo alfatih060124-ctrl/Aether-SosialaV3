@@ -63,6 +63,30 @@ const malformedExpected = reconcileNetBalanceChanges({
 });
 assert.deepEqual(malformedExpected, { ok: false, reason: 'INVALID_EXPECTED_RAW_AMOUNT' });
 
+const unsafeExpectedNumber = reconcileNetBalanceChanges({
+  tokenBalanceChanges: [
+    { token: TOKEN_IN, deltaRaw: '-9007199254740992' },
+    { token: TOKEN_OUT, deltaRaw: '100' }
+  ],
+  tokenIn: TOKEN_IN,
+  tokenOut: TOKEN_OUT,
+  amountInRaw: Number.MAX_SAFE_INTEGER + 1,
+  amountOutRaw: 100
+});
+assert.deepEqual(unsafeExpectedNumber, { ok: false, reason: 'INVALID_EXPECTED_RAW_AMOUNT' });
+
+const unsafeBalanceNumber = reconcileNetBalanceChanges({
+  tokenBalanceChanges: [
+    { token: TOKEN_IN, deltaRaw: -(Number.MAX_SAFE_INTEGER + 1) },
+    { token: TOKEN_OUT, deltaRaw: 100 }
+  ],
+  tokenIn: TOKEN_IN,
+  tokenOut: TOKEN_OUT,
+  amountInRaw: '9007199254740992',
+  amountOutRaw: '100'
+});
+assert.deepEqual(unsafeBalanceNumber, { ok: false, reason: 'INVALID_BALANCE_CHANGE' });
+
 const wrongDirection = reconcileNetBalanceChanges({
   tokenBalanceChanges: [
     { token: TOKEN_IN, deltaRaw: '100' },
