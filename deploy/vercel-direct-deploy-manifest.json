@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "project_name": "aether-sosiala-v3",
+  "target": "production",
+  "source_ref": "main",
+  "deployment_role": "PUBLIC_EDGE",
+  "safety": {
+    "execution_mode": "SHADOW",
+    "live_enabled": false,
+    "signer_included": false,
+    "secrets_included": false
+  },
+  "files": [
+    "vercel.json",
+    "api/index.mjs",
+    "services/api/src/market-intelligence.mjs",
+    "public/account.html",
+    "public/admin.html",
+    "public/aether-mark.svg",
+    "public/dashboard.html",
+    "public/favicon.svg",
+    "public/index.html",
+    "public/market.html",
+    "public/og-aether.svg",
+    "public/onboarding.html",
+    "public/shadow.html"
+  ]
+}
