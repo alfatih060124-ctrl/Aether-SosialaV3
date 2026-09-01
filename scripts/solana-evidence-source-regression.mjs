@@ -3,10 +3,10 @@ import { collectSolanaRpcEvidence, buildSolanaRpcProvenance } from '../services/
 
 // Synthetic/test-only fixtures. These are not production wallet signatures or trader performance.
 const wallet = '11111111111111111111111111111111';
-const signature = '5'.repeat(64);
-const olderSignature = '6'.repeat(64);
-const failedSignature = '7'.repeat(64);
-const oldestSignature = '8'.repeat(64);
+const signature = '5'.repeat(87);
+const olderSignature = '6'.repeat(87);
+const failedSignature = '7'.repeat(87);
+const oldestSignature = '8'.repeat(87);
 const calls = [];
 const result = await collectSolanaRpcEvidence({
   walletAddress: wallet,
@@ -126,6 +126,11 @@ assert.throws(() => buildSolanaRpcProvenance({
 assert.throws(() => buildSolanaRpcProvenance({
   walletAddress: wallet,
   signatures: [{ signature: 'not-a-solana-signature', slot: 125, blockTime: 1788190002, err: null }]
+}), /invalid_rpc_signature/);
+
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [{ signature: '1'.repeat(32), slot: 125, blockTime: 1788190002, err: null }]
 }), /invalid_rpc_signature/);
 
 await assert.rejects(
