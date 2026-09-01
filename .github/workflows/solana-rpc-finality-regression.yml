@@ -1,0 +1,30 @@
+name: Solana RPC Finality Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-evidence-source.mjs'
+      - 'scripts/solana-rpc-finality-regression.mjs'
+      - '.github/workflows/solana-rpc-finality-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/api/src/solana-evidence-source.mjs'
+      - 'scripts/solana-rpc-finality-regression.mjs'
+      - '.github/workflows/solana-rpc-finality-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: node --check services/api/src/solana-evidence-source.mjs
+      - name: Synthetic finality regression
+        run: node scripts/solana-rpc-finality-regression.mjs
