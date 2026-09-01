@@ -1,0 +1,32 @@
+name: Automatic Network Fee Runtime Regression
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install API dependencies
+        working-directory: services/api
+        run: npm install --omit=dev
+      - name: Syntax check
+        run: |
+          node --check services/api/src/reconciliation-network-fee-source.mjs
+          node --check services/api/src/reconciliation-runtime-service.mjs
+          node --check scripts/automatic-network-fee-runtime-regression.mjs
+      - name: Automatic network fee regression
+        run: node scripts/automatic-network-fee-runtime-regression.mjs
+      - name: Fail-closed contract
+        run: |
+          grep -q 'reconciliation_caller_network_fee_snapshot_forbidden' services/api/src/reconciliation-runtime-service.mjs
+          grep -q 'RECONCILIATION_SOL_USD_POOL_ADDRESS=' .env.example
+          ! grep -q 'networkFeeSnapshot: input.network_fee_snapshot' services/api/src/reconciliation-runtime-service.mjs
+          ! grep -q 'verification_authorized: true' services/api/src/reconciliation-network-fee-source.mjs
+          ! grep -q 'publication_authorized: true' services/api/src/reconciliation-network-fee-source.mjs
+          ! grep -q 'live_execution_authorized: true' services/api/src/reconciliation-network-fee-source.mjs
