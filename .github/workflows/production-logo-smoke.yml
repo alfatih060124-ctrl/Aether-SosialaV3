@@ -1,0 +1,25 @@
+name: AETHER Production Logo Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      origin:
+        description: Public AETHER origin
+        required: false
+        default: https://aether.boats
+  deployment_status:
+
+jobs:
+  production-logo-smoke:
+    if: github.event_name == 'workflow_dispatch' || github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Verify public AETHER logo is real SVG, not SPA fallback
+        env:
+          AETHER_PUBLIC_ORIGIN: ${{ github.event.inputs.origin || 'https://aether.boats' }}
+        run: node scripts/production-logo-smoke.mjs
