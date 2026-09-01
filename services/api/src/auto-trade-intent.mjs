@@ -3,11 +3,24 @@ import { buildExecutionIntent } from './execution-boundary.mjs';
 const ACTIVE = 'ACTIVE';
 const SHADOW = 'SHADOW';
 const EXECUTABLE_ACTIONS = new Set(['BUY', 'SELL']);
+const SENSITIVE_KEYS = new Set(['privatekey','secretkey','seedphrase','mnemonic','keypair','signingkey','signer']);
 
 function text(value, name) {
   const out = String(value ?? '').trim();
   if (!out) throw new Error(`${name}_required`);
   return out;
+}
+
+function assertNoSigningMaterial(value) {
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return;
+    for (const [key, child] of Object.entries(node)) {
+      const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (SENSITIVE_KEYS.has(normalized)) throw new Error('signing_material_forbidden');
+      visit(child);
+    }
+  };
+  visit(value);
 }
 
 function assertTraderGate(trader = {}) {
@@ -38,6 +51,7 @@ export function buildAutoTradeExecutionIntent({
   ttlMs = 30_000
 } = {}) {
   if (!decision || typeof decision !== 'object') throw new Error('autotrade_decision_required');
+  assertNoSigningMaterial({ decision, trader, mandate });
   const action = String(decision.action || '').toUpperCase();
   if (!EXECUTABLE_ACTIONS.has(action)) throw new Error('autotrade_decision_not_executable');
   if (String(decision.mode || '').toUpperCase() !== SHADOW) throw new Error('non_shadow_autotrade_decision_blocked');
