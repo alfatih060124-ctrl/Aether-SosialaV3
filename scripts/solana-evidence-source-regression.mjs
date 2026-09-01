@@ -29,7 +29,7 @@ assert.equal(result.published, false);
 assert.equal(result.evidence_status, 'NOT_RECORDED');
 assert.equal(result.reason, 'reconciled_trade_performance_required');
 assert.equal(result.source_reference, signature);
-assert.equal(result.provenance.schema_version, 6);
+assert.equal(result.provenance.schema_version, 7);
 assert.equal(result.provenance.rpc_endpoint_label, 'synthetic-rpc-test-only');
 assert.equal(result.provenance.rpc_commitment, 'finalized');
 assert.equal(result.provenance.pages_fetched, 1);
@@ -198,6 +198,25 @@ assert.throws(() => buildSolanaRpcProvenance({
   walletAddress: wallet,
   signatures: [{ signature, slot: 123, blockTime: 1788190000, err: null, confirmationStatus: 'mystery' }]
 }), /invalid_rpc_confirmation_status/);
+
+// RPC error metadata participates in the provenance hash and must be lossless JSON.
+// Reject values JSON.stringify would silently coerce/drop or cannot serialize.
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [{ signature, slot: 123, blockTime: 1788190000, err: { code: Number.NaN } }]
+}), /invalid_rpc_error_json/);
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [{ signature, slot: 123, blockTime: 1788190000, err: { code: Number.POSITIVE_INFINITY } }]
+}), /invalid_rpc_error_json/);
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [{ signature, slot: 123, blockTime: 1788190000, err: { detail: undefined } }]
+}), /invalid_rpc_error_json/);
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [{ signature, slot: 123, blockTime: 1788190000, err: 1n }]
+}), /invalid_rpc_error_json/);
 
 assert.throws(() => buildSolanaRpcProvenance({
   walletAddress: wallet,
