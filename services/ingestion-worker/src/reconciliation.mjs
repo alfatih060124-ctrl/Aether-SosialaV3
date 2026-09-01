@@ -1,4 +1,9 @@
 function parseIntegerRaw(value) {
+  if (typeof value === 'number') {
+    if (!Number.isSafeInteger(value)) return null;
+    return BigInt(value);
+  }
+
   const text = typeof value === 'bigint' ? value.toString() : String(value ?? '');
   if (!/^-?(0|[1-9]\d*)$/.test(text)) return null;
   try {
