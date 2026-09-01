@@ -26,6 +26,7 @@ assert.throws(()=>buildExecutionIntent({ ...base, mode:'LIVE' }),/non_shadow_exe
 assert.throws(()=>buildExecutionIntent({ ...base, token_mint:'not-a-mint' }),/invalid_token_mint/);
 assert.throws(()=>buildExecutionIntent({ ...base, mandate_id:null }),/invalid_execution_mandate_link/);
 assert.throws(()=>buildExecutionIntent({ ...base, risk_context:{ private_key:'forbidden' } }),/signing_material_forbidden/);
+assert.throws(()=>buildExecutionIntent({ ...base, risk_context:{ signer:{ publicKey:'forbidden-in-shadow-boundary' } } }),/signing_material_forbidden/);
 assert.throws(()=>createLiveDispatcherBoundary(),/live_dispatcher_not_implemented/);
 
 assert.equal(transitionExecution('CREATED','RISK_CHECKED').state,'RISK_CHECKED');
@@ -64,5 +65,29 @@ const blockedSignature = await fakeSignatureAttempt.dispatch(a,{ risk:goodRisk,n
 assert.equal(blockedSignature.state,'FAILED');
 assert.ok(blockedSignature.reason_codes.includes('SHADOW_CHAIN_SIGNATURE_FORBIDDEN'));
 assert.equal(blockedSignature.execution_dispatched,false);
+
+for (const [name, hookConfig] of [
+  ['quote signer metadata', { quoteHook: async()=>({ ok:true, shadow:true, signer:{ publicKey:'forbidden' } }) }],
+  ['simulation private key metadata', { simulationHook: async()=>({ ok:true, shadow:true, private_key:'forbidden' }) }],
+  ['authorization signer metadata', { authorizationHook: async()=>({ ok:true, shadow:true, signer:{ publicKey:'forbidden' }, signer_required:false, live_execution_authorized:false }) }],
+  ['reconciliation signing key metadata', { reconciliationHook: async()=>({ ok:true, shadow:true, signing_key:'forbidden' }) }]
+]) {
+  const guarded = new ShadowDispatcher(hookConfig);
+  await assert.rejects(()=>guarded.dispatch(a,{ risk:goodRisk,now:NOW }),/signing_material_forbidden/,name);
+}
+
+const networkQuote = new ShadowDispatcher({ quoteHook: async()=>({ ok:true, shadow:true, network_submission:true }) });
+const blockedNetworkQuote = await networkQuote.dispatch(a,{ risk:goodRisk,now:NOW });
+assert.equal(blockedNetworkQuote.state,'REJECTED');
+assert.ok(blockedNetworkQuote.reason_codes.includes('QUOTE_REJECTED'));
+assert.equal(blockedNetworkQuote.execution_dispatched,false);
+assert.equal(blockedNetworkQuote.network_submission,false);
+
+const networkAuthorization = new ShadowDispatcher({ authorizationHook: async()=>({ ok:true, shadow:true, signer_required:false, live_execution_authorized:false, network_submission:true }) });
+const blockedNetworkAuthorization = await networkAuthorization.dispatch(a,{ risk:goodRisk,now:NOW });
+assert.equal(blockedNetworkAuthorization.state,'REJECTED');
+assert.ok(blockedNetworkAuthorization.reason_codes.includes('SHADOW_AUTHORIZATION_REJECTED'));
+assert.equal(blockedNetworkAuthorization.execution_dispatched,false);
+assert.equal(blockedNetworkAuthorization.network_submission,false);
 
 console.log('execution boundary regression: PASS');

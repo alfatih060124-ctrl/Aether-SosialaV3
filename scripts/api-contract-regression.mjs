@@ -4,6 +4,8 @@ import { API_CONTRACT } from '../services/api/src/api-contract.mjs';
 
 const server = await fs.readFile(new URL('../services/api/src/server.mjs', import.meta.url), 'utf8');
 const edge = await fs.readFile(new URL('../api/index.mjs', import.meta.url), 'utf8');
+const reconciledService = await fs.readFile(new URL('../services/api/src/reconciled-performance-service.mjs', import.meta.url), 'utf8');
+const reconciliationRuntime = await fs.readFile(new URL('../services/api/src/reconciliation-runtime-service.mjs', import.meta.url), 'utf8');
 
 const allRoutes = Object.entries(API_CONTRACT)
   .filter(([, value]) => Array.isArray(value))
@@ -46,6 +48,9 @@ assert.equal(API_CONTRACT.invariants.market_token_lookup_is_read_only, true);
 assert.equal(API_CONTRACT.invariants.evidence_collection_does_not_verify, true);
 assert.equal(API_CONTRACT.invariants.evidence_recording_does_not_verify, true);
 assert.equal(API_CONTRACT.invariants.reconciled_performance_evidence_does_not_verify, true);
+assert.equal(API_CONTRACT.invariants.direct_reconciliation_metrics_ingest_blocked, true);
+assert.equal(API_CONTRACT.invariants.coordinated_reconciliation_sources_required, true);
+assert.equal(API_CONTRACT.invariants.incomplete_reconciliation_sources_do_not_write_ledger, true);
 assert.equal(API_CONTRACT.invariants.verification_does_not_publish, true);
 assert.equal(API_CONTRACT.invariants.publication_requires_prior_verification, true);
 assert.equal(API_CONTRACT.invariants.copy_mandate_requires_published_verified_trader, true);
@@ -90,5 +95,17 @@ assert.ok(
   server.includes("route==='/api/shadow/simulate'){if(!auth(req))return send(res,401,{error:'unauthorized'});"),
   'direct PRIMARY_VM shadow simulation must require API_TOKEN before any simulation work'
 );
+
+assert.ok(reconciledService.includes('createReconciliationRuntimeService'));
+assert.ok(reconciledService.includes('reconciliation_manual_metrics_blocked'));
+assert.ok(reconciledService.includes('coordinateAndRecord'));
+assert.ok(reconciliationRuntime.includes('coordinateReconciliationSources'));
+assert.ok(reconciliationRuntime.includes("status: 'PENDING_CONFIGURATION'"));
+assert.ok(reconciliationRuntime.includes("status: 'RECONCILIATION_RECORDED'"));
+assert.ok(reconciliationRuntime.includes('ledger_recorded: false'));
+assert.ok(reconciliationRuntime.includes("source_type: 'AETHER_COORDINATED_RECONCILIATION'"));
+assert.equal(reconciliationRuntime.includes('verification_authorized: true'), false);
+assert.equal(reconciliationRuntime.includes('publication_authorized: true'), false);
+assert.equal(reconciliationRuntime.includes('live_execution_authorized: true'), false);
 
 console.log('api contract regression: PASS');
