@@ -133,12 +133,35 @@ assert.throws(() => buildSolanaRpcProvenance({
   signatures: [{ signature: '1'.repeat(32), slot: 125, blockTime: 1788190002, err: null }]
 }), /invalid_rpc_signature/);
 
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [{ signature, slot: '123', blockTime: 1788190000, err: null }]
+}), /invalid_rpc_slot/);
+
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [{ signature, slot: 123, blockTime: -1, err: null }]
+}), /invalid_rpc_block_time/);
+
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [{ signature, slot: 123, blockTime: 1788190000, err: null, confirmationStatus: 'mystery' }]
+}), /invalid_rpc_confirmation_status/);
+
 await assert.rejects(
   collectSolanaRpcEvidence({
     walletAddress: wallet,
     rpcCall: async () => [{ signature: '', slot: 126, blockTime: 1788190003, err: null }]
   }),
   /invalid_rpc_signature/
+);
+
+await assert.rejects(
+  collectSolanaRpcEvidence({
+    walletAddress: wallet,
+    rpcCall: async () => [{ signature, slot: null, blockTime: 1788190003, err: null }]
+  }),
+  /invalid_rpc_slot/
 );
 
 const empty = await collectSolanaRpcEvidence({ walletAddress: wallet, rpcCall: async () => [] });
