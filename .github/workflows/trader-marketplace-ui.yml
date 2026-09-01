@@ -1,0 +1,31 @@
+name: Trader Marketplace UI Regression
+
+on:
+  pull_request:
+    paths:
+      - 'public/marketplace.html'
+      - 'vercel.json'
+      - 'deploy/vercel-direct-deploy-manifest.json'
+      - 'scripts/trader-marketplace-ui-regression.mjs'
+      - '.github/workflows/trader-marketplace-ui.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'public/marketplace.html'
+      - 'vercel.json'
+      - 'deploy/vercel-direct-deploy-manifest.json'
+      - 'scripts/trader-marketplace-ui-regression.mjs'
+      - '.github/workflows/trader-marketplace-ui.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  trader-marketplace-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/trader-marketplace-ui-regression.mjs
