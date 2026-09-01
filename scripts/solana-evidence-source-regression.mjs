@@ -129,6 +129,28 @@ assert.equal(paginated.verification_status, 'PENDING_DATA');
 assert.equal(paginated.verified, false);
 assert.equal(paginated.published, false);
 
+// Cursor must follow the provider's final row even when canonical sort order differs.
+const sameSlotA = '3'.repeat(87);
+const sameSlotB = '4'.repeat(87);
+const positionalCursorCalls = [];
+await collectSolanaRpcEvidence({
+  walletAddress: wallet,
+  limit: 2,
+  maxPages: 2,
+  rpcCall: async (method, params) => {
+    positionalCursorCalls.push({ method, params });
+    if (positionalCursorCalls.length === 1) {
+      return [
+        { signature: sameSlotA, slot: 200, blockTime: 1788190100, err: null, confirmationStatus: 'finalized' },
+        { signature: sameSlotB, slot: 200, blockTime: 1788190100, err: null, confirmationStatus: 'finalized' }
+      ];
+    }
+    assert.equal(params[1].before, sameSlotB);
+    return [];
+  }
+});
+assert.equal(positionalCursorCalls[1].params[1].before, sameSlotB);
+
 const capped = await collectSolanaRpcEvidence({
   walletAddress: wallet,
   limit: 2,
@@ -239,6 +261,18 @@ await assert.rejects(
     rpcCall: async () => [{ signature, slot: null, blockTime: 1788190003, err: null }]
   }),
   /invalid_rpc_slot/
+);
+
+await assert.rejects(
+  collectSolanaRpcEvidence({
+    walletAddress: wallet,
+    limit: 1,
+    rpcCall: async () => [
+      { signature, slot: 126, blockTime: 1788190003, err: null, confirmationStatus: 'finalized' },
+      { signature: olderSignature, slot: 125, blockTime: 1788190002, err: null, confirmationStatus: 'finalized' }
+    ]
+  }),
+  /rpc_page_exceeds_requested_limit/
 );
 
 const empty = await collectSolanaRpcEvidence({ walletAddress: wallet, rpcCall: async () => [] });
