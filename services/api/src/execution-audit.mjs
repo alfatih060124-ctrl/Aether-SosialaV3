@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { assertCanonicalExecutionIntent, ShadowDispatcher } from './execution-boundary.mjs';
 
 const OUTCOMES = new Set(['RECONCILED','REJECTED','FAILED']);
+const CANONICAL_SHADOW_DISPATCHER = 'ShadowDispatcher';
 
 function iso(value, name) {
   const date = new Date(value);
@@ -29,9 +30,15 @@ function assertShadowResult(result = {}) {
   return result;
 }
 
-export function buildExecutionAuditEnvelope({ intent, result, started_at, completed_at, dispatcher = 'ShadowDispatcher' } = {}) {
+function assertCanonicalShadowDispatcher(dispatcher) {
+  if (dispatcher !== CANONICAL_SHADOW_DISPATCHER) throw new Error('execution_audit_dispatcher_identity_violation');
+  return dispatcher;
+}
+
+export function buildExecutionAuditEnvelope({ intent, result, started_at, completed_at, dispatcher = CANONICAL_SHADOW_DISPATCHER } = {}) {
   assertCanonicalExecutionIntent(intent);
   assertShadowResult(result);
+  assertCanonicalShadowDispatcher(dispatcher);
   const startedAt = iso(started_at, 'execution_audit_started_at');
   const completedAt = iso(completed_at, 'execution_audit_completed_at');
   if (Date.parse(completedAt) < Date.parse(startedAt)) throw new Error('invalid_execution_audit_time_order');
@@ -57,7 +64,7 @@ export function buildExecutionAuditEnvelope({ intent, result, started_at, comple
     trader_id: intent.trader_id,
     follower_user_id: intent.follower_user_id,
     mandate_id: intent.mandate_id,
-    dispatcher,
+    dispatcher: CANONICAL_SHADOW_DISPATCHER,
     mode: 'SHADOW',
     outcome: result.state,
     reason_codes: Array.isArray(result.reason_codes) ? result.reason_codes.map(String).sort() : [],
@@ -94,6 +101,7 @@ export function buildExecutionAuditEnvelope({ intent, result, started_at, comple
 
 export class AuditedShadowDispatcher {
   constructor({ dispatcher, clock = () => Date.now() } = {}) {
+    if (dispatcher && !(dispatcher instanceof ShadowDispatcher)) throw new Error('invalid_shadow_dispatcher');
     this.dispatcher = dispatcher || new ShadowDispatcher();
     this.clock = clock;
   }
@@ -105,7 +113,7 @@ export class AuditedShadowDispatcher {
     const completedAt = iso(this.clock(), 'execution_audit_completed_at');
     return {
       ...result,
-      audit: buildExecutionAuditEnvelope({ intent, result, started_at: startedAt, completed_at: completedAt })
+      audit: buildExecutionAuditEnvelope({ intent, result, started_at: startedAt, completed_at: completedAt, dispatcher: CANONICAL_SHADOW_DISPATCHER })
     };
   }
 }
