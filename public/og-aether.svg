@@ -1,1 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="t d"><title id="t">AETHER — Trade with proof.</title><desc id="d">Social Trading + On-chain Intelligence + Verified Performance + Automated Risk + Non-Custodial Execution. AETHER brand social preview; SHADOW-safe and not a live performance claim.</desc><defs><linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630"><stop stop-color="#07111F"/><stop offset="1" stop-color="#10213A"/></linearGradient><linearGradient id="g" x1="110" y1="470" x2="390" y2="150"><stop stop-color="#8DE6CF"/><stop offset="1" stop-color="#80AAFF"/></linearGradient></defs><rect width="1200" height="630" fill="url(#bg)"/><circle cx="1020" cy="90" r="260" fill="#80AAFF" opacity=".08"/><circle cx="160" cy="560" r="270" fill="#8DE6CF" opacity=".07"/><rect x="84" y="72" width="154" height="154" rx="38" fill="#0A1728" stroke="#29445F" stroke-width="3"/><path d="M108 191 144 105h18l36 86h-24l-7-18h-29l-7 18h-23Zm39-38h12l-6-15-6 15Z" fill="url(#g)"/><path d="M103 139c20-32 58-47 93-31 8 4 16 9 23 15" fill="none" stroke="#F5F8FF" stroke-opacity=".68" stroke-width="4" stroke-linecap="round"/><circle cx="219" cy="123" r="6" fill="#8DE6CF"/><text x="278" y="138" fill="#F5F8FF" font-family="Inter,Arial,sans-serif" font-size="64" font-weight="800" letter-spacing="10">AETHER</text><text x="282" y="190" fill="#8DE6CF" font-family="Inter,Arial,sans-serif" font-size="25" font-weight="700" letter-spacing="3">TRADE WITH PROOF.</text><text x="84" y="300" fill="#F5F8FF" font-family="Inter,Arial,sans-serif" font-size="31" font-weight="700">Social Trading + On-chain Intelligence + Verified Performance</text><text x="84" y="350" fill="#F5F8FF" font-family="Inter,Arial,sans-serif" font-size="31" font-weight="700">+ Automated Risk + Non-Custodial Execution.</text><text x="84" y="420" fill="#9FB0C8" font-family="Inter,Arial,sans-serif" font-size="24">Proof-first intelligence and execution design. No illustrative metric is a LIVE performance claim.</text><rect x="84" y="484" width="224" height="50" rx="25" fill="#0D1A2D" stroke="#29445F"/><text x="114" y="517" fill="#F5F8FF" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="700" letter-spacing="2">SHADOW MODE</text><text x="84" y="580" fill="#8193AC" font-family="Inter,Arial,sans-serif" font-size="18">Non-custodial · Read-only market intelligence · LIVE execution locked</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="t d">
+<title id="t">AETHER — Trade with proof.</title>
+<desc id="d">AETHER social trading brand preview with metallic orbital identity. SHADOW-first; not a live performance claim.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630"><stop stop-color="#02050a"/><stop offset=".52" stop-color="#07111f"/><stop offset="1" stop-color="#0b1730"/></linearGradient>
+  <radialGradient id="halo" cx="50%" cy="50%" r="50%"><stop stop-color="#2c8cff" stop-opacity=".22"/><stop offset=".55" stop-color="#244bd7" stop-opacity=".09"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+  <linearGradient id="silver" x1="130" y1="120" x2="295" y2="390"><stop stop-color="#fff"/><stop offset=".28" stop-color="#ccd5e2"/><stop offset=".58" stop-color="#68778d"/><stop offset="1" stop-color="#e6edf7"/></linearGradient>
+  <linearGradient id="blue" x1="260" y1="100" x2="390" y2="405"><stop stop-color="#a2efff"/><stop offset=".25" stop-color="#3cb4ff"/><stop offset=".62" stop-color="#2767f2"/><stop offset="1" stop-color="#183b91"/></linearGradient>
+  <linearGradient id="orbit" x1="70" y1="410" x2="410" y2="145"><stop stop-color="#6046e8"/><stop offset=".45" stop-color="#2f9cff"/><stop offset=".72" stop-color="#39d1ff"/><stop offset="1" stop-color="#a5f3ff"/></linearGradient>
+  <linearGradient id="word" x1="505" y1="180" x2="1000" y2="310"><stop stop-color="#f8fbff"/><stop offset=".35" stop-color="#aeb9c9"/><stop offset=".68" stop-color="#eef4fb"/><stop offset="1" stop-color="#77869b"/></linearGradient>
+  <radialGradient id="orb" cx="35%" cy="30%" r="70%"><stop stop-color="#e9fcff"/><stop offset=".25" stop-color="#64dcff"/><stop offset=".7" stop-color="#2878ff"/><stop offset="1" stop-color="#183689"/></radialGradient>
+  <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="1200" height="630" fill="url(#bg)"/>
+<ellipse cx="276" cy="277" rx="250" ry="245" fill="url(#halo)"/>
+<circle cx="270" cy="276" r="176" fill="none" stroke="#2f69ae" stroke-opacity=".18" stroke-width="3"/>
+<path d="M107 423 223 152c6-14 16-21 30-21h18l121 292h-77l-28-70h-80l-29 70h-71Zm123-134h34l-17-45-17 45Z" fill="url(#silver)"/>
+<path d="M260 131h26l125 292h-84l-35-87h-79l31-72h22l-18-48 12-85Z" fill="url(#blue)" opacity=".98"/>
+<path d="M75 350c58 43 160 48 253 10 74-31 122-80 137-126" fill="none" stroke="#142a53" stroke-width="28" stroke-linecap="round" opacity=".6"/>
+<path d="M75 342c58 43 160 48 253 10 74-31 122-80 137-126" fill="none" stroke="url(#orbit)" stroke-width="10" stroke-linecap="round" filter="url(#glow)"/>
+<path d="M93 233c39-83 128-134 226-124 48 5 89 23 121 50" fill="none" stroke="#85dfff" stroke-opacity=".22" stroke-width="5" stroke-linecap="round"/>
+<circle cx="446" cy="186" r="27" fill="url(#orb)" filter="url(#glow)"/>
+<circle cx="437" cy="177" r="7" fill="#fff" opacity=".92"/>
+<text x="515" y="256" fill="url(#word)" font-family="Arial,Helvetica,sans-serif" font-size="102" font-weight="800" letter-spacing="13">AETHER</text>
+<rect x="518" y="286" width="448" height="3" rx="1.5" fill="url(#orbit)" opacity=".85"/>
+<text x="520" y="337" fill="#6fdcff" font-family="Arial,Helvetica,sans-serif" font-size="25" font-weight="700" letter-spacing="6">TRADE WITH PROOF.</text>
+<text x="520" y="403" fill="#d8e3f2" font-family="Arial,Helvetica,sans-serif" font-size="27" font-weight="650">Social Trading + On-chain Intelligence</text>
+<text x="520" y="445" fill="#d8e3f2" font-family="Arial,Helvetica,sans-serif" font-size="27" font-weight="650">Verified Performance + Automated Risk</text>
+<text x="520" y="487" fill="#d8e3f2" font-family="Arial,Helvetica,sans-serif" font-size="27" font-weight="650">Non-Custodial Execution</text>
+<rect x="520" y="526" width="210" height="46" rx="23" fill="#0c172b" stroke="#315589"/>
+<text x="550" y="556" fill="#9ddfff" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="700" letter-spacing="2">SHADOW MODE</text>
+<text x="760" y="555" fill="#7f91aa" font-family="Arial,Helvetica,sans-serif" font-size="17">LIVE execution locked</text>
+</svg>
