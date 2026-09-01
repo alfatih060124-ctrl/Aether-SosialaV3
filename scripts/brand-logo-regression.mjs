@@ -50,4 +50,18 @@ rejectText(legacyLanding, '<span class="mark">A</span>', 'web/index.html');
 const vmDashboard = read('web/dashboard.html');
 requireText(vmDashboard, '/aether-mark.svg', 'web/dashboard.html');
 
+const vercel = JSON.parse(read('vercel.json'));
+const routes = Array.isArray(vercel.routes) ? vercel.routes : [];
+const fallbackIndex = routes.findIndex(route => route?.src === '/(.*)' && route?.dest === '/public/index.html');
+if (fallbackIndex < 0) throw new Error('vercel_spa_fallback_missing');
+for (const [src, dest] of [
+  ['/aether-mark.svg', '/public/aether-mark.svg'],
+  ['/favicon.svg', '/public/favicon.svg'],
+  ['/og-aether.svg', '/public/og-aether.svg'],
+]) {
+  const index = routes.findIndex(route => route?.src === src && route?.dest === dest);
+  if (index < 0) throw new Error(`vercel_brand_asset_route_missing:${src}`);
+  if (index > fallbackIndex) throw new Error(`vercel_brand_asset_route_after_fallback:${src}`);
+}
+
 console.log('AETHER brand logo regression: PASS');
