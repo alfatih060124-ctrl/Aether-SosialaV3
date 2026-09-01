@@ -66,6 +66,7 @@ jobs:
           node --check scripts/admin-evidence-ui-regression.mjs
           node --check scripts/marketplace-fixture-quarantine-regression.mjs
           node --check scripts/api-contract-regression.mjs
+          node --check scripts/current-main-rollout-regression.mjs
           node --check scripts/infrastructure-contract.mjs
           bash -n scripts/vm-apply-routing.sh
           bash -n scripts/vm-apply-infrastructure-topology.sh
@@ -73,6 +74,7 @@ jobs:
           bash -n scripts/vm-deploy-trader-onboarding.sh
           bash -n scripts/vm-deploy-verification-copy-mandates.sh
           bash -n scripts/vm-deploy-execution-uuid-hardening.sh
+          bash -n scripts/vm-deploy-current-main-shadow.sh
           bash -n scripts/vm-finalize-shadow.sh
       - name: PRIMARY_VM rollout host-node independence
         run: |
@@ -82,6 +84,8 @@ jobs:
           grep -q -- '--read-only' scripts/vm-deploy-execution-uuid-hardening.sh
       - name: Infrastructure topology regression
         run: node scripts/infrastructure-contract.mjs
+      - name: Current main rollout regression
+        run: node scripts/current-main-rollout-regression.mjs
       - name: Admin fail-closed safety regression
         run: node scripts/admin-safety-regression.mjs
       - name: Execution UUID fail-closed regression
