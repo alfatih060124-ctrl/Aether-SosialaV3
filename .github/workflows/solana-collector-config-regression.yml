@@ -1,0 +1,29 @@
+name: Solana Collector Config Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-evidence-source.mjs'
+      - 'scripts/solana-collector-config-regression.mjs'
+      - '.github/workflows/solana-collector-config-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/api/src/solana-evidence-source.mjs'
+      - 'scripts/solana-collector-config-regression.mjs'
+      - '.github/workflows/solana-collector-config-regression.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        run: |
+          node --check services/api/src/solana-evidence-source.mjs
+          node --check scripts/solana-collector-config-regression.mjs
+      - name: Fail-closed collector config regression
+        run: node scripts/solana-collector-config-regression.mjs
