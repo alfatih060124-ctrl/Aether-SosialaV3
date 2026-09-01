@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { collectInternalReconciliationEvidence } from './internal-reconciliation-evidence-source.mjs';
+import { createReconciliationRuntimeService } from './reconciliation-runtime-service.mjs';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const ACCOUNTING_METHODS = new Set(['FIFO_COST_BASIS_V1','WEIGHTED_AVERAGE_COST_BASIS_V1']);
@@ -88,6 +89,9 @@ export function calculateDeterministicReputation(metrics = {}) {
   };
 }
 
+// Legacy pure validator retained for historical regression coverage only. Runtime ledger
+// ingestion no longer accepts these caller-supplied metrics; recordTrades delegates to the
+// coordinated FIFO/fee/valuation/equity path below.
 export function buildReconciledLedgerRecord({ traderId, walletAddress, event, input = {} } = {}) {
   const trader = text(traderId, 'trader_id', 8, 80);
   const wallet = text(walletAddress, 'wallet_address', 32, 44);
@@ -199,6 +203,9 @@ function collectionProjection(row) {
 
 export function createReconciledPerformanceService(pool) {
   if (!pool) throw new Error('database_unconfigured');
+  const reconciliationRuntime = createReconciliationRuntimeService(pool, {
+    quoteMints: process.env.RECONCILIATION_QUOTE_MINTS || ''
+  });
 
   async function loadApprovedTrader(traderId, client = pool) {
     const trader = (await client.query(
@@ -215,46 +222,19 @@ export function createReconciledPerformanceService(pool) {
   return {
     async recordTrades(traderId, input = {}) {
       const rows = input.rows;
-      if (!Array.isArray(rows) || rows.length < 1 || rows.length > MAX_BATCH_ROWS) throw new Error('invalid_reconciliation_rows');
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        const trader = await loadApprovedTrader(traderId, client);
-        const output = [];
-        for (const item of rows) {
-          const eventId = text(item.trade_event_id, 'trade_event_id', 1, 120);
-          const event = (await client.query('SELECT * FROM trade_events WHERE event_id=$1', [eventId])).rows[0];
-          const record = buildReconciledLedgerRecord({ traderId: trader.trader_id, walletAddress: trader.wallet_address, event, input: item });
-          const existing = (await client.query(
-            'SELECT * FROM trader_reconciled_trades WHERE trader_id=$1 AND trade_event_id=$2',
-            [trader.trader_id, record.trade_event_id]
-          )).rows[0];
-          if (existing) {
-            if (existing.source_hash !== record.source_hash) throw new Error('reconciliation_conflict');
-            output.push(tradeProjection(existing));
-            continue;
-          }
-          const stored = (await client.query(
-            `INSERT INTO trader_reconciled_trades(
-               reconciliation_trade_id,trader_id,trade_event_id,source_signature,source_slot,executed_at,
-               realized_pnl_minor,capital_minor,equity_after_minor,accounting_method,valuation_reference,
-               source_hash,reconciliation_status,provenance
-             ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'RECONCILED',$13::jsonb)
-             RETURNING *`,
-            [record.reconciliation_trade_id,record.trader_id,record.trade_event_id,record.source_signature,record.source_slot,
-             record.executed_at,record.realized_pnl_minor,record.capital_minor,record.equity_after_minor,
-             record.accounting_method,record.valuation_reference,record.source_hash,JSON.stringify(record.provenance)]
-          )).rows[0];
-          output.push(tradeProjection(stored));
-        }
-        await client.query('COMMIT');
-        return output;
-      } catch (error) {
-        await client.query('ROLLBACK').catch(()=>{});
-        throw error;
-      } finally {
-        client.release();
+      if (!Array.isArray(rows) || rows.length !== 1) throw new Error('reconciliation_coordinated_single_trade_required');
+      const item = rows[0] || {};
+      for (const forbidden of ['realized_pnl_minor','capital_minor','equity_after_minor','accounting_method','valuation_reference']) {
+        if (Object.prototype.hasOwnProperty.call(item, forbidden)) throw new Error('reconciliation_manual_metrics_blocked');
       }
+      const result = await reconciliationRuntime.coordinateAndRecord(traderId, item);
+      if (!result.ledger_recorded) {
+        const status = String(result.status || 'PENDING').toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+        const blocker = String(result.blockers?.[0] || result.missing_sources?.[0] || 'source_completeness_required')
+          .toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+        throw new Error(`reconciliation_sources_incomplete:${status}:${blocker}`);
+      }
+      return [result.record];
     },
 
     async listTrades(traderId, limit = 100) {
