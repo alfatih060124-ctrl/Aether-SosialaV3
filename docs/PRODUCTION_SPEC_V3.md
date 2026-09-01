@@ -38,6 +38,10 @@ Per DEX/version: at least 30 verified positive fixtures and 10 negative/ambiguou
 
 `preflight_live.py` is the intended activation gate. LIVE must remain blocked when the corpus or any required check is incomplete.
 
+The implemented preflight is intentionally read-only and fail-closed. It validates a non-secret `VERIFIED_ONCHAIN` evidence manifest plus the runtime safety flags, emits machine-readable PASS/FAIL output, and never changes execution mode, enables LIVE, writes runtime state, contacts the network, or handles signing material. It requires `EXECUTION_MODE=SHADOW` and `LIVE_ENABLED=false` while evaluating readiness, so activation remains a separate explicit operator-controlled action after preflight.
+
+Synthetic/demo fixtures do not count toward LIVE readiness. `packages/decoder-fixtures/live-manifest.example.json` is an intentionally failing template only; its zero counts, placeholder sources, and false checks must not be interpreted as evidence. The dedicated regression suite must prove that incomplete coverage, insufficient counts, nonzero negative false positives, non-100% regression, inexact reconciliation, stale/failed health checks, secret-bearing manifests, disabled fixture approval, missing operator approval, or already-enabled LIVE all fail closed.
+
 ## Services
 
 - Public Web

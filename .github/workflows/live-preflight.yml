@@ -1,0 +1,33 @@
+name: AETHER LIVE Preflight Regression
+
+on:
+  pull_request:
+    paths:
+      - preflight_live.py
+      - scripts/live-preflight-regression.py
+      - packages/decoder-fixtures/**
+      - docs/PRODUCTION_SPEC_V3.md
+      - .github/workflows/live-preflight.yml
+  push:
+    branches: [main]
+    paths:
+      - preflight_live.py
+      - scripts/live-preflight-regression.py
+      - packages/decoder-fixtures/**
+      - docs/PRODUCTION_SPEC_V3.md
+      - .github/workflows/live-preflight.yml
+
+jobs:
+  fail-closed-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python syntax check
+        run: |
+          python -m py_compile preflight_live.py
+          python -m py_compile scripts/live-preflight-regression.py
+      - name: LIVE preflight fail-closed regression
+        run: python scripts/live-preflight-regression.py
