@@ -16,10 +16,7 @@ fail(){ printf '[aether-current-main] ERROR: %s\n' "$*" >&2; exit 1; }
 [ -s "$ENV_FILE" ] || fail "$ENV_FILE is missing or empty"
 cd "$APP_DIR"
 
-case "$EXPECTED_SHA" in
-  [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]) ;;
-  *) fail "EXPECTED_SHA must be the approved 40-character commit SHA" ;;
-esac
+printf '%s' "$EXPECTED_SHA" | grep -Eq '^[0-9a-fA-F]{40}$' || fail "EXPECTED_SHA must be the approved 40-character commit SHA"
 EXPECTED_SHA="$(printf '%s' "$EXPECTED_SHA" | tr 'A-F' 'a-f')"
 
 for cmd in git docker curl; do command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not installed"; done
@@ -76,7 +73,9 @@ grep -q '127.0.0.1:8080:8080' docker-compose.yml || fail "API must remain localh
 if grep -Eq '(^|["[:space:]-])5432:5432(["[:space:]]|$)|0\.0\.0\.0:5432' docker-compose.yml; then
   fail "PostgreSQL host publishing is forbidden"
 fi
-! grep -Eq 'EXECUTION_MODE:[[:space:]]*LIVE|LIVE_ENABLED:[[:space:]]*["'"']?true' docker-compose.yml || fail "compose contains LIVE enablement"
+if grep -Eq 'EXECUTION_MODE:[[:space:]]*LIVE|LIVE_ENABLED:[[:space:]]*"?true"?' docker-compose.yml; then
+  fail "compose contains LIVE enablement"
+fi
 
 say "building candidate API image"
 docker compose --env-file "$ENV_FILE" build api
@@ -115,7 +114,7 @@ cleanup_smoke
 trap - EXIT INT TERM
 
 say "recreating PRIMARY_VM API from approved image/source"
-docker compose --env-file "$ENV_FILE" up -d api
+docker compose --env-file "$ENV_FILE" up -d --force-recreate api
 
 say "waiting for database-backed readiness and migrations"
 ready=0
