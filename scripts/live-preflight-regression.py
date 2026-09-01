@@ -109,6 +109,26 @@ def main():
     weak["coverage"][0]["positive_verified"] = 29
     expect_fail(weak, "insufficient_positive_fixtures")
 
+    weak_negative = valid_manifest()
+    weak_negative["coverage"][0]["negative_verified"] = 9
+    expect_fail(weak_negative, "insufficient_negative_fixtures")
+
+    false_positive = valid_manifest()
+    false_positive["coverage"][0]["negative_false_positives"] = 1
+    expect_fail(false_positive, "negative_false_positives_nonzero")
+
+    partial_regression = valid_manifest()
+    partial_regression["coverage"][0]["regression_pass_rate"] = 0.99
+    expect_fail(partial_regression, "regression_not_100_percent")
+
+    inexact = valid_manifest()
+    inexact["coverage"][0]["exact_token_amount_reconciliation"] = False
+    expect_fail(inexact, "reconciliation_not_exact")
+
+    bad_hash = valid_manifest()
+    bad_hash["coverage"][0]["evidence_sha256"] = "not-a-hash"
+    expect_fail(bad_hash, "invalid_evidence_sha256")
+
     synthetic = valid_manifest()
     synthetic["fixture_class"] = "SYNTHETIC_TEST"
     expect_fail(synthetic, "fixture_class_must_be_verified_onchain")
