@@ -71,17 +71,22 @@ function normalizeEndpointLabel(value) {
   return label;
 }
 
-function normalizeCollectionMetadata({ pagesFetched, pageSize, collectionComplete }) {
+function normalizeCollectionMetadata({ pagesFetched, pageSize, maxPages, collectionComplete }) {
   if (!Number.isSafeInteger(pagesFetched) || pagesFetched < 0 || pagesFetched > 20) {
     throw new Error('invalid_rpc_pages_fetched');
   }
   if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 1000) {
     throw new Error('invalid_rpc_page_size');
   }
+  if (!Number.isSafeInteger(maxPages) || maxPages < 1 || maxPages > 20) {
+    throw new Error('invalid_rpc_max_pages');
+  }
+  if (pagesFetched > maxPages) throw new Error('invalid_rpc_pages_fetched');
   if (typeof collectionComplete !== 'boolean') throw new Error('invalid_rpc_collection_complete');
   return {
     pages_fetched: pagesFetched,
     page_size: pageSize,
+    max_pages: maxPages,
     complete: collectionComplete
   };
 }
@@ -143,16 +148,17 @@ export function buildSolanaRpcProvenance({
   endpointLabel = 'solana-rpc',
   pagesFetched = 1,
   pageSize = 100,
+  maxPages = 3,
   collectionComplete = true,
   commitment = 'finalized'
 }) {
   const wallet = assertWallet(walletAddress);
   const canonical = canonicalSignatures(signatures);
   const normalizedEndpointLabel = normalizeEndpointLabel(endpointLabel);
-  const collection = normalizeCollectionMetadata({ pagesFetched, pageSize, collectionComplete });
+  const collection = normalizeCollectionMetadata({ pagesFetched, pageSize, maxPages, collectionComplete });
   const normalizedCommitment = normalizeCommitment(commitment);
   const sourceHash = crypto.createHash('sha256').update(JSON.stringify({
-    v: 7,
+    v: 8,
     wallet,
     source: {
       type: 'SOLANA_RPC',
@@ -163,13 +169,14 @@ export function buildSolanaRpcProvenance({
     collection
   })).digest('hex');
   return {
-    schema_version: 7,
+    schema_version: 8,
     source_type: 'SOLANA_RPC',
     wallet_address: wallet,
     rpc_endpoint_label: normalizedEndpointLabel,
     rpc_commitment: normalizedCommitment,
     pages_fetched: collection.pages_fetched,
     page_size: collection.page_size,
+    max_pages: collection.max_pages,
     collection_complete: collection.complete,
     signatures_observed: canonical.length,
     successful_signatures_observed: canonical.filter(row => row.err === null).length,
@@ -227,6 +234,7 @@ export async function collectSolanaRpcEvidence({
     endpointLabel,
     pagesFetched,
     pageSize: safeLimit,
+    maxPages: safeMaxPages,
     collectionComplete,
     commitment: normalizedCommitment
   });
