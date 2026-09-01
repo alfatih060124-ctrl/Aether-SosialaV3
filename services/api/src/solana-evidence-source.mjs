@@ -15,7 +15,7 @@ function canonicalSignatures(rows = []) {
   const deduped = new Map();
   for (const row of rows) {
     const signature = String(row?.signature || '').trim();
-    if (!SIGNATURE_BASE58.test(signature)) continue;
+    if (!SIGNATURE_BASE58.test(signature)) throw new Error('invalid_rpc_signature');
     const rawBlockTime = row?.blockTime ?? row?.block_time;
     const rawConfirmationStatus = row?.confirmationStatus ?? row?.confirmation_status;
     const normalized = {
