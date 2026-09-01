@@ -50,6 +50,7 @@ jobs:
           node --check scripts/internal-reconciliation-evidence-regression.mjs
           node --check scripts/automatic-evidence-service-regression.mjs
           node --check scripts/reconciled-performance-regression.mjs
+          node --check scripts/reconciled-performance-contract-regression.mjs
           node --check scripts/product-audit-separation-regression.mjs
           node --check scripts/execution-boundary-regression.mjs
           node --check scripts/market-intelligence-regression.mjs
@@ -85,6 +86,8 @@ jobs:
         run: node scripts/automatic-evidence-service-regression.mjs
       - name: Reconciled performance evidence regression
         run: node scripts/reconciled-performance-regression.mjs
+      - name: Reconciled performance separation contract
+        run: node scripts/reconciled-performance-contract-regression.mjs
       - name: Product audit separation regression
         run: node scripts/product-audit-separation-regression.mjs
       - name: Execution boundary regression
