@@ -75,6 +75,24 @@ for (const bad of [
   }), bad.error, bad.name);
 }
 
+const traderWithoutMode = { ...trader };
+delete traderWithoutMode.mode;
+assert.throws(() => buildAutoTradeExecutionIntent({
+  decision,
+  trader: traderWithoutMode,
+  mandate,
+  sourceDecisionId: 'decision-missing-trader-mode'
+}), /non_shadow_trader_blocked/, 'missing trader mode must fail closed');
+
+const mandateWithoutMode = { ...mandate };
+delete mandateWithoutMode.mode;
+assert.throws(() => buildAutoTradeExecutionIntent({
+  decision,
+  trader,
+  mandate: mandateWithoutMode,
+  sourceDecisionId: 'decision-missing-mandate-mode'
+}), /non_shadow_copy_mandate_blocked/, 'missing mandate mode must fail closed');
+
 assert.throws(() => buildAutoTradeExecutionIntent({
   decision: { ...decision, private_key: 'forbidden' },
   trader,

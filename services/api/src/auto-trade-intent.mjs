@@ -27,7 +27,7 @@ function assertTraderGate(trader = {}) {
   if (String(trader.status || '').toUpperCase() !== ACTIVE) throw new Error('trader_not_active');
   if (trader.verified !== true || String(trader.verification_status || '').toUpperCase() !== 'VERIFIED') throw new Error('trader_not_verified');
   if (trader.published !== true) throw new Error('trader_not_published');
-  if (String(trader.mode || SHADOW).toUpperCase() !== SHADOW) throw new Error('non_shadow_trader_blocked');
+  if (String(trader.mode || '').toUpperCase() !== SHADOW) throw new Error('non_shadow_trader_blocked');
   return text(trader.trader_id, 'trader_id');
 }
 
@@ -35,7 +35,7 @@ function assertCopyMandateGate(mandate = {}, traderId) {
   const mandateId = text(mandate.policy_id || mandate.mandate_id, 'mandate_id');
   const followerUserId = text(mandate.follower_user_id, 'follower_user_id');
   if (String(mandate.status || '').toUpperCase() !== ACTIVE) throw new Error('copy_mandate_not_active');
-  if (String(mandate.mode || SHADOW).toUpperCase() !== SHADOW) throw new Error('non_shadow_copy_mandate_blocked');
+  if (String(mandate.mode || '').toUpperCase() !== SHADOW) throw new Error('non_shadow_copy_mandate_blocked');
   if (mandate.live_execution_authorized !== false) throw new Error('copy_mandate_live_authorization_blocked');
   if (text(mandate.trader_id, 'mandate_trader_id') !== traderId) throw new Error('copy_mandate_trader_mismatch');
   return { mandateId, followerUserId };
