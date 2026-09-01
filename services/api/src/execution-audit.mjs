@@ -44,10 +44,6 @@ function assertDispatcherOptions(options) {
     if (!allowed.has(key)) throw new Error('invalid_shadow_dispatcher_options');
     if (value !== undefined && typeof value !== 'function') throw new Error('invalid_shadow_dispatcher_options');
     if (typeof value === 'function') {
-      // ShadowDispatcher invokes hooks as instance properties (`this.quoteHook(...)`).
-      // Never expose that receiver to caller-provided hooks: otherwise a hook could
-      // mutate `this.dispatch` and later execute an unaudited implementation while
-      // the envelope still records the canonical ShadowDispatcher identity.
       detached[key] = (...args) => Reflect.apply(value, undefined, args);
     }
   }
@@ -119,21 +115,23 @@ export function buildExecutionAuditEnvelope({ intent, result, started_at, comple
 }
 
 export class AuditedShadowDispatcher {
+  #dispatcher;
+  #clock;
+
   constructor({ dispatcher, dispatcherOptions, clock = () => Date.now() } = {}) {
-    // Never accept a dispatcher instance here. Even a ShadowDispatcher subclass can
-    // override dispatch() while still passing instanceof checks and then be falsely
-    // recorded as the canonical ShadowDispatcher. Accept only detached hook options
-    // and construct the concrete boundary implementation inside this trust boundary.
+    // Keep the canonical dispatcher private: no caller callback may obtain a reference
+    // and mutate dispatch() while the audit envelope still claims ShadowDispatcher.
     if (dispatcher !== undefined) throw new Error('shadow_dispatcher_injection_forbidden');
-    this.dispatcher = new ShadowDispatcher(assertDispatcherOptions(dispatcherOptions));
-    this.clock = clock;
+    if (typeof clock !== 'function') throw new Error('invalid_execution_audit_clock');
+    this.#dispatcher = new ShadowDispatcher(assertDispatcherOptions(dispatcherOptions));
+    this.#clock = (...args) => Reflect.apply(clock, undefined, args);
   }
 
   async dispatch(intent, context = {}) {
     assertCanonicalExecutionIntent(intent);
-    const startedAt = iso(this.clock(), 'execution_audit_started_at');
-    const result = await this.dispatcher.dispatch(intent, context);
-    const completedAt = iso(this.clock(), 'execution_audit_completed_at');
+    const startedAt = iso(this.#clock(), 'execution_audit_started_at');
+    const result = await this.#dispatcher.dispatch(intent, context);
+    const completedAt = iso(this.#clock(), 'execution_audit_completed_at');
     return {
       ...result,
       audit: buildExecutionAuditEnvelope({ intent, result, started_at: startedAt, completed_at: completedAt, dispatcher: CANONICAL_SHADOW_DISPATCHER })
