@@ -87,10 +87,22 @@ function normalizeCollectionMetadata({ pagesFetched, pageSize, collectionComplet
 }
 
 function canonicalJsonValue(value) {
-  if (value === null || typeof value !== 'object') return value;
+  if (value === null) return null;
+  if (typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error('invalid_rpc_error_json');
+    return value;
+  }
   if (Array.isArray(value)) return value.map(canonicalJsonValue);
+  if (typeof value !== 'object') throw new Error('invalid_rpc_error_json');
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error('invalid_rpc_error_json');
   const normalized = {};
-  for (const key of Object.keys(value).sort()) normalized[key] = canonicalJsonValue(value[key]);
+  for (const key of Object.keys(value).sort()) {
+    const child = value[key];
+    if (child === undefined) throw new Error('invalid_rpc_error_json');
+    normalized[key] = canonicalJsonValue(child);
+  }
   return normalized;
 }
 
@@ -140,7 +152,7 @@ export function buildSolanaRpcProvenance({
   const collection = normalizeCollectionMetadata({ pagesFetched, pageSize, collectionComplete });
   const normalizedCommitment = normalizeCommitment(commitment);
   const sourceHash = crypto.createHash('sha256').update(JSON.stringify({
-    v: 6,
+    v: 7,
     wallet,
     source: {
       type: 'SOLANA_RPC',
@@ -151,7 +163,7 @@ export function buildSolanaRpcProvenance({
     collection
   })).digest('hex');
   return {
-    schema_version: 6,
+    schema_version: 7,
     source_type: 'SOLANA_RPC',
     wallet_address: wallet,
     rpc_endpoint_label: normalizedEndpointLabel,
