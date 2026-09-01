@@ -3,10 +3,10 @@ import { collectSolanaRpcEvidence, buildSolanaRpcProvenance } from '../services/
 
 // Synthetic/test-only fixtures. These are not production wallet signatures or trader performance.
 const wallet = '11111111111111111111111111111111';
-const signature = '5'.repeat(64);
-const olderSignature = '6'.repeat(64);
-const failedSignature = '7'.repeat(64);
-const oldestSignature = '8'.repeat(64);
+const signature = '5'.repeat(87);
+const olderSignature = '6'.repeat(87);
+const failedSignature = '7'.repeat(87);
+const oldestSignature = '8'.repeat(87);
 const calls = [];
 const result = await collectSolanaRpcEvidence({
   walletAddress: wallet,
@@ -16,7 +16,7 @@ const result = await collectSolanaRpcEvidence({
     return [
       { signature: olderSignature, slot: 122, blockTime: 1788189990, err: null, confirmationStatus: 'finalized' },
       { signature, slot: 123, blockTime: 1788190000, err: null, confirmationStatus: 'finalized' },
-      { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, 'Custom'] }, confirmationStatus: 'finalized' },
+      { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, { Custom: 1, Detail: { b: 2, a: 1 } }] }, confirmationStatus: 'finalized' },
       { signature, slot: 123, blockTime: 1788190000, err: null, confirmationStatus: 'finalized' }
     ];
   }
@@ -48,7 +48,7 @@ const reordered = buildSolanaRpcProvenance({
   walletAddress: wallet,
   endpointLabel: 'synthetic-rpc-test-only',
   signatures: [
-    { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, 'Custom'] }, confirmationStatus: 'finalized' },
+    { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, { Detail: { a: 1, b: 2 }, Custom: 1 }] }, confirmationStatus: 'finalized' },
     { signature, slot: 123, blockTime: 1788190000, err: null, confirmationStatus: 'finalized' },
     { signature: olderSignature, slot: 122, blockTime: 1788189990, err: null, confirmationStatus: 'finalized' }
   ]
@@ -56,6 +56,16 @@ const reordered = buildSolanaRpcProvenance({
 assert.equal(reordered.source_hash, result.provenance.source_hash);
 assert.equal(reordered.newest_signature, signature);
 assert.equal(reordered.oldest_signature, failedSignature);
+
+const equivalentDuplicate = buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [
+    { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, { Custom: 1, Detail: { b: 2, a: 1 } }] } },
+    { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, { Detail: { a: 1, b: 2 }, Custom: 1 }] } }
+  ]
+});
+assert.equal(equivalentDuplicate.signatures_observed, 1);
+assert.equal(equivalentDuplicate.failed_signatures_observed, 1);
 
 const paginatedCalls = [];
 const paginated = await collectSolanaRpcEvidence({
@@ -113,9 +123,28 @@ assert.throws(() => buildSolanaRpcProvenance({
   ]
 }), /conflicting_duplicate_signature/);
 
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [{ signature: 'not-a-solana-signature', slot: 125, blockTime: 1788190002, err: null }]
+}), /invalid_rpc_signature/);
+
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [{ signature: '1'.repeat(32), slot: 125, blockTime: 1788190002, err: null }]
+}), /invalid_rpc_signature/);
+
+await assert.rejects(
+  collectSolanaRpcEvidence({
+    walletAddress: wallet,
+    rpcCall: async () => [{ signature: '', slot: 126, blockTime: 1788190003, err: null }]
+  }),
+  /invalid_rpc_signature/
+);
+
 const empty = await collectSolanaRpcEvidence({ walletAddress: wallet, rpcCall: async () => [] });
 assert.equal(empty.reason, 'no_verifiable_chain_activity');
 assert.equal(empty.source_reference, null);
 assert.equal(empty.provenance.collection_complete, true);
 assert.throws(() => buildSolanaRpcProvenance({ walletAddress: 'bad', signatures: [] }), /invalid_solana_wallet/);
+assert.throws(() => buildSolanaRpcProvenance({ walletAddress: '2'.repeat(32), signatures: [] }), /invalid_solana_wallet/);
 console.log('solana evidence source regression: PASS');
