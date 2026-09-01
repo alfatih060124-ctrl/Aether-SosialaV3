@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -18,22 +19,29 @@ BASE_ENV = {
     "OPERATOR_APPROVED": "true",
 }
 
+TARGETS = [
+    ("jupiter", "router-v6"),
+    ("raydium", "amm-v4"),
+    ("orca", "whirlpool-v2"),
+]
+
+
+def evidence_bytes(dex: str, version: str) -> bytes:
+    payload = {
+        "fixture_class": "VERIFIED_ONCHAIN",
+        "dex": dex,
+        "version": version,
+        "reviewed": True,
+        "test_only": True,
+    }
+    return (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+
 
 def valid_manifest() -> dict:
-    targets = [
-        ("jupiter", "router-v6"),
-        ("raydium", "amm-v4"),
-        ("orca", "whirlpool-v2"),
-    ]
-    hashes = {
-        "jupiter": "ab" * 32,
-        "raydium": "cd" * 32,
-        "orca": "ef" * 32,
-    }
     return {
         "schema_version": 1,
         "fixture_class": "VERIFIED_ONCHAIN",
-        "required_targets": [{"dex": dex, "version": version} for dex, version in targets],
+        "required_targets": [{"dex": dex, "version": version} for dex, version in TARGETS],
         "coverage": [
             {
                 "dex": dex,
@@ -44,9 +52,10 @@ def valid_manifest() -> dict:
                 "negative_false_positives": 0,
                 "regression_pass_rate": 1.0,
                 "exact_token_amount_reconciliation": True,
-                "evidence_sha256": hashes[dex],
+                "evidence_file": f"evidence/{dex}-{version}.json",
+                "evidence_sha256": hashlib.sha256(evidence_bytes(dex, version)).hexdigest(),
             }
-            for dex, version in targets
+            for dex, version in TARGETS
         ],
         "checks": {
             "replay_idempotency": True,
@@ -57,7 +66,25 @@ def valid_manifest() -> dict:
     }
 
 
-def run_case(manifest: dict | None, *, env_overrides: dict[str, str] | None = None):
+def write_evidence_files(root: Path, manifest: dict, *, corrupt_first: bool = False):
+    for index, row in enumerate(manifest.get("coverage", [])):
+        relative = row.get("evidence_file")
+        if not isinstance(relative, str) or not relative or Path(relative).is_absolute() or ".." in Path(relative).parts:
+            continue
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = evidence_bytes(str(row.get("dex")), str(row.get("version")))
+        if corrupt_first and index == 0:
+            payload += b"tampered\n"
+        path.write_bytes(payload)
+
+
+def run_case(
+    manifest: dict | None,
+    *,
+    env_overrides: dict[str, str] | None = None,
+    corrupt_first_evidence: bool = False,
+):
     env = os.environ.copy()
     env.update(BASE_ENV)
     if env_overrides:
@@ -74,7 +101,9 @@ def run_case(manifest: dict | None, *, env_overrides: dict[str, str] | None = No
         )
     else:
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "manifest.json"
+            tmp_root = Path(tmp)
+            path = tmp_root / "manifest.json"
+            write_evidence_files(tmp_root, manifest, corrupt_first=corrupt_first_evidence)
             path.write_text(json.dumps(manifest), encoding="utf-8")
             proc = subprocess.run(
                 [sys.executable, str(PREFLIGHT), "--manifest", str(path)],
@@ -90,8 +119,12 @@ def run_case(manifest: dict | None, *, env_overrides: dict[str, str] | None = No
     return proc.returncode, payload
 
 
-def expect_fail(manifest, reason, *, env_overrides=None):
-    code, payload = run_case(manifest, env_overrides=env_overrides)
+def expect_fail(manifest, reason, *, env_overrides=None, corrupt_first_evidence=False):
+    code, payload = run_case(
+        manifest,
+        env_overrides=env_overrides,
+        corrupt_first_evidence=corrupt_first_evidence,
+    )
     assert code == 2, (reason, code, payload)
     assert payload["eligible_for_operator_activation"] is False
     assert payload["reason"] == reason, payload
@@ -104,6 +137,7 @@ def main():
     assert code == 0, payload
     assert payload["eligible_for_operator_activation"] is True
     assert payload["targets"] == 3
+    assert payload["evidence_files_verified"] == 3
 
     weak = valid_manifest()
     weak["coverage"][0]["positive_verified"] = 29
@@ -128,6 +162,22 @@ def main():
     bad_hash = valid_manifest()
     bad_hash["coverage"][0]["evidence_sha256"] = "not-a-hash"
     expect_fail(bad_hash, "invalid_evidence_sha256")
+
+    tampered = valid_manifest()
+    expect_fail(tampered, "evidence_sha256_mismatch", corrupt_first_evidence=True)
+
+    missing_file_field = valid_manifest()
+    del missing_file_field["coverage"][0]["evidence_file"]
+    expect_fail(missing_file_field, "evidence_file_missing")
+
+    traversal = valid_manifest()
+    traversal["coverage"][0]["evidence_file"] = "../outside.json"
+    expect_fail(traversal, "evidence_file_must_be_relative")
+
+    duplicate_evidence = valid_manifest()
+    duplicate_evidence["coverage"][1]["evidence_file"] = duplicate_evidence["coverage"][0]["evidence_file"]
+    duplicate_evidence["coverage"][1]["evidence_sha256"] = duplicate_evidence["coverage"][0]["evidence_sha256"]
+    expect_fail(duplicate_evidence, "duplicate_evidence_file")
 
     synthetic = valid_manifest()
     synthetic["fixture_class"] = "SYNTHETIC_TEST"
