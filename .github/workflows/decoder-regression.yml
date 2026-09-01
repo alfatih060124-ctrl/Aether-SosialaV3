@@ -17,3 +17,5 @@ jobs:
         run: node scripts/run-decoder-fixtures.mjs
       - name: Run FIFO accounting candidate gate
         run: node scripts/fifo-accounting-regression.mjs
+      - name: Run fee equity reconciliation promoter gate
+        run: node scripts/reconciliation-promoter-regression.mjs
