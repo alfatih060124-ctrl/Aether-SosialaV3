@@ -18,6 +18,12 @@ function boundedInt(value, fallback, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
+function optionalNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function projection(row) {
   if (!row) return null;
   return {
@@ -30,6 +36,12 @@ function projection(row) {
     reason: row.reason,
     provenance: row.provenance || {},
     metrics_available: row.metrics_available === true,
+    trades_count: optionalNumber(row.trades_count),
+    total_return_bps: optionalNumber(row.total_return_bps),
+    win_rate_bps: optionalNumber(row.win_rate_bps),
+    drawdown_bps: optionalNumber(row.drawdown_bps),
+    reputation_score: optionalNumber(row.reputation_score),
+    calculation_hash: row.calculation_hash || null,
     verified: false,
     published: false,
     live_execution_authorized: false,
