@@ -40,7 +40,30 @@ assert.equal(a.audit_id,b.audit_id,'same audited execution must hash determinist
 
 assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:raw,dispatcher:'SolanaLiveDispatcher',started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/execution_audit_dispatcher_identity_violation/);
 assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:raw,dispatcher:'CustomDispatcher',started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/execution_audit_dispatcher_identity_violation/);
-assert.throws(()=>new AuditedShadowDispatcher({ dispatcher:{ async dispatch(){ return raw; } } }),/invalid_shadow_dispatcher/);
+assert.throws(()=>new AuditedShadowDispatcher({ dispatcher:{ async dispatch(){ return raw; } } }),/shadow_dispatcher_injection_forbidden/);
+assert.throws(()=>new AuditedShadowDispatcher({ dispatcher:new ShadowDispatcher() }),/shadow_dispatcher_injection_forbidden/);
+class ShadowDispatcherOverride extends ShadowDispatcher {
+  async dispatch() { return raw; }
+}
+assert.throws(()=>new AuditedShadowDispatcher({ dispatcher:new ShadowDispatcherOverride() }),/shadow_dispatcher_injection_forbidden/);
+assert.throws(()=>new AuditedShadowDispatcher({ dispatcher:Object.create(ShadowDispatcher.prototype) }),/shadow_dispatcher_injection_forbidden/);
+assert.throws(()=>new AuditedShadowDispatcher({ dispatcherOptions:{ dispatch:async()=>raw } }),/invalid_shadow_dispatcher_options/);
+assert.throws(()=>new AuditedShadowDispatcher({ dispatcherOptions:{ quoteHook:'not-a-function' } }),/invalid_shadow_dispatcher_options/);
+let observedHookReceiver = 'not-called';
+const hookedTicks = [Date.parse('2026-09-01T10:00:01.000Z'), Date.parse('2026-09-01T10:00:02.000Z')];
+const hooked = new AuditedShadowDispatcher({
+  dispatcherOptions:{
+    quoteHook:async function () {
+      observedHookReceiver = this;
+      return {ok:true,shadow:true};
+    }
+  },
+  clock:()=>hookedTicks.shift()
+});
+const hookedResult = await hooked.dispatch(intent,{ risk,now:Date.parse('2026-09-01T10:00:05.000Z') });
+assert.equal(observedHookReceiver,undefined,'audited hook must not receive ShadowDispatcher as this');
+assert.equal(hookedResult.audit.dispatcher,'ShadowDispatcher');
+assert.equal(hookedResult.execution_dispatched,false);
 assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:{...raw,intent_id:'10000000-0000-0000-0000-000000000099'},started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/execution_audit_intent_mismatch/);
 assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:{...raw,execution_dispatched:true},started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/shadow_execution_dispatch_flag_violation/);
 assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:{...raw,network_submission:true},started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/shadow_network_submission_violation/);
