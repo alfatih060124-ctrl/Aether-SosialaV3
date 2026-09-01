@@ -1,0 +1,25 @@
+name: Canonical Intent Dispatch Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/execution-boundary.mjs'
+      - 'scripts/canonical-intent-dispatch-regression.mjs'
+      - '.github/workflows/canonical-intent-dispatch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canonical-intent-dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: node --check services/api/src/execution-boundary.mjs && node --check scripts/canonical-intent-dispatch-regression.mjs
+      - name: Canonical intent dispatch regression
+        run: node scripts/canonical-intent-dispatch-regression.mjs

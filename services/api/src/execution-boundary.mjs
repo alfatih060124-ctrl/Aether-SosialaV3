@@ -17,12 +17,18 @@ const TRANSITIONS = Object.freeze({
 });
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const SENSITIVE_CONTEXT_KEYS = new Set(['privatekey','secretkey','seedphrase','mnemonic','keypair','signingkey','signer']);
 
 const text = (value, name, min = 1, max = 200) => {
   const s = String(value ?? '').trim();
   if (s.length < min || s.length > max) throw new Error(`invalid_${name}`);
+  return s;
+};
+const uuid = (value, name) => {
+  const s = text(value, name, 36, 36);
+  if (!UUID.test(s)) throw new Error(`invalid_${name}`);
   return s;
 };
 const money = (value, name) => {
@@ -96,13 +102,58 @@ function canonicalJson(value) {
   return JSON.stringify(value);
 }
 
+function executionIdempotencyPayload(intent) {
+  return {
+    schema_version:intent.schema_version,chain:intent.chain,network:intent.network,
+    source_decision_id:intent.source_decision_id,signal_assessment_id:intent.signal_assessment_id,
+    trader_id:intent.trader_id,follower_user_id:intent.follower_user_id,mandate_id:intent.mandate_id,
+    token_mint:intent.token_mint,quote_mint:intent.quote_mint,side:intent.side,
+    requested_amount_usd:intent.requested_amount_usd,max_slippage_bps:intent.max_slippage_bps,
+    mode:intent.mode,source:intent.source
+  };
+}
+
+function executionIdempotencyKey(intent) {
+  return crypto.createHash('sha256').update(canonicalJson(executionIdempotencyPayload(intent))).digest('hex');
+}
+
+export function assertCanonicalExecutionIntent(intent = {}) {
+  if (!intent || typeof intent !== 'object' || Array.isArray(intent)) throw new Error('invalid_execution_intent');
+  sanitizeContext(intent, 'execution_intent');
+  if (intent.schema_version !== 2) throw new Error('unsupported_execution_intent_schema');
+  if (intent.chain !== 'SOLANA' || intent.network !== 'mainnet-beta') throw new Error('invalid_execution_network');
+  if (intent.mode !== 'SHADOW' || intent.live_execution_authorized !== false) throw new Error('execution_intent_fail_closed');
+  uuid(intent.intent_id, 'intent_id');
+  text(intent.source_decision_id, 'source_decision_id', 8, 200);
+  if (intent.signal_assessment_id !== null && intent.signal_assessment_id !== undefined) text(intent.signal_assessment_id, 'signal_assessment_id');
+  uuid(intent.trader_id, 'trader_id');
+  const followerUserId = intent.follower_user_id === null || intent.follower_user_id === undefined ? null : uuid(intent.follower_user_id, 'follower_user_id');
+  const mandateId = intent.mandate_id === null || intent.mandate_id === undefined ? null : uuid(intent.mandate_id, 'mandate_id');
+  if (Boolean(followerUserId) !== Boolean(mandateId)) throw new Error('invalid_execution_mandate_link');
+  solanaMint(intent.token_mint, 'token_mint');
+  solanaMint(intent.quote_mint, 'quote_mint');
+  if (!SIDES.has(intent.side)) throw new Error('invalid_execution_side');
+  if (typeof intent.requested_amount_usd !== 'number' || money(intent.requested_amount_usd, 'requested_amount_usd') !== intent.requested_amount_usd) throw new Error('invalid_requested_amount_usd');
+  if (typeof intent.max_slippage_bps !== 'number' || bps(intent.max_slippage_bps, 'max_slippage_bps', 1, 5000) !== intent.max_slippage_bps) throw new Error('invalid_max_slippage_bps');
+  const createdAt = dateIso(intent.created_at, 'execution_created_at');
+  const expiresAt = dateIso(intent.expires_at, 'execution_expires_at');
+  if (createdAt !== intent.created_at || expiresAt !== intent.expires_at) throw new Error('non_canonical_execution_timestamp');
+  const expiryWindow = Date.parse(expiresAt) - Date.parse(createdAt);
+  if (expiryWindow < 1_000 || expiryWindow > 300_000) throw new Error('invalid_execution_expiry_window');
+  sanitizeContext(intent.risk_context || {}, 'risk_context');
+  text(intent.source, 'execution_source', 3, 80);
+  const idempotencyKey = text(intent.idempotency_key, 'idempotency_key', 64, 64);
+  if (!/^[a-f0-9]{64}$/.test(idempotencyKey) || idempotencyKey !== executionIdempotencyKey(intent)) throw new Error('execution_idempotency_mismatch');
+  return intent;
+}
+
 export function buildExecutionIntent(input = {}) {
   const side = String(input.side || '').toUpperCase();
   if (!SIDES.has(side)) throw new Error('invalid_execution_side');
-  const mode = String(input.mode || 'SHADOW').toUpperCase();
+  const mode = String(input.mode || '').toUpperCase();
   if (mode !== 'SHADOW') throw new Error('non_shadow_execution_intent_blocked');
-  const followerUserId = input.follower_user_id ? text(input.follower_user_id, 'follower_user_id') : null;
-  const mandateId = input.mandate_id ? text(input.mandate_id, 'mandate_id') : null;
+  const followerUserId = input.follower_user_id ? uuid(input.follower_user_id, 'follower_user_id') : null;
+  const mandateId = input.mandate_id ? uuid(input.mandate_id, 'mandate_id') : null;
   if (Boolean(followerUserId) !== Boolean(mandateId)) throw new Error('invalid_execution_mandate_link');
 
   const createdAt = dateIso(input.created_at ?? Date.now(), 'execution_created_at');
@@ -115,12 +166,12 @@ export function buildExecutionIntent(input = {}) {
 
   const intent = {
     schema_version: 2,
-    intent_id: String(input.intent_id || crypto.randomUUID()),
+    intent_id: uuid(input.intent_id || crypto.randomUUID(), 'intent_id'),
     chain: 'SOLANA',
     network: 'mainnet-beta',
     source_decision_id: text(input.source_decision_id, 'source_decision_id', 8, 200),
     signal_assessment_id: input.signal_assessment_id ? text(input.signal_assessment_id, 'signal_assessment_id') : null,
-    trader_id: text(input.trader_id, 'trader_id'),
+    trader_id: uuid(input.trader_id, 'trader_id'),
     follower_user_id: followerUserId,
     mandate_id: mandateId,
     token_mint: solanaMint(input.token_mint, 'token_mint'),
@@ -136,14 +187,7 @@ export function buildExecutionIntent(input = {}) {
     source: text(input.source || 'AUTO_TRADE_ENGINE', 'execution_source', 3, 80)
   };
 
-  intent.idempotency_key = crypto.createHash('sha256').update(canonicalJson({
-    schema_version:intent.schema_version,chain:intent.chain,network:intent.network,
-    source_decision_id:intent.source_decision_id,signal_assessment_id:intent.signal_assessment_id,
-    trader_id:intent.trader_id,follower_user_id:intent.follower_user_id,mandate_id:intent.mandate_id,
-    token_mint:intent.token_mint,quote_mint:intent.quote_mint,side:intent.side,
-    requested_amount_usd:intent.requested_amount_usd,max_slippage_bps:intent.max_slippage_bps,
-    mode:intent.mode,source:intent.source
-  })).digest('hex');
+  intent.idempotency_key = executionIdempotencyKey(intent);
   return intent;
 }
 
@@ -156,9 +200,7 @@ export function transitionExecution(state, nextState, metadata = {}) {
 }
 
 export function assertRiskRecheck({ intent, risk = {}, now = Date.now() } = {}) {
-  if (!intent || intent.mode !== 'SHADOW' || intent.live_execution_authorized !== false || intent.chain !== 'SOLANA') {
-    throw new Error('execution_intent_fail_closed');
-  }
+  assertCanonicalExecutionIntent(intent);
   const reasons = [];
   const nowMs = Number(now);
   if (!Number.isFinite(nowMs) || nowMs > Date.parse(intent.expires_at)) reasons.push('EXECUTION_INTENT_EXPIRED');
@@ -181,6 +223,7 @@ export class ShadowDispatcher {
   }
 
   async dispatch(intent, { risk, now = Date.now() } = {}) {
+    assertCanonicalExecutionIntent(intent);
     const trace = [{ state: 'CREATED', network_submission: false }];
     const riskCheck = assertRiskRecheck({ intent, risk, now });
     if (!riskCheck.passed) return { intent_id:intent.intent_id,state:'REJECTED',reason_codes:riskCheck.reason_codes,lifecycle:trace,execution_dispatched:false,network_submission:false,live_execution_authorized:false,signer_used:false };
