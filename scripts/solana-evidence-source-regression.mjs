@@ -29,7 +29,7 @@ assert.equal(result.published, false);
 assert.equal(result.evidence_status, 'NOT_RECORDED');
 assert.equal(result.reason, 'reconciled_trade_performance_required');
 assert.equal(result.source_reference, signature);
-assert.equal(result.provenance.schema_version, 8);
+assert.equal(result.provenance.schema_version, 9);
 assert.equal(result.provenance.rpc_endpoint_label, 'synthetic-rpc-test-only');
 assert.equal(result.provenance.rpc_commitment, 'finalized');
 assert.equal(result.provenance.pages_fetched, 1);
