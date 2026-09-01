@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { buildFifoAccountingCandidates } from '../../../packages/reconciliation-accounting/fifo.mjs';
 import { coordinateReconciliationSources } from '../../../packages/reconciliation-accounting/coordinator.mjs';
+import { collectAutomaticNetworkFeeSnapshot } from './reconciliation-network-fee-source.mjs';
 
 const MAX_ACCOUNTING_EVENTS = 10_000;
 const HASH_RE = /^[a-f0-9]{64}$/;
@@ -237,14 +238,28 @@ function project(row) {
   } : null;
 }
 
-export function createReconciliationRuntimeService(pool, { quoteMints = [] } = {}) {
+export function createReconciliationRuntimeService(pool, {
+  quoteMints = [],
+  networkFeeCollector = collectAutomaticNetworkFeeSnapshot,
+  networkFeeOptions = {}
+} = {}) {
   if (!pool) throw new Error('database_unconfigured');
+  if (typeof networkFeeCollector !== 'function') throw new Error('network_fee_collector_required');
   const configuredQuoteMints = normalizeReconciliationQuoteMints(quoteMints);
+  const configuredNetworkFeeOptions = {
+    rpcUrl: process.env.SOLANA_RPC_URL,
+    endpointLabel: process.env.SOLANA_RPC_ENDPOINT_LABEL || 'solana-rpc',
+    solUsdPoolAddress: process.env.RECONCILIATION_SOL_USD_POOL_ADDRESS || '',
+    ...networkFeeOptions
+  };
 
   return {
     configuredQuoteMints: [...configuredQuoteMints],
 
     async coordinateAndRecord(traderId, input = {}) {
+      if (Object.prototype.hasOwnProperty.call(input, 'network_fee_snapshot')) {
+        throw new Error('reconciliation_caller_network_fee_snapshot_forbidden');
+      }
       const targetEventId = text(input.trade_event_id, 'trade_event_id', 1, 120);
       const client = await pool.connect();
       try {
@@ -292,9 +307,29 @@ export function createReconciliationRuntimeService(pool, { quoteMints = [] } = {
           return { ...derived, ledger_recorded: false };
         }
 
+        const automaticNetworkFee = await networkFeeCollector({
+          ...configuredNetworkFeeOptions,
+          sourceSignature: String(target.tx_hash || ''),
+          expectedSlot: Number(target.slot)
+        });
+        if (!automaticNetworkFee || automaticNetworkFee.network_fee_ready !== true) {
+          await client.query('ROLLBACK');
+          return boundary({
+            status: automaticNetworkFee?.status || 'PENDING_SOURCE_COMPLETENESS',
+            source_completeness: automaticNetworkFee?.source_completeness || 'INCOMPLETE',
+            missing_sources: automaticNetworkFee?.missing_sources?.length
+              ? automaticNetworkFee.missing_sources
+              : ['SOLANA_NETWORK_FEE_USD'],
+            blockers: automaticNetworkFee?.blockers?.length
+              ? automaticNetworkFee.blockers
+              : ['network_fee_source_incomplete'],
+            ledger_recorded: false
+          });
+        }
+
         const coordinated = coordinateReconciliationSources({
           candidate: derived.candidate,
-          networkFeeSnapshot: input.network_fee_snapshot || null,
+          networkFeeSnapshot: automaticNetworkFee.network_fee_snapshot,
           explicitFees: Array.isArray(input.explicit_fees) ? input.explicit_fees : [],
           explicitFeeScan: input.explicit_fee_scan || null,
           balanceInventory: input.balance_inventory || null,
