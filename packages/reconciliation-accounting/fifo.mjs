@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 const USD_SCALE = 1_000_000n;
 const MAX_EVENTS = 10_000;
 const MAX_DECIMAL_PLACES = 6;
+export const INVENTORY_SCOPE = 'OBSERVED_EVENTS_ONLY_ZERO_OPENING_BALANCE';
 
 function requiredText(value, name, max = 160) {
   const text = String(value ?? '').trim();
@@ -166,6 +167,7 @@ export function buildFifoAccountingCandidates({ events = [], quoteMints = [] } =
         event_id: event.event_id,
         token_mint: baseMint,
         reason,
+        inventory_scope: INVENTORY_SCOPE,
         missing_quantity_raw: result.remaining.toString(),
         reconciliation_ready: false,
         evidence_ready: false,
@@ -180,6 +182,7 @@ export function buildFifoAccountingCandidates({ events = [], quoteMints = [] } =
     const hashPayload = {
       schema_version: 1,
       accounting_method: 'FIFO_COST_BASIS_V1',
+      inventory_scope: INVENTORY_SCOPE,
       event_id: event.event_id,
       source_signature: event.tx_hash,
       source_slot: event.slot,
@@ -220,6 +223,7 @@ export function buildFifoAccountingCandidates({ events = [], quoteMints = [] } =
 
   return {
     accounting_method: 'FIFO_COST_BASIS_V1',
+    inventory_scope: INVENTORY_SCOPE,
     usd_minor_scale: Number(USD_SCALE),
     trader_wallet: normalized[0]?.trader_wallet || null,
     candidates,
