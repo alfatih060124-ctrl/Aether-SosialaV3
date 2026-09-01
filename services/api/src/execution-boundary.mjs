@@ -17,12 +17,18 @@ const TRANSITIONS = Object.freeze({
 });
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const SENSITIVE_CONTEXT_KEYS = new Set(['privatekey','secretkey','seedphrase','mnemonic','keypair','signingkey','signer']);
 
 const text = (value, name, min = 1, max = 200) => {
   const s = String(value ?? '').trim();
   if (s.length < min || s.length > max) throw new Error(`invalid_${name}`);
+  return s;
+};
+const uuid = (value, name) => {
+  const s = text(value, name, 36, 36);
+  if (!UUID.test(s)) throw new Error(`invalid_${name}`);
   return s;
 };
 const money = (value, name) => {
@@ -117,12 +123,12 @@ export function assertCanonicalExecutionIntent(intent = {}) {
   if (intent.schema_version !== 2) throw new Error('unsupported_execution_intent_schema');
   if (intent.chain !== 'SOLANA' || intent.network !== 'mainnet-beta') throw new Error('invalid_execution_network');
   if (intent.mode !== 'SHADOW' || intent.live_execution_authorized !== false) throw new Error('execution_intent_fail_closed');
-  text(intent.intent_id, 'intent_id', 1, 200);
+  uuid(intent.intent_id, 'intent_id');
   text(intent.source_decision_id, 'source_decision_id', 8, 200);
   if (intent.signal_assessment_id !== null && intent.signal_assessment_id !== undefined) text(intent.signal_assessment_id, 'signal_assessment_id');
-  text(intent.trader_id, 'trader_id');
-  const followerUserId = intent.follower_user_id === null || intent.follower_user_id === undefined ? null : text(intent.follower_user_id, 'follower_user_id');
-  const mandateId = intent.mandate_id === null || intent.mandate_id === undefined ? null : text(intent.mandate_id, 'mandate_id');
+  uuid(intent.trader_id, 'trader_id');
+  const followerUserId = intent.follower_user_id === null || intent.follower_user_id === undefined ? null : uuid(intent.follower_user_id, 'follower_user_id');
+  const mandateId = intent.mandate_id === null || intent.mandate_id === undefined ? null : uuid(intent.mandate_id, 'mandate_id');
   if (Boolean(followerUserId) !== Boolean(mandateId)) throw new Error('invalid_execution_mandate_link');
   solanaMint(intent.token_mint, 'token_mint');
   solanaMint(intent.quote_mint, 'quote_mint');
@@ -146,8 +152,8 @@ export function buildExecutionIntent(input = {}) {
   if (!SIDES.has(side)) throw new Error('invalid_execution_side');
   const mode = String(input.mode || '').toUpperCase();
   if (mode !== 'SHADOW') throw new Error('non_shadow_execution_intent_blocked');
-  const followerUserId = input.follower_user_id ? text(input.follower_user_id, 'follower_user_id') : null;
-  const mandateId = input.mandate_id ? text(input.mandate_id, 'mandate_id') : null;
+  const followerUserId = input.follower_user_id ? uuid(input.follower_user_id, 'follower_user_id') : null;
+  const mandateId = input.mandate_id ? uuid(input.mandate_id, 'mandate_id') : null;
   if (Boolean(followerUserId) !== Boolean(mandateId)) throw new Error('invalid_execution_mandate_link');
 
   const createdAt = dateIso(input.created_at ?? Date.now(), 'execution_created_at');
@@ -160,12 +166,12 @@ export function buildExecutionIntent(input = {}) {
 
   const intent = {
     schema_version: 2,
-    intent_id: String(input.intent_id || crypto.randomUUID()),
+    intent_id: uuid(input.intent_id || crypto.randomUUID(), 'intent_id'),
     chain: 'SOLANA',
     network: 'mainnet-beta',
     source_decision_id: text(input.source_decision_id, 'source_decision_id', 8, 200),
     signal_assessment_id: input.signal_assessment_id ? text(input.signal_assessment_id, 'signal_assessment_id') : null,
-    trader_id: text(input.trader_id, 'trader_id'),
+    trader_id: uuid(input.trader_id, 'trader_id'),
     follower_user_id: followerUserId,
     mandate_id: mandateId,
     token_mint: solanaMint(input.token_mint, 'token_mint'),
