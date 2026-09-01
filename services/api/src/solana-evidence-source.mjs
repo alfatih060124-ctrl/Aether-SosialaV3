@@ -5,12 +5,6 @@ const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const SIGNATURE_BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,100}$/;
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
-function assertWallet(value) {
-  const wallet = String(value || '').trim();
-  if (!BASE58.test(wallet)) throw new Error('invalid_solana_wallet');
-  return wallet;
-}
-
 function decodedBase58ByteLength(value) {
   let decoded = 0n;
   for (const char of value) {
@@ -23,6 +17,12 @@ function decodedBase58ByteLength(value) {
   let leadingZeroBytes = 0;
   while (leadingZeroBytes < value.length && value[leadingZeroBytes] === '1') leadingZeroBytes += 1;
   return leadingZeroBytes + significantBytes;
+}
+
+function assertWallet(value) {
+  const wallet = String(value || '').trim();
+  if (!BASE58.test(wallet) || decodedBase58ByteLength(wallet) !== 32) throw new Error('invalid_solana_wallet');
+  return wallet;
 }
 
 function assertSignature(value) {
