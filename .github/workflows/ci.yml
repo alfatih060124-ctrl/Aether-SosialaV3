@@ -51,6 +51,7 @@ jobs:
           node --check scripts/product-audit-separation-regression.mjs
           node --check scripts/execution-boundary-regression.mjs
           node --check scripts/market-intelligence-regression.mjs
+          node --check scripts/market-edge-regression.mjs
           node --check scripts/infrastructure-contract.mjs
           bash -n scripts/vm-apply-routing.sh
           bash -n scripts/vm-apply-infrastructure-topology.sh
@@ -85,6 +86,8 @@ jobs:
         run: node scripts/execution-boundary-regression.mjs
       - name: Market intelligence regression
         run: node scripts/market-intelligence-regression.mjs
+      - name: Market edge regression
+        run: node scripts/market-edge-regression.mjs
       - name: Caddy ingress validation
         run: docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Signal quality regression
