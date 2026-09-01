@@ -76,7 +76,7 @@ assert.throws(()=>promoteAccountingCandidate({candidate,feeSnapshot:{...feeSnaps
 assert.throws(()=>promoteAccountingCandidate({candidate,feeSnapshot:{...feeSnapshot,additional_fee_minor:1_400_000},valuationSnapshot,equitySnapshot}),/fee_breakdown_mismatch/);
 assert.throws(()=>promoteAccountingCandidate({candidate,feeSnapshot:{...feeSnapshot,embedded_swap_fee_handling:'SUBTRACT_AGAIN'},valuationSnapshot,equitySnapshot}),/embedded_swap_fee_handling_required/);
 assert.throws(()=>promoteAccountingCandidate({candidate,feeSnapshot,valuationSnapshot:{...valuationSnapshot,proceeds_minor:129_000_000},equitySnapshot}),/valuation_candidate_mismatch/);
-assert.throws(()=>promoteAccountingCandidate({candidate,feeSnapshot,valuationSnapshot,equitySnapshot:{...equitySnapshot,balance_scope:'PARTIAL_WALLET'}),/equity_balance_scope_invalid/);
+assert.throws(()=>promoteAccountingCandidate({candidate,feeSnapshot,valuationSnapshot,equitySnapshot:{...equitySnapshot,balance_scope:'PARTIAL_WALLET'}}),/equity_balance_scope_invalid/);
 assert.throws(()=>promoteAccountingCandidate({candidate,feeSnapshot:{...feeSnapshot,source_hash:'not-a-hash'},valuationSnapshot,equitySnapshot}),/invalid_fee_source_hash/);
 
 console.log('reconciliation promoter regression: PASS');
