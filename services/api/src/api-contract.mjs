@@ -92,6 +92,7 @@ export const API_CONTRACT = {
     publication_requires_prior_verification: true,
     copy_mandate_requires_published_verified_trader: true,
     auto_trade_execution_dispatched: false,
-    shadow_simulation_never_authorizes_live: true
+    shadow_simulation_never_authorizes_live: true,
+    shadow_simulation_requires_api_token: true
   }
 };
