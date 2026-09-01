@@ -1,0 +1,26 @@
+name: AETHER Brand Logo Regression
+on:
+  pull_request:
+    paths:
+      - 'public/**'
+      - 'web/**'
+      - 'scripts/brand-logo-regression.mjs'
+      - '.github/workflows/brand-logo.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'public/**'
+      - 'web/**'
+      - 'scripts/brand-logo-regression.mjs'
+      - '.github/workflows/brand-logo.yml'
+
+jobs:
+  brand-logo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Verify canonical AETHER logo synchronization
+        run: node scripts/brand-logo-regression.mjs
