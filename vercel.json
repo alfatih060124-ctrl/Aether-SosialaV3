@@ -6,6 +6,9 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/index.mjs" },
+    { "src": "/aether-mark.svg", "dest": "/public/aether-mark.svg" },
+    { "src": "/favicon.svg", "dest": "/public/favicon.svg" },
+    { "src": "/og-aether.svg", "dest": "/public/og-aether.svg" },
     { "src": "/dashboard/?", "dest": "/public/dashboard.html" },
     { "src": "/onboarding/?", "dest": "/public/onboarding.html" },
     { "src": "/account/?", "dest": "/public/account.html" },
