@@ -1,10 +1,12 @@
 import crypto from 'node:crypto';
 
 const SOURCES = new Set(['SOLANA_RPC','SOLSCAN','INDEXER','INTERNAL_RECONCILIATION']);
+const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
+const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
 
 function int(value, name, min, max) {
   const n = Number(value);
-  if (!Number.isInteger(n) || n < min || n > max) throw new Error(`invalid_${name}`);
+  if (!Number.isSafeInteger(n) || n < min || n > max) throw new Error(`invalid_${name}`);
   return n;
 }
 
@@ -12,6 +14,21 @@ function text(value, name, min, max) {
   const s = String(value ?? '').trim();
   if (s.length < min || s.length > max) throw new Error(`invalid_${name}`);
   return s;
+}
+
+function safeMetricNumber(value, name) {
+  if (value < MIN_SAFE_BIGINT || value > MAX_SAFE_BIGINT) throw new Error(`invalid_${name}_range`);
+  return Number(value);
+}
+
+function roundRatio(numerator, denominator) {
+  if (denominator <= 0n) throw new Error('invalid_metric_denominator');
+  const quotient = numerator / denominator;
+  const remainder = numerator % denominator;
+  if (remainder === 0n) return quotient;
+  const twiceAbsRemainder = (remainder < 0n ? -remainder : remainder) * 2n;
+  if (numerator >= 0n) return twiceAbsRemainder >= denominator ? quotient + 1n : quotient;
+  return twiceAbsRemainder > denominator ? quotient - 1n : quotient;
 }
 
 export function normalizeEvidenceReference({ sourceType, reference }) {
@@ -31,22 +48,23 @@ export function calculateReconciledMetrics(trades = []) {
     equity_after_minor: int(trade.equity_after_minor, `trade_${i}_equity_after_minor`, 1, 9_000_000_000_000_000)
   }));
 
-  const capital = rows.reduce((sum, row) => sum + row.capital_minor, 0);
-  const pnl = rows.reduce((sum, row) => sum + row.realized_pnl_minor, 0);
+  const capital = rows.reduce((sum, row) => sum + BigInt(row.capital_minor), 0n);
+  const pnl = rows.reduce((sum, row) => sum + BigInt(row.realized_pnl_minor), 0n);
   const wins = rows.filter(row => row.realized_pnl_minor > 0).length;
-  let peak = rows[0].equity_after_minor;
-  let maxDrawdownBps = 0;
+  let peak = BigInt(rows[0].equity_after_minor);
+  let maxDrawdownBps = 0n;
   for (const row of rows) {
-    peak = Math.max(peak, row.equity_after_minor);
-    const dd = Math.round(((peak - row.equity_after_minor) * 10_000) / peak);
-    maxDrawdownBps = Math.max(maxDrawdownBps, dd);
+    const equity = BigInt(row.equity_after_minor);
+    if (equity > peak) peak = equity;
+    const dd = roundRatio((peak - equity) * 10_000n, peak);
+    if (dd > maxDrawdownBps) maxDrawdownBps = dd;
   }
 
   return {
     trades_count: rows.length,
-    total_return_bps: Math.round((pnl * 10_000) / capital),
-    win_rate_bps: Math.round((wins * 10_000) / rows.length),
-    drawdown_bps: maxDrawdownBps
+    total_return_bps: safeMetricNumber(roundRatio(pnl * 10_000n, capital), 'total_return_bps'),
+    win_rate_bps: safeMetricNumber(roundRatio(BigInt(wins) * 10_000n, BigInt(rows.length)), 'win_rate_bps'),
+    drawdown_bps: safeMetricNumber(maxDrawdownBps, 'drawdown_bps')
   };
 }
 
@@ -57,12 +75,13 @@ export function buildRecordedEvidence({ sourceType, reference, observedAt, trade
   const metrics = calculateReconciledMetrics(trades);
   const canonicalCalculationRows = trades.map(t => ({
     trade_id: String(t.trade_id),
-    realized_pnl_minor: Number(t.realized_pnl_minor),
-    capital_minor: Number(t.capital_minor),
-    equity_after_minor: Number(t.equity_after_minor)
+    realized_pnl_minor: int(t.realized_pnl_minor, 'calculation_realized_pnl_minor', -9_000_000_000_000_000, 9_000_000_000_000_000),
+    capital_minor: int(t.capital_minor, 'calculation_capital_minor', 1, 9_000_000_000_000_000),
+    equity_after_minor: int(t.equity_after_minor, 'calculation_equity_after_minor', 1, 9_000_000_000_000_000)
   }));
   const calculationHash = crypto.createHash('sha256').update(JSON.stringify({
-    v: 2,
+    v: 3,
+    arithmetic: 'BIGINT_INTEGER_BPS_HALF_TOWARD_POSITIVE_INFINITY',
     rows: canonicalCalculationRows,
     metrics
   })).digest('hex');
@@ -74,8 +93,9 @@ export function buildRecordedEvidence({ sourceType, reference, observedAt, trade
     ...metrics,
     evidence_status: 'RECORDED',
     provenance: {
-      schema_version: 2,
+      schema_version: 3,
       collector: 'AETHER_TRADER_EVIDENCE',
+      calculation_method: 'BIGINT_INTEGER_BPS_HALF_TOWARD_POSITIVE_INFINITY',
       calculation_hash: calculationHash,
       source_hash: sourceHash || null,
       rpc_endpoint_label: String(provenance.rpc_endpoint_label || '').trim() || null,
