@@ -1,0 +1,35 @@
+name: Finalized On-chain Fixture Collector Regression
+
+on:
+  pull_request:
+    paths:
+      - 'packages/decoder-fixtures/finalized-fixture-collector.mjs'
+      - 'scripts/collect-finalized-fixture.mjs'
+      - 'scripts/finalized-fixture-collector-regression.mjs'
+      - '.github/workflows/finalized-fixture-collector.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/decoder-fixtures/finalized-fixture-collector.mjs'
+      - 'scripts/collect-finalized-fixture.mjs'
+      - 'scripts/finalized-fixture-collector-regression.mjs'
+      - '.github/workflows/finalized-fixture-collector.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  collector-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        run: |
+          node --check packages/decoder-fixtures/finalized-fixture-collector.mjs
+          node --check scripts/collect-finalized-fixture.mjs
+          node --check scripts/finalized-fixture-collector-regression.mjs
+      - name: Fail-closed finalized capture regression
+        run: node scripts/finalized-fixture-collector-regression.mjs
