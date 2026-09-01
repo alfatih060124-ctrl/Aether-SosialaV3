@@ -119,7 +119,7 @@ export async function captureFinalizedFixture({
   const normalizedDex = text(dex, 'dex', 3, 20).toLowerCase();
   if (!REQUIRED_DEX.has(normalizedDex)) throw new Error('unsupported_fixture_dex');
   const normalizedVersion = normalizeVersion(version);
-  const normalizedExpected = text(expected, 'expected', 5, 6).toUpperCase();
+  const normalizedExpected = text(expected, 'expected', 1, 10).toUpperCase();
   if (!EXPECTED.has(normalizedExpected)) throw new Error('invalid_fixture_expected');
   const normalizedEndpointLabel = normalizeEndpointLabel(endpointLabel);
 
