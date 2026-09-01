@@ -4,6 +4,7 @@ import { pendingData } from './trader-evidence-collector.mjs';
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const SIGNATURE_BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,100}$/;
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const CONFIRMATION_STATUSES = new Set(['processed', 'confirmed', 'finalized']);
 
 function decodedBase58ByteLength(value) {
   let decoded = 0n;
@@ -33,6 +34,25 @@ function assertSignature(value) {
   return signature;
 }
 
+function normalizeSlot(value) {
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error('invalid_rpc_slot');
+  return value;
+}
+
+function normalizeBlockTime(value) {
+  if (value === null || value === undefined) return null;
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error('invalid_rpc_block_time');
+  return value;
+}
+
+function normalizeConfirmationStatus(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') throw new Error('invalid_rpc_confirmation_status');
+  const status = value.trim();
+  if (!CONFIRMATION_STATUSES.has(status)) throw new Error('invalid_rpc_confirmation_status');
+  return status;
+}
+
 function canonicalJsonValue(value) {
   if (value === null || typeof value !== 'object') return value;
   if (Array.isArray(value)) return value.map(canonicalJsonValue);
@@ -50,10 +70,10 @@ function canonicalSignatures(rows = []) {
     const rawConfirmationStatus = row?.confirmationStatus ?? row?.confirmation_status;
     const normalized = {
       signature,
-      slot: Number.isSafeInteger(row?.slot) && row.slot >= 0 ? row.slot : null,
-      block_time: Number.isSafeInteger(rawBlockTime) ? rawBlockTime : null,
+      slot: normalizeSlot(row?.slot),
+      block_time: normalizeBlockTime(rawBlockTime),
       err: canonicalJsonValue(row?.err ?? null),
-      confirmation_status: typeof rawConfirmationStatus === 'string' ? rawConfirmationStatus.trim() || null : null
+      confirmation_status: normalizeConfirmationStatus(rawConfirmationStatus)
     };
     const existing = deduped.get(signature);
     if (!existing) {
@@ -64,9 +84,7 @@ function canonicalSignatures(rows = []) {
     if (conflict) throw new Error('conflicting_duplicate_signature');
   }
   return [...deduped.values()].sort((a, b) => {
-    const slotA = a.slot ?? -1;
-    const slotB = b.slot ?? -1;
-    if (slotA !== slotB) return slotB - slotA;
+    if (a.slot !== b.slot) return b.slot - a.slot;
     const timeA = a.block_time ?? -1;
     const timeB = b.block_time ?? -1;
     if (timeA !== timeB) return timeB - timeA;
