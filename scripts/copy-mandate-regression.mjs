@@ -24,10 +24,11 @@ assert.equal(mandate.signer_required, false);
 assert.equal(Object.isFrozen(mandate), true);
 assert.equal(Object.isFrozen(mandate.policy), true);
 
-const allowed = assertCopyMandateAllowsIntent(mandate, {
+const identityContext = {
   follower_user_id: base.follower_user_id,
   trader_id: base.trader_id
-});
+};
+const allowed = assertCopyMandateAllowsIntent(mandate, identityContext);
 assert.equal(allowed.allowed, true);
 assert.equal(allowed.live_execution_authorized, false);
 
@@ -47,19 +48,26 @@ for (const [patch, error] of [
 
 for (const status of ['PAUSED', 'REVOKED']) {
   const inactive = createCopyMandate({ ...base, status });
-  assert.throws(() => assertCopyMandateAllowsIntent(inactive), /copy_mandate_not_active/);
+  assert.throws(() => assertCopyMandateAllowsIntent(inactive, identityContext), /copy_mandate_not_active/);
+}
+
+for (const missingContext of [undefined, null, {}, { follower_user_id: base.follower_user_id }, { trader_id: base.trader_id }]) {
+  assert.throws(
+    () => assertCopyMandateAllowsIntent(mandate, missingContext),
+    /invalid_copy_mandate_context|invalid_context_follower_user_id|invalid_context_trader_id/
+  );
 }
 
 assert.throws(
-  () => assertCopyMandateAllowsIntent(mandate, { follower_user_id: 'other-follower' }),
+  () => assertCopyMandateAllowsIntent(mandate, { ...identityContext, follower_user_id: 'other-follower' }),
   /copy_mandate_follower_mismatch/
 );
 assert.throws(
-  () => assertCopyMandateAllowsIntent(mandate, { trader_id: 'other-trader' }),
+  () => assertCopyMandateAllowsIntent(mandate, { ...identityContext, trader_id: 'other-trader' }),
   /copy_mandate_trader_mismatch/
 );
 
 const tampered = { ...mandate, live_execution_authorized: true };
-assert.throws(() => assertCopyMandateAllowsIntent(tampered), /live_execution_forbidden/);
+assert.throws(() => assertCopyMandateAllowsIntent(tampered, identityContext), /live_execution_forbidden/);
 
 console.log('Copy Mandate Regression: PASS');
