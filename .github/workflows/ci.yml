@@ -29,6 +29,7 @@ jobs:
           node --check services/api/src/trader-evidence-collector.mjs
           node --check services/api/src/solana-evidence-source.mjs
           node --check services/api/src/internal-reconciliation-evidence-source.mjs
+          node --check services/api/src/automatic-evidence-service.mjs
           node --check services/api/src/repositories/signal-intelligence.mjs
           node --check services/api/src/repositories/core.mjs
           node --check services/api/src/repositories/admin.mjs
@@ -44,6 +45,7 @@ jobs:
           node --check scripts/trader-evidence-collector-regression.mjs
           node --check scripts/solana-evidence-source-regression.mjs
           node --check scripts/internal-reconciliation-evidence-regression.mjs
+          node --check scripts/automatic-evidence-service-regression.mjs
           node --check scripts/infrastructure-contract.mjs
           bash -n scripts/vm-apply-routing.sh
           bash -n scripts/vm-apply-infrastructure-topology.sh
@@ -70,6 +72,8 @@ jobs:
         run: node scripts/solana-evidence-source-regression.mjs
       - name: Internal reconciliation evidence regression
         run: node scripts/internal-reconciliation-evidence-regression.mjs
+      - name: Automatic evidence service regression
+        run: node scripts/automatic-evidence-service-regression.mjs
       - name: Caddy ingress validation
         run: docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Signal quality regression
