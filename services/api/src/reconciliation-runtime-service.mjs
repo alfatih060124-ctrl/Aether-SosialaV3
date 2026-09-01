@@ -4,7 +4,8 @@ import { coordinateReconciliationSources } from '../../../packages/reconciliatio
 
 const MAX_ACCOUNTING_EVENTS = 10_000;
 const HASH_RE = /^[a-f0-9]{64}$/;
-const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const SOLANA_ADDRESS_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 function text(value, name, min = 1, max = 300) {
   const s = String(value ?? '').trim();
@@ -22,6 +23,32 @@ function hashText(value, name) {
   const h = text(value, name, 64, 64).toLowerCase();
   if (!HASH_RE.test(h)) throw new Error(`invalid_${name}`);
   return h;
+}
+
+function solanaAddress(value, name) {
+  const address = text(value, name, 32, 44);
+  if (!SOLANA_ADDRESS_RE.test(address)) throw new Error(`invalid_${name}`);
+  return address;
+}
+
+function decodedBase58ByteLength(value) {
+  let decoded = 0n;
+  for (const char of value) {
+    const digit = BASE58_ALPHABET.indexOf(char);
+    if (digit < 0) return -1;
+    decoded = decoded * 58n + BigInt(digit);
+  }
+  let significantBytes = 0;
+  for (let current = decoded; current > 0n; current >>= 8n) significantBytes += 1;
+  let leadingZeroBytes = 0;
+  while (leadingZeroBytes < value.length && value[leadingZeroBytes] === '1') leadingZeroBytes += 1;
+  return leadingZeroBytes + significantBytes;
+}
+
+function solanaSignature(value) {
+  const signature = text(value, 'source_signature', 64, 100);
+  if (decodedBase58ByteLength(signature) !== 64) throw new Error('invalid_source_signature');
+  return signature;
 }
 
 function boundary(extra = {}) {
@@ -42,7 +69,7 @@ export function normalizeReconciliationQuoteMints(value) {
     ? value
     : String(value ?? '').split(',').map(v => v.trim()).filter(Boolean);
   const out = [...new Set(raw.map(v => String(v).trim()).filter(Boolean))];
-  for (const mint of out) if (!MINT_RE.test(mint)) throw new Error('invalid_reconciliation_quote_mint');
+  for (const mint of out) solanaAddress(mint, 'reconciliation_quote_mint');
   return out.sort();
 }
 
@@ -115,7 +142,7 @@ export function deriveRuntimeAccountingCandidate({ events = [], targetEventId, q
 
 export function buildCoordinatedLedgerRecord({ traderId, walletAddress, event, coordinated } = {}) {
   const trader = text(traderId, 'trader_id', 8, 80);
-  const wallet = text(walletAddress, 'wallet_address', 8, 120);
+  const wallet = solanaAddress(walletAddress, 'wallet_address');
   if (!event || typeof event !== 'object') throw new Error('trade_event_not_found');
   if (!coordinated || typeof coordinated !== 'object') throw new Error('coordinated_reconciliation_required');
   if (coordinated.status !== 'RECONCILIATION_READY' || coordinated.reconciliation_ready !== true) {
@@ -140,8 +167,8 @@ export function buildCoordinatedLedgerRecord({ traderId, walletAddress, event, c
   if (String(event.chain || '').toUpperCase() !== 'SOLANA') throw new Error('reconciliation_non_solana_event');
   if (String(event.trader_wallet || '') !== wallet) throw new Error('reconciliation_wallet_mismatch');
   const eventId = text(event.event_id, 'trade_event_id', 1, 120);
-  const signature = text(event.tx_hash, 'source_signature', 32, 120);
-  if (/^shadow[_:-]/i.test(eventId) || /^shadow[_:-]/i.test(signature) || /shadow/i.test(String(event.decoder_version || ''))) {
+  const signature = solanaSignature(event.tx_hash);
+  if (/^shadow[_:-]/i.test(eventId) || /shadow/i.test(String(event.decoder_version || ''))) {
     throw new Error('synthetic_trade_event_blocked');
   }
   const slot = safeInt(event.slot, 'source_slot', 0);
