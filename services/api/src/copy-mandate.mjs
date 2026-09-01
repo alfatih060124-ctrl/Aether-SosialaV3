@@ -58,7 +58,7 @@ export function createCopyMandate(input) {
   });
 }
 
-export function assertCopyMandateAllowsIntent(mandate, context = {}) {
+export function assertCopyMandateAllowsIntent(mandate, context) {
   if (!mandate || mandate.schema !== COPY_MANDATE_SCHEMA) throw new Error('invalid_copy_mandate_schema');
   if (mandate.status !== 'ACTIVE') throw new Error('copy_mandate_not_active');
   if (mandate.execution_mode !== 'SHADOW' || mandate.execution_scope !== 'INTENT_ONLY') throw new Error('copy_mandate_scope_violation');
@@ -66,12 +66,11 @@ export function assertCopyMandateAllowsIntent(mandate, context = {}) {
   if (mandate.network_submission_authorized !== false) throw new Error('network_submission_forbidden');
   if (mandate.signer_required !== false) throw new Error('signer_forbidden');
 
-  if (context.follower_user_id !== undefined && context.follower_user_id !== mandate.follower_user_id) {
-    throw new Error('copy_mandate_follower_mismatch');
-  }
-  if (context.trader_id !== undefined && context.trader_id !== mandate.trader_id) {
-    throw new Error('copy_mandate_trader_mismatch');
-  }
+  if (!context || typeof context !== 'object' || Array.isArray(context)) throw new Error('invalid_copy_mandate_context');
+  const followerUserId = requireString(context.follower_user_id, 'context_follower_user_id');
+  const traderId = requireString(context.trader_id, 'context_trader_id');
+  if (followerUserId !== mandate.follower_user_id) throw new Error('copy_mandate_follower_mismatch');
+  if (traderId !== mandate.trader_id) throw new Error('copy_mandate_trader_mismatch');
 
   return Object.freeze({
     allowed: true,
