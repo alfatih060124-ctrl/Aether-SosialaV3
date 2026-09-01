@@ -1,0 +1,32 @@
+name: Vercel Direct Deploy Bundle Regression
+on:
+  pull_request:
+    paths:
+      - 'vercel.json'
+      - 'api/index.mjs'
+      - 'services/api/src/market-intelligence.mjs'
+      - 'public/**'
+      - 'deploy/vercel-direct-deploy-manifest.json'
+      - 'scripts/vercel-direct-deploy-bundle-regression.mjs'
+      - '.github/workflows/vercel-direct-deploy-bundle.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'vercel.json'
+      - 'api/index.mjs'
+      - 'services/api/src/market-intelligence.mjs'
+      - 'public/**'
+      - 'deploy/vercel-direct-deploy-manifest.json'
+      - 'scripts/vercel-direct-deploy-bundle-regression.mjs'
+      - '.github/workflows/vercel-direct-deploy-bundle.yml'
+
+jobs:
+  bundle-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate complete fail-closed Vercel bundle
+        run: node scripts/vercel-direct-deploy-bundle-regression.mjs
