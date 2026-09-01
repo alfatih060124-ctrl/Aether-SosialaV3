@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "fixture_class": "VERIFIED_ONCHAIN",
+  "required_targets": [
+    {"dex": "jupiter", "version": "REPLACE_WITH_EXACT_DEPLOYED_VERSION"},
+    {"dex": "raydium", "version": "REPLACE_WITH_EXACT_DEPLOYED_VERSION"},
+    {"dex": "orca", "version": "REPLACE_WITH_EXACT_DEPLOYED_VERSION"}
+  ],
+  "coverage": [
+    {
+      "dex": "jupiter",
+      "version": "REPLACE_WITH_EXACT_DEPLOYED_VERSION",
+      "source": "REPLACE_WITH_VERIFIED_ONCHAIN",
+      "positive_verified": 0,
+      "negative_verified": 0,
+      "negative_false_positives": 0,
+      "regression_pass_rate": 0.0,
+      "exact_token_amount_reconciliation": false,
+      "evidence_sha256": ""
+    },
+    {
+      "dex": "raydium",
+      "version": "REPLACE_WITH_EXACT_DEPLOYED_VERSION",
+      "source": "REPLACE_WITH_VERIFIED_ONCHAIN",
+      "positive_verified": 0,
+      "negative_verified": 0,
+      "negative_false_positives": 0,
+      "regression_pass_rate": 0.0,
+      "exact_token_amount_reconciliation": false,
+      "evidence_sha256": ""
+    },
+    {
+      "dex": "orca",
+      "version": "REPLACE_WITH_EXACT_DEPLOYED_VERSION",
+      "source": "REPLACE_WITH_VERIFIED_ONCHAIN",
+      "positive_verified": 0,
+      "negative_verified": 0,
+      "negative_false_positives": 0,
+      "regression_pass_rate": 0.0,
+      "exact_token_amount_reconciliation": false,
+      "evidence_sha256": ""
+    }
+  ],
+  "checks": {
+    "replay_idempotency": false,
+    "price_freshness": false,
+    "execution_engine_v3_health": false,
+    "signer_isolation": false
+  }
+}
