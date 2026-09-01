@@ -63,6 +63,21 @@ function normalizeEndpointLabel(value) {
   return label;
 }
 
+function normalizeCollectionMetadata({ pagesFetched, pageSize, collectionComplete }) {
+  if (!Number.isSafeInteger(pagesFetched) || pagesFetched < 0 || pagesFetched > 20) {
+    throw new Error('invalid_rpc_pages_fetched');
+  }
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 1000) {
+    throw new Error('invalid_rpc_page_size');
+  }
+  if (typeof collectionComplete !== 'boolean') throw new Error('invalid_rpc_collection_complete');
+  return {
+    pages_fetched: pagesFetched,
+    page_size: pageSize,
+    complete: collectionComplete
+  };
+}
+
 function canonicalJsonValue(value) {
   if (value === null || typeof value !== 'object') return value;
   if (Array.isArray(value)) return value.map(canonicalJsonValue);
@@ -113,31 +128,25 @@ export function buildSolanaRpcProvenance({
   const wallet = assertWallet(walletAddress);
   const canonical = canonicalSignatures(signatures);
   const normalizedEndpointLabel = normalizeEndpointLabel(endpointLabel);
-  const normalizedPagesFetched = Number.isInteger(pagesFetched) && pagesFetched >= 0 ? pagesFetched : 0;
-  const normalizedPageSize = Number.isInteger(pageSize) && pageSize > 0 ? pageSize : 100;
-  const complete = collectionComplete === true;
+  const collection = normalizeCollectionMetadata({ pagesFetched, pageSize, collectionComplete });
   const sourceHash = crypto.createHash('sha256').update(JSON.stringify({
-    v: 4,
+    v: 5,
     wallet,
     source: {
       type: 'SOLANA_RPC',
       endpoint_label: normalizedEndpointLabel
     },
     signatures: canonical,
-    collection: {
-      pages_fetched: normalizedPagesFetched,
-      page_size: normalizedPageSize,
-      complete
-    }
+    collection
   })).digest('hex');
   return {
-    schema_version: 4,
+    schema_version: 5,
     source_type: 'SOLANA_RPC',
     wallet_address: wallet,
     rpc_endpoint_label: normalizedEndpointLabel,
-    pages_fetched: normalizedPagesFetched,
-    page_size: normalizedPageSize,
-    collection_complete: complete,
+    pages_fetched: collection.pages_fetched,
+    page_size: collection.page_size,
+    collection_complete: collection.complete,
     signatures_observed: canonical.length,
     successful_signatures_observed: canonical.filter(row => row.err === null).length,
     failed_signatures_observed: canonical.filter(row => row.err !== null).length,
