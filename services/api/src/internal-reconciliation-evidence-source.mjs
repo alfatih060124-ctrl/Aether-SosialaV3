@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { buildRecordedEvidence, pendingData } from './trader-evidence-collector.mjs';
 
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]+$/;
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 function text(value, name, min = 1, max = 160) {
   const s = String(value ?? '').trim();
@@ -9,9 +10,23 @@ function text(value, name, min = 1, max = 160) {
   return s;
 }
 
-function solanaBase58(value, name, min, max) {
+function decodedBase58ByteLength(value) {
+  let decoded = 0n;
+  for (const char of value) {
+    const digit = BASE58_ALPHABET.indexOf(char);
+    if (digit < 0) return -1;
+    decoded = decoded * 58n + BigInt(digit);
+  }
+  let significantBytes = 0;
+  for (let current = decoded; current > 0n; current >>= 8n) significantBytes += 1;
+  let leadingZeroBytes = 0;
+  while (leadingZeroBytes < value.length && value[leadingZeroBytes] === '1') leadingZeroBytes += 1;
+  return leadingZeroBytes + significantBytes;
+}
+
+function solanaBase58(value, name, min, max, expectedBytes) {
   const s = text(value, name, min, max);
-  if (!BASE58.test(s)) throw new Error(`invalid_${name}`);
+  if (!BASE58.test(s) || decodedBase58ByteLength(s) !== expectedBytes) throw new Error(`invalid_${name}`);
   return s;
 }
 
@@ -31,13 +46,13 @@ function canonicalReconciledTrades(rows = []) {
       realized_pnl_minor: row.realized_pnl_minor,
       capital_minor: row.capital_minor,
       equity_after_minor: row.equity_after_minor,
-      source_signature: solanaBase58(row.source_signature, `trade_${i}_source_signature`, 32, 100)
+      source_signature: solanaBase58(row.source_signature, `trade_${i}_source_signature`, 32, 100, 64)
     }))
     .sort((a, b) => a.executed_at.localeCompare(b.executed_at) || a.trade_id.localeCompare(b.trade_id));
 }
 
 export function buildInternalReconciliationProvenance({ walletAddress, reconciliationBatchId, trades }) {
-  const wallet = solanaBase58(walletAddress, 'wallet_address', 32, 44);
+  const wallet = solanaBase58(walletAddress, 'wallet_address', 32, 44, 32);
   const batch = text(reconciliationBatchId, 'reconciliation_batch_id', 8, 160);
   const canonical = canonicalReconciledTrades(trades);
   const sourceHash = crypto.createHash('sha256').update(JSON.stringify({
