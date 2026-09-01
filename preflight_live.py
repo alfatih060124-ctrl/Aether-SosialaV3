@@ -2,12 +2,14 @@
 """Read-only, fail-closed LIVE preflight for AETHER.
 
 This script never enables LIVE, mutates environment variables, writes runtime state,
-or contacts the network. It only validates a non-secret evidence manifest plus the
-current safety-gate environment and exits 0 when every prerequisite is satisfied.
+or contacts the network. It only validates a non-secret evidence manifest, binds each
+coverage row to local evidence bytes, checks the current safety-gate environment, and
+exits 0 when every prerequisite is satisfied.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -17,6 +19,7 @@ from typing import Any
 SCHEMA_VERSION = 1
 MIN_POSITIVE_FIXTURES = 30
 MIN_NEGATIVE_FIXTURES = 10
+MAX_EVIDENCE_BYTES = 64 * 1024 * 1024
 REQUIRED_DEX_FAMILIES = {"jupiter", "raydium", "orca"}
 PLACEHOLDER_VERSION_MARKERS = ("replace", "unset", "unknown", "placeholder", "any")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -87,6 +90,48 @@ def strict_nonnegative_int(value: Any, reason: str) -> int | dict[str, Any]:
     return value
 
 
+def resolve_evidence_file(manifest_dir: Path, value: Any) -> tuple[Path | None, str | None]:
+    if not isinstance(value, str) or not value.strip():
+        return None, "evidence_file_missing"
+    relative = Path(value.strip())
+    if relative.is_absolute() or ".." in relative.parts:
+        return None, "evidence_file_must_be_relative"
+
+    root = manifest_dir.resolve()
+    candidate = manifest_dir / relative
+    try:
+        resolved = candidate.resolve(strict=True)
+        resolved.relative_to(root)
+    except (OSError, RuntimeError, ValueError):
+        return None, "evidence_file_unreadable_or_outside_manifest_dir"
+
+    if not resolved.is_file():
+        return None, "evidence_file_unreadable_or_outside_manifest_dir"
+    try:
+        size = resolved.stat().st_size
+    except OSError:
+        return None, "evidence_file_unreadable_or_outside_manifest_dir"
+    if size <= 0:
+        return None, "evidence_file_empty"
+    if size > MAX_EVIDENCE_BYTES:
+        return None, "evidence_file_too_large"
+    return resolved, None
+
+
+def sha256_file(path: Path) -> tuple[str | None, str | None]:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            while True:
+                chunk = handle.read(1024 * 1024)
+                if not chunk:
+                    break
+                digest.update(chunk)
+    except OSError:
+        return None, "evidence_file_unreadable_or_outside_manifest_dir"
+    return digest.hexdigest(), None
+
+
 def validate_runtime_env() -> dict[str, Any]:
     execution_mode = os.environ.get("EXECUTION_MODE")
     if execution_mode != "SHADOW":
@@ -113,7 +158,7 @@ def validate_runtime_env() -> dict[str, Any]:
     return {"ok": True}
 
 
-def validate_manifest(manifest: Any) -> dict[str, Any]:
+def validate_manifest(manifest: Any, manifest_dir: Path) -> dict[str, Any]:
     if not isinstance(manifest, dict):
         return fail("manifest_must_be_object")
 
@@ -155,6 +200,7 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
             return fail(f"missing_required_dex_family:{family}")
 
     seen: set[tuple[str, str]] = set()
+    seen_evidence_files: set[Path] = set()
     for row in coverage:
         if not isinstance(row, dict):
             return fail("invalid_coverage_row")
@@ -203,6 +249,20 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
         if not isinstance(evidence_sha256, str) or not HEX64.fullmatch(evidence_sha256.lower()):
             return fail("invalid_evidence_sha256")
 
+        evidence_path, error = resolve_evidence_file(manifest_dir, row.get("evidence_file"))
+        if error:
+            return fail(error)
+        assert evidence_path is not None
+        if evidence_path in seen_evidence_files:
+            return fail("duplicate_evidence_file")
+        seen_evidence_files.add(evidence_path)
+
+        actual_sha256, error = sha256_file(evidence_path)
+        if error:
+            return fail(error)
+        if actual_sha256 != evidence_sha256.lower():
+            return fail("evidence_sha256_mismatch")
+
     if seen != normalized_required:
         return fail("required_target_coverage_incomplete")
 
@@ -216,7 +276,7 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
         if checks.get(name) is not True:
             return fail(f"check_failed:{name}")
 
-    return {"ok": True, "targets": len(seen)}
+    return {"ok": True, "targets": len(seen), "evidence_files_verified": len(seen_evidence_files)}
 
 
 def load_manifest(path: Path) -> tuple[Any | None, str | None]:
@@ -242,12 +302,13 @@ def main() -> int:
     if not args.manifest:
         result = fail("manifest_path_missing")
     else:
-        manifest, error = load_manifest(Path(args.manifest))
+        manifest_path = Path(args.manifest)
+        manifest, error = load_manifest(manifest_path)
         if error:
             result = fail(error)
         else:
             runtime = validate_runtime_env()
-            result = runtime if not runtime["ok"] else validate_manifest(manifest)
+            result = runtime if not runtime["ok"] else validate_manifest(manifest, manifest_path.parent)
 
     output = {
         "preflight": "AETHER_LIVE_V1",
