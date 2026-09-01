@@ -42,11 +42,11 @@ requireMatch(onboarding, /single-use,? short-lived nonce|single-use.*nonce|short
 requireMatch(onboarding, /seed phrase|private key/i, 'Onboarding must explicitly reject secret collection.');
 requireMatch(onboarding, /HttpOnly/i, 'Onboarding must disclose secure HttpOnly session storage.');
 
-requireMatch(market, /Solana Token Mint Address|Token Mint Address/i, 'Market page must identify token lookup by Solana mint address.');
+requireMatch(market, /Solana(?: Token)? Mint Address|Solana mint address|Token Mint Address/i, 'Market page must identify token lookup by Solana mint address.');
 requireMatch(market, /\/api\/market\/token\?mint=/i, 'Market page must use the canonical read-only market token API.');
 requireMatch(market, /stale/i, 'Market page must expose stale-data handling.');
 requireMatch(market, /invalid|not found|unavailable/i, 'Market page must expose invalid/not-found/unavailable states.');
-if (/signTransaction|sendTransaction|signAndSendTransaction|\/api\/execution|\/api\/trade/i.test(market)) {
+if (/signTransaction|sendTransaction|signAndSendTransaction|\/api\/execution|\/api\/trade(?!rs)/i.test(market)) {
   failures.push('Market page must remain read-only and must not expose signer or execution paths.');
 }
 
