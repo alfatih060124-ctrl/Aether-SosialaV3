@@ -1,8 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
-<title id="title">AETHER mark</title><desc id="desc">Geometric AETHER monogram for product navigation and icons.</desc>
-<defs><linearGradient id="g" x1="12" y1="84" x2="84" y2="12" gradientUnits="userSpaceOnUse"><stop stop-color="#8DE6CF"/><stop offset="1" stop-color="#80AAFF"/></linearGradient></defs>
-<rect width="96" height="96" rx="24" fill="#0A1728"/>
-<path d="M20 72 43.4 22h9.2L76 72H63.2l-5.1-11.6H37.8L32.8 72H20Zm22.3-22h11.4L48 36.9 42.3 50Z" fill="url(#g)"/>
-<path d="M17 47.5c8.2-15.6 25-25.8 43.8-23.2 7.8 1.1 14.4 4 19.7 8" fill="none" stroke="#F5F8FF" stroke-opacity=".68" stroke-width="2.5" stroke-linecap="round"/>
-<circle cx="80.5" cy="32.3" r="3.2" fill="#8DE6CF"/>
+<title id="title">AETHER official mark</title>
+<desc id="desc">Metallic A monogram with electric-blue orbital ring and orb.</desc>
+<defs>
+  <linearGradient id="bg" x1="8" y1="8" x2="88" y2="88" gradientUnits="userSpaceOnUse"><stop stop-color="#05080f"/><stop offset=".55" stop-color="#081323"/><stop offset="1" stop-color="#03060b"/></linearGradient>
+  <linearGradient id="silver" x1="24" y1="20" x2="48" y2="76" gradientUnits="userSpaceOnUse"><stop stop-color="#ffffff"/><stop offset=".28" stop-color="#cdd5e2"/><stop offset=".62" stop-color="#68778d"/><stop offset="1" stop-color="#dce5f2"/></linearGradient>
+  <linearGradient id="blue" x1="45" y1="18" x2="72" y2="76" gradientUnits="userSpaceOnUse"><stop stop-color="#8ee7ff"/><stop offset=".28" stop-color="#2f9cff"/><stop offset=".68" stop-color="#2563eb"/><stop offset="1" stop-color="#173b8f"/></linearGradient>
+  <linearGradient id="orbit" x1="12" y1="70" x2="84" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#4f46e5"/><stop offset=".48" stop-color="#35c8ff"/><stop offset="1" stop-color="#87ecff"/></linearGradient>
+  <radialGradient id="orb" cx="35%" cy="30%" r="70%"><stop stop-color="#d9f8ff"/><stop offset=".25" stop-color="#63d8ff"/><stop offset=".72" stop-color="#2878ff"/><stop offset="1" stop-color="#153583"/></radialGradient>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="96" height="96" rx="22" fill="url(#bg)"/>
+<circle cx="48" cy="47" r="31" fill="none" stroke="#2e5d9f" stroke-opacity=".25" stroke-width="1.4"/>
+<path d="M22 71 42.8 22.5c1.1-2.5 2.8-3.8 5.2-3.8h3.1L72.8 71H59.2l-5-12.6H39.8L34.6 71H22Zm22.1-24h6.2L47.2 39l-3.1 8Z" fill="url(#silver)"/>
+<path d="M49.2 18.7h4.5L76 71H61.2L55 55.3H41.1l5.4-12.7h3.9l-3.1-8.3 1.9-15.6Z" fill="url(#blue)" opacity=".96"/>
+<path d="M14.5 58.8c10.4 7.7 28.7 8.7 45.4 1.8 13.3-5.5 21.9-14.3 24.6-22.7" fill="none" stroke="#112a54" stroke-width="5.8" stroke-linecap="round" opacity=".7"/>
+<path d="M14.5 57.2c10.4 7.8 28.6 8.6 45 1.8 13-5.4 21.6-14.1 24.3-22.4" fill="none" stroke="url(#orbit)" stroke-width="2.4" stroke-linecap="round" filter="url(#glow)"/>
+<path d="M17.8 39.5c6.9-14.8 22.8-24 40.3-22.2 8.6.9 16 4.1 21.6 9" fill="none" stroke="#9bdfff" stroke-opacity=".22" stroke-width="1.2" stroke-linecap="round"/>
+<circle cx="81.7" cy="29.2" r="5.1" fill="url(#orb)" filter="url(#glow)"/>
+<circle cx="80.1" cy="27.6" r="1.3" fill="#ffffff" opacity=".9"/>
 </svg>
