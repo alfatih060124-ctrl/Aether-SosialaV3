@@ -17,6 +17,8 @@ from typing import Any
 SCHEMA_VERSION = 1
 MIN_POSITIVE_FIXTURES = 30
 MIN_NEGATIVE_FIXTURES = 10
+REQUIRED_DEX_FAMILIES = {"jupiter", "raydium", "orca"}
+PLACEHOLDER_VERSION_MARKERS = ("replace", "unset", "unknown", "placeholder", "any")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 FORBIDDEN_KEY_PARTS = (
     "private_key",
@@ -30,6 +32,10 @@ FORBIDDEN_KEY_PARTS = (
     "secretkey",
     "api_token",
     "admin_api_token",
+    "auth_token",
+    "bearer_token",
+    "password",
+    "passphrase",
 )
 
 
@@ -64,6 +70,21 @@ def has_forbidden_key(value: Any, path: str = "$") -> str | None:
             if nested:
                 return nested
     return None
+
+
+def normalize_target(dex: Any, version: Any, error: str) -> tuple[str, str] | dict[str, Any]:
+    if not isinstance(dex, str) or not dex.strip() or not isinstance(version, str) or not version.strip():
+        return fail(error)
+    normalized_version = version.strip().lower()
+    if any(marker in normalized_version for marker in PLACEHOLDER_VERSION_MARKERS):
+        return fail("placeholder_version_not_allowed")
+    return dex.strip().lower(), normalized_version
+
+
+def strict_nonnegative_int(value: Any, reason: str) -> int | dict[str, Any]:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return fail(reason)
+    return value
 
 
 def validate_runtime_env() -> dict[str, Any]:
@@ -121,46 +142,63 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
     for target in required_targets:
         if not isinstance(target, dict):
             return fail("invalid_required_target")
-        dex = target.get("dex")
-        version = target.get("version")
-        if not isinstance(dex, str) or not dex.strip() or not isinstance(version, str) or not version.strip():
-            return fail("invalid_required_target")
-        key = (dex.strip().lower(), version.strip().lower())
-        if key in normalized_required:
+        normalized = normalize_target(target.get("dex"), target.get("version"), "invalid_required_target")
+        if isinstance(normalized, dict):
+            return normalized
+        if normalized in normalized_required:
             return fail("duplicate_required_target")
-        normalized_required.add(key)
+        normalized_required.add(normalized)
+
+    required_families = {dex for dex, _ in normalized_required}
+    for family in sorted(REQUIRED_DEX_FAMILIES):
+        if family not in required_families:
+            return fail(f"missing_required_dex_family:{family}")
 
     seen: set[tuple[str, str]] = set()
     for row in coverage:
         if not isinstance(row, dict):
             return fail("invalid_coverage_row")
-        dex = row.get("dex")
-        version = row.get("version")
-        if not isinstance(dex, str) or not dex.strip() or not isinstance(version, str) or not version.strip():
-            return fail("invalid_coverage_target")
-        key = (dex.strip().lower(), version.strip().lower())
-        if key in seen:
+        normalized = normalize_target(row.get("dex"), row.get("version"), "invalid_coverage_target")
+        if isinstance(normalized, dict):
+            return normalized
+        if normalized in seen:
             return fail("duplicate_coverage_target")
-        seen.add(key)
-        if key not in normalized_required:
+        seen.add(normalized)
+        if normalized not in normalized_required:
             return fail("coverage_contains_unrequired_target")
 
         if row.get("source") != "VERIFIED_ONCHAIN":
             return fail("coverage_source_not_verified_onchain")
-        if row.get("positive_verified") is None or not isinstance(row.get("positive_verified"), int):
-            return fail("invalid_positive_fixture_count")
-        if row["positive_verified"] < MIN_POSITIVE_FIXTURES:
+
+        positive = strict_nonnegative_int(row.get("positive_verified"), "invalid_positive_fixture_count")
+        if isinstance(positive, dict):
+            return positive
+        if positive < MIN_POSITIVE_FIXTURES:
             return fail("insufficient_positive_fixtures")
-        if row.get("negative_verified") is None or not isinstance(row.get("negative_verified"), int):
-            return fail("invalid_negative_fixture_count")
-        if row["negative_verified"] < MIN_NEGATIVE_FIXTURES:
+
+        negative = strict_nonnegative_int(row.get("negative_verified"), "invalid_negative_fixture_count")
+        if isinstance(negative, dict):
+            return negative
+        if negative < MIN_NEGATIVE_FIXTURES:
             return fail("insufficient_negative_fixtures")
-        if row.get("negative_false_positives") != 0:
+
+        false_positives = strict_nonnegative_int(
+            row.get("negative_false_positives"), "invalid_negative_false_positive_count"
+        )
+        if isinstance(false_positives, dict):
+            return false_positives
+        if false_positives != 0:
             return fail("negative_false_positives_nonzero")
-        if row.get("regression_pass_rate") != 1.0:
+
+        pass_rate = row.get("regression_pass_rate")
+        if isinstance(pass_rate, bool) or not isinstance(pass_rate, (int, float)):
+            return fail("invalid_regression_pass_rate")
+        if float(pass_rate) != 1.0:
             return fail("regression_not_100_percent")
+
         if row.get("exact_token_amount_reconciliation") is not True:
             return fail("reconciliation_not_exact")
+
         evidence_sha256 = row.get("evidence_sha256")
         if not isinstance(evidence_sha256, str) or not HEX64.fullmatch(evidence_sha256.lower()):
             return fail("invalid_evidence_sha256")
