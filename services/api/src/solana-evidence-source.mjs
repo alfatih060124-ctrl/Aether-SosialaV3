@@ -191,6 +191,7 @@ export async function collectSolanaRpcEvidence({
     if (before) options.before = before;
     const pageResult = await rpcCall('getSignaturesForAddress', [wallet, options]);
     if (!Array.isArray(pageResult)) throw new Error('invalid_rpc_signature_response');
+    if (pageResult.length > safeLimit) throw new Error('rpc_page_exceeds_requested_limit');
     pagesFetched += 1;
     rows.push(...pageResult);
 
@@ -199,9 +200,10 @@ export async function collectSolanaRpcEvidence({
       break;
     }
 
-    const canonicalPage = canonicalSignatures(pageResult);
-    const nextBefore = canonicalPage.at(-1)?.signature || null;
-    if (!nextBefore) throw new Error('rpc_pagination_cursor_missing');
+    // Solana's `before` cursor is positional: it must be the signature from the
+    // final row returned by the provider, not a signature chosen after canonical sorting.
+    // Canonical ordering is only for deterministic provenance hashing after collection.
+    const nextBefore = assertSignature(pageResult.at(-1)?.signature);
     if (nextBefore === before) throw new Error('rpc_pagination_stalled');
     before = nextBefore;
   }
