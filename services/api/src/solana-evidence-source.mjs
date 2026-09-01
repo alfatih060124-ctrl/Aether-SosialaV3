@@ -3,11 +3,34 @@ import { pendingData } from './trader-evidence-collector.mjs';
 
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const SIGNATURE_BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,100}$/;
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 function assertWallet(value) {
   const wallet = String(value || '').trim();
   if (!BASE58.test(wallet)) throw new Error('invalid_solana_wallet');
   return wallet;
+}
+
+function decodedBase58ByteLength(value) {
+  let decoded = 0n;
+  for (const char of value) {
+    const digit = BASE58_ALPHABET.indexOf(char);
+    if (digit < 0) return -1;
+    decoded = decoded * 58n + BigInt(digit);
+  }
+  let significantBytes = 0;
+  for (let current = decoded; current > 0n; current >>= 8n) significantBytes += 1;
+  let leadingZeroBytes = 0;
+  while (leadingZeroBytes < value.length && value[leadingZeroBytes] === '1') leadingZeroBytes += 1;
+  return leadingZeroBytes + significantBytes;
+}
+
+function assertSignature(value) {
+  const signature = String(value || '').trim();
+  if (!SIGNATURE_BASE58.test(signature) || decodedBase58ByteLength(signature) !== 64) {
+    throw new Error('invalid_rpc_signature');
+  }
+  return signature;
 }
 
 function canonicalJsonValue(value) {
@@ -22,8 +45,7 @@ function canonicalSignatures(rows = []) {
   if (!Array.isArray(rows)) throw new Error('invalid_rpc_signature_response');
   const deduped = new Map();
   for (const row of rows) {
-    const signature = String(row?.signature || '').trim();
-    if (!SIGNATURE_BASE58.test(signature)) throw new Error('invalid_rpc_signature');
+    const signature = assertSignature(row?.signature);
     const rawBlockTime = row?.blockTime ?? row?.block_time;
     const rawConfirmationStatus = row?.confirmationStatus ?? row?.confirmation_status;
     const normalized = {
