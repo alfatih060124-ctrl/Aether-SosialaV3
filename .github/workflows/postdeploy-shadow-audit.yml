@@ -1,0 +1,30 @@
+name: Postdeploy SHADOW Audit Regression
+on:
+  pull_request:
+    paths:
+      - 'scripts/vm-postdeploy-shadow-audit.sh'
+      - 'scripts/postdeploy-shadow-audit-regression.mjs'
+      - '.github/workflows/postdeploy-shadow-audit.yml'
+      - 'services/api/src/server.mjs'
+      - 'deploy/Caddyfile'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/vm-postdeploy-shadow-audit.sh'
+      - 'scripts/postdeploy-shadow-audit-regression.mjs'
+      - '.github/workflows/postdeploy-shadow-audit.yml'
+      - 'services/api/src/server.mjs'
+      - 'deploy/Caddyfile'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Shell syntax check
+        run: bash -n scripts/vm-postdeploy-shadow-audit.sh
+      - name: Read-only audit contract regression
+        run: node scripts/postdeploy-shadow-audit-regression.mjs
