@@ -73,6 +73,8 @@ def write_evidence_files(root: Path, manifest: dict, *, corrupt_first: bool = Fa
             continue
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            continue
         payload = evidence_bytes(str(row.get("dex")), str(row.get("version")))
         if corrupt_first and index == 0:
             payload += b"tampered\n"
