@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - 'services/api/src/solana-evidence-source.mjs'
+      - 'services/api/src/automatic-evidence-service.mjs'
       - 'scripts/solana-collector-config-regression.mjs'
       - '.github/workflows/solana-collector-config-regression.yml'
   push:
     branches: [main]
     paths:
       - 'services/api/src/solana-evidence-source.mjs'
+      - 'services/api/src/automatic-evidence-service.mjs'
       - 'scripts/solana-collector-config-regression.mjs'
       - '.github/workflows/solana-collector-config-regression.yml'
 
@@ -24,6 +26,7 @@ jobs:
       - name: Syntax check
         run: |
           node --check services/api/src/solana-evidence-source.mjs
+          node --check services/api/src/automatic-evidence-service.mjs
           node --check scripts/solana-collector-config-regression.mjs
       - name: Fail-closed collector config regression
         run: node scripts/solana-collector-config-regression.mjs
