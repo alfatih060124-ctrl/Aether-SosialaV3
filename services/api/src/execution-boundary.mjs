@@ -18,7 +18,7 @@ const TRANSITIONS = Object.freeze({
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const SENSITIVE_CONTEXT_KEYS = new Set(['privatekey','secretkey','seedphrase','mnemonic','keypair','signingkey']);
+const SENSITIVE_CONTEXT_KEYS = new Set(['privatekey','secretkey','seedphrase','mnemonic','keypair','signingkey','signer']);
 
 const text = (value, name, min = 1, max = 200) => {
   const s = String(value ?? '').trim();
@@ -83,6 +83,11 @@ function sanitizeContext(value, name = 'risk_context') {
   const serialized = JSON.stringify(clean);
   if (Buffer.byteLength(serialized, 'utf8') > 8192) throw new Error(`invalid_${name}`);
   return clean;
+}
+
+function sanitizeHookOutput(value, hookName) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`invalid_${hookName}_hook_output`);
+  return sanitizeContext(value, `${hookName}_hook_output`);
 }
 
 function canonicalJson(value) {
@@ -181,30 +186,30 @@ export class ShadowDispatcher {
     if (!riskCheck.passed) return { intent_id:intent.intent_id,state:'REJECTED',reason_codes:riskCheck.reason_codes,lifecycle:trace,execution_dispatched:false,network_submission:false,live_execution_authorized:false,signer_used:false };
     trace.push({ state:'RISK_CHECKED', network_submission:false });
 
-    const quote = this.quoteHook ? await this.quoteHook(intent) : { ok:true, shadow:true };
-    if (quote?.ok !== true) return { intent_id:intent.intent_id,state:'REJECTED',reason_codes:['QUOTE_REJECTED'],lifecycle:trace,execution_dispatched:false,network_submission:false,live_execution_authorized:false,signer_used:false };
+    const quote = sanitizeHookOutput(this.quoteHook ? await this.quoteHook(intent) : { ok:true, shadow:true }, 'quote');
+    if (quote.ok !== true || quote.network_submission === true) return { intent_id:intent.intent_id,state:'REJECTED',reason_codes:['QUOTE_REJECTED'],lifecycle:trace,execution_dispatched:false,network_submission:false,live_execution_authorized:false,signer_used:false };
     trace.push({ state:'QUOTED', network_submission:false });
 
-    const simulation = this.simulationHook ? await this.simulationHook(intent, quote) : { ok:true, shadow:true };
-    if (simulation?.ok !== true) return { intent_id:intent.intent_id,state:'REJECTED',reason_codes:['SIMULATION_REJECTED'],lifecycle:trace,execution_dispatched:false,network_submission:false,live_execution_authorized:false,signer_used:false };
+    const simulation = sanitizeHookOutput(this.simulationHook ? await this.simulationHook(intent, quote) : { ok:true, shadow:true }, 'simulation');
+    if (simulation.ok !== true || simulation.network_submission === true) return { intent_id:intent.intent_id,state:'REJECTED',reason_codes:['SIMULATION_REJECTED'],lifecycle:trace,execution_dispatched:false,network_submission:false,live_execution_authorized:false,signer_used:false };
     trace.push({ state:'SIMULATED', network_submission:false });
 
-    const authorization = this.authorizationHook ? await this.authorizationHook(intent, simulation) : { ok:true, shadow:true, signer_required:false, live_execution_authorized:false };
-    if (authorization?.ok !== true || authorization?.signer_required === true || authorization?.live_execution_authorized === true) {
+    const authorization = sanitizeHookOutput(this.authorizationHook ? await this.authorizationHook(intent, simulation) : { ok:true, shadow:true, signer_required:false, live_execution_authorized:false }, 'authorization');
+    if (authorization.ok !== true || authorization.signer_required === true || authorization.live_execution_authorized === true || authorization.network_submission === true) {
       return { intent_id:intent.intent_id,state:'REJECTED',reason_codes:['SHADOW_AUTHORIZATION_REJECTED'],lifecycle:trace,execution_dispatched:false,network_submission:false,live_execution_authorized:false,signer_used:false };
     }
     trace.push({ state:'AUTHORIZED', network_submission:false });
     trace.push({ state:'DISPATCHED', channel:'SHADOW', network_submission:false });
 
-    const confirmation = this.confirmationHook ? await this.confirmationHook(intent) : { ok:true, shadow:true, signature:null };
-    if (confirmation?.signature) {
+    const confirmation = sanitizeHookOutput(this.confirmationHook ? await this.confirmationHook(intent) : { ok:true, shadow:true, signature:null }, 'confirmation');
+    if (confirmation.signature) {
       return { intent_id:intent.intent_id,state:'FAILED',reason_codes:['SHADOW_CHAIN_SIGNATURE_FORBIDDEN'],lifecycle:trace,execution_dispatched:false,network_submission:false,live_execution_authorized:false,signer_used:false };
     }
-    if (confirmation?.ok !== true) return { intent_id:intent.intent_id,state:'FAILED',reason_codes:['SHADOW_CONFIRMATION_FAILED'],lifecycle:trace,execution_dispatched:false,network_submission:false,live_execution_authorized:false,signer_used:false };
+    if (confirmation.ok !== true || confirmation.network_submission === true) return { intent_id:intent.intent_id,state:'FAILED',reason_codes:['SHADOW_CONFIRMATION_FAILED'],lifecycle:trace,execution_dispatched:false,network_submission:false,live_execution_authorized:false,signer_used:false };
     trace.push({ state:'CONFIRMED', channel:'SHADOW', network_submission:false });
 
-    const reconciliation = this.reconciliationHook ? await this.reconciliationHook(intent, confirmation) : { ok:true, shadow:true };
-    if (reconciliation?.ok !== true) return { intent_id:intent.intent_id,state:'FAILED',reason_codes:['SHADOW_RECONCILIATION_FAILED'],lifecycle:trace,execution_dispatched:false,network_submission:false,live_execution_authorized:false,signer_used:false };
+    const reconciliation = sanitizeHookOutput(this.reconciliationHook ? await this.reconciliationHook(intent, confirmation) : { ok:true, shadow:true }, 'reconciliation');
+    if (reconciliation.ok !== true || reconciliation.network_submission === true) return { intent_id:intent.intent_id,state:'FAILED',reason_codes:['SHADOW_RECONCILIATION_FAILED'],lifecycle:trace,execution_dispatched:false,network_submission:false,live_execution_authorized:false,signer_used:false };
     trace.push({ state:'RECONCILED', channel:'SHADOW', network_submission:false });
 
     return {
