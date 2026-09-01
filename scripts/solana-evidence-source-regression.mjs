@@ -29,11 +29,12 @@ assert.equal(result.published, false);
 assert.equal(result.evidence_status, 'NOT_RECORDED');
 assert.equal(result.reason, 'reconciled_trade_performance_required');
 assert.equal(result.source_reference, signature);
-assert.equal(result.provenance.schema_version, 7);
+assert.equal(result.provenance.schema_version, 8);
 assert.equal(result.provenance.rpc_endpoint_label, 'synthetic-rpc-test-only');
 assert.equal(result.provenance.rpc_commitment, 'finalized');
 assert.equal(result.provenance.pages_fetched, 1);
 assert.equal(result.provenance.page_size, 100);
+assert.equal(result.provenance.max_pages, 3);
 assert.equal(result.provenance.collection_complete, true);
 assert.equal(result.provenance.signatures_observed, 3);
 assert.equal(result.provenance.successful_signatures_observed, 2);
@@ -86,6 +87,20 @@ const differentCommitment = buildSolanaRpcProvenance({
 assert.notEqual(differentCommitment.source_hash, result.provenance.source_hash);
 assert.equal(differentCommitment.rpc_commitment, 'confirmed');
 
+const differentPaginationCap = buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  endpointLabel: 'synthetic-rpc-test-only',
+  commitment: 'finalized',
+  maxPages: 4,
+  signatures: [
+    { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, { Detail: { a: 1, b: 2 }, Custom: 1 }] }, confirmationStatus: 'finalized' },
+    { signature, slot: 123, blockTime: 1788190000, err: null, confirmationStatus: 'finalized' },
+    { signature: olderSignature, slot: 122, blockTime: 1788189990, err: null, confirmationStatus: 'finalized' }
+  ]
+});
+assert.notEqual(differentPaginationCap.source_hash, result.provenance.source_hash);
+assert.equal(differentPaginationCap.max_pages, 4);
+
 const equivalentDuplicate = buildSolanaRpcProvenance({
   walletAddress: wallet,
   signatures: [
@@ -122,6 +137,7 @@ assert.deepEqual(paginatedCalls[0].params[1], { limit: 2, commitment: 'finalized
 assert.deepEqual(paginatedCalls[1].params[1], { limit: 2, commitment: 'finalized', before: olderSignature });
 assert.equal(paginated.provenance.pages_fetched, 2);
 assert.equal(paginated.provenance.page_size, 2);
+assert.equal(paginated.provenance.max_pages, 3);
 assert.equal(paginated.provenance.collection_complete, true);
 assert.equal(paginated.provenance.signatures_observed, 3);
 assert.equal(paginated.provenance.oldest_signature, oldestSignature);
@@ -161,6 +177,7 @@ const capped = await collectSolanaRpcEvidence({
   ]
 });
 assert.equal(capped.provenance.pages_fetched, 1);
+assert.equal(capped.provenance.max_pages, 1);
 assert.equal(capped.provenance.collection_complete, false);
 assert.equal(capped.verification_status, 'PENDING_DATA');
 assert.equal(capped.verified, false);
@@ -254,6 +271,25 @@ assert.throws(() => buildSolanaRpcProvenance({
 assert.throws(() => buildSolanaRpcProvenance({
   walletAddress: wallet,
   signatures: [],
+  maxPages: 0
+}), /invalid_rpc_max_pages/);
+
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [],
+  maxPages: 21
+}), /invalid_rpc_max_pages/);
+
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [],
+  pagesFetched: 2,
+  maxPages: 1
+}), /invalid_rpc_pages_fetched/);
+
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [],
   collectionComplete: 'true'
 }), /invalid_rpc_collection_complete/);
 
@@ -298,6 +334,7 @@ const empty = await collectSolanaRpcEvidence({ walletAddress: wallet, rpcCall: a
 assert.equal(empty.reason, 'no_verifiable_chain_activity');
 assert.equal(empty.source_reference, null);
 assert.equal(empty.provenance.collection_complete, true);
+assert.equal(empty.provenance.max_pages, 3);
 assert.equal(empty.provenance.rpc_commitment, 'finalized');
 assert.throws(() => buildSolanaRpcProvenance({ walletAddress: 'bad', signatures: [] }), /invalid_solana_wallet/);
 assert.throws(() => buildSolanaRpcProvenance({ walletAddress: '2'.repeat(32), signatures: [] }), /invalid_solana_wallet/);
