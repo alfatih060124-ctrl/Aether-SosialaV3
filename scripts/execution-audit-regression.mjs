@@ -21,6 +21,7 @@ const result = await audited.dispatch(intent,{ risk,now:Date.parse('2026-09-01T1
 assert.equal(result.state,'RECONCILED');
 assert.equal(result.execution_dispatched,false);
 assert.equal(result.audit.mode,'SHADOW');
+assert.equal(result.audit.dispatcher,'ShadowDispatcher');
 assert.equal(result.audit.execution_dispatched,false);
 assert.equal(result.audit.network_submission,false);
 assert.equal(result.audit.live_execution_authorized,false);
@@ -37,6 +38,9 @@ const a = buildExecutionAuditEnvelope({ intent,result:raw,started_at:'2026-09-01
 const b = buildExecutionAuditEnvelope({ intent,result:raw,started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' });
 assert.equal(a.audit_id,b.audit_id,'same audited execution must hash deterministically');
 
+assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:raw,dispatcher:'SolanaLiveDispatcher',started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/execution_audit_dispatcher_identity_violation/);
+assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:raw,dispatcher:'CustomDispatcher',started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/execution_audit_dispatcher_identity_violation/);
+assert.throws(()=>new AuditedShadowDispatcher({ dispatcher:{ async dispatch(){ return raw; } } }),/invalid_shadow_dispatcher/);
 assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:{...raw,intent_id:'10000000-0000-0000-0000-000000000099'},started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/execution_audit_intent_mismatch/);
 assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:{...raw,execution_dispatched:true},started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/shadow_execution_dispatch_flag_violation/);
 assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:{...raw,network_submission:true},started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/shadow_network_submission_violation/);
