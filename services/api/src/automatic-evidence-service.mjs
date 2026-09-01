@@ -18,6 +18,12 @@ function boundedInt(value, fallback, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
+function strictOptionalBoundedInt(value, fallback, min, max, reason) {
+  if (value === undefined) return fallback;
+  if (!Number.isSafeInteger(value) || value < min || value > max) throw new Error(reason);
+  return value;
+}
+
 function optionalNumber(value) {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
@@ -100,6 +106,8 @@ export function createAutomaticEvidenceService(pool, {
 
   return {
     async collectSolana(traderId, input = {}) {
+      const limit = strictOptionalBoundedInt(input.limit, 100, 1, 1000, 'invalid_rpc_page_size');
+      const maxPages = strictOptionalBoundedInt(input.max_pages, 3, 1, 20, 'invalid_rpc_max_pages');
       const trader = await loadApprovedTrader(traderId);
       const rpcCall = createSolanaJsonRpcCaller({
         rpcUrl,
@@ -109,8 +117,8 @@ export function createAutomaticEvidenceService(pool, {
       const collected = await collectSolanaRpcEvidence({
         walletAddress: trader.wallet_address,
         rpcCall,
-        limit: boundedInt(input.limit, 100, 1, 1000),
-        maxPages: boundedInt(input.max_pages, 3, 1, 20),
+        limit,
+        maxPages,
         endpointLabel
       });
       const collectionId = crypto.randomUUID();
