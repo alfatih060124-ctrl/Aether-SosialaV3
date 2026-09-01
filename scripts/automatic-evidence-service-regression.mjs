@@ -16,6 +16,7 @@ function base58(bytes) {
   return '1'.repeat(zeroes) + (out || '1');
 }
 
+// SYNTHETIC / TEST-ONLY values. Never use as production trader evidence.
 const wallet = base58(new Uint8Array(32).fill(7));
 const signature = base58(new Uint8Array(64).fill(9));
 const trader = {
@@ -68,7 +69,7 @@ const fetchImpl = async (_url, options) => {
 const service = createAutomaticEvidenceService(pool, {
   rpcUrl: 'https://rpc.example.invalid', endpointLabel: 'test-rpc', fetchImpl
 });
-const collection = await service.collectSolana(trader.trader_id, { limit: 10, max_pages: 2 });
+const collection = await service.collectSolana(trader.trader_id, { limit: 10, max_pages: 2, timeout_ms: 8000 });
 assert.equal(rpcCalls, 1);
 assert.equal(collection.source_type, 'SOLANA_RPC');
 assert.equal(collection.source_reference, signature);
@@ -88,6 +89,40 @@ assert.equal(listed[0].collection_id, collection.collection_id);
 
 assert.throws(() => createSolanaJsonRpcCaller({ rpcUrl: '' }), /solana_rpc_unconfigured/);
 assert.throws(() => createSolanaJsonRpcCaller({ rpcUrl: 'file:///tmp/rpc' }), /invalid_solana_rpc_url/);
+assert.throws(
+  () => createSolanaJsonRpcCaller({ rpcUrl: 'https://rpc.example.invalid', timeoutMs: 999 }),
+  /invalid_rpc_timeout_ms/
+);
+assert.throws(
+  () => createSolanaJsonRpcCaller({ rpcUrl: 'https://rpc.example.invalid', timeoutMs: 30001 }),
+  /invalid_rpc_timeout_ms/
+);
+assert.throws(
+  () => createSolanaJsonRpcCaller({ rpcUrl: 'https://rpc.example.invalid', timeoutMs: 1500.5 }),
+  /invalid_rpc_timeout_ms/
+);
+
+let invalidTimeoutDbCalls = 0;
+let invalidTimeoutRpcCalls = 0;
+const failIfQueriedPool = {
+  async query() {
+    invalidTimeoutDbCalls += 1;
+    throw new Error('database_must_not_be_touched');
+  }
+};
+const failIfFetched = async () => {
+  invalidTimeoutRpcCalls += 1;
+  throw new Error('rpc_must_not_be_touched');
+};
+const timeoutGuardService = createAutomaticEvidenceService(failIfQueriedPool, {
+  rpcUrl: 'https://rpc.example.invalid', fetchImpl: failIfFetched
+});
+await assert.rejects(
+  () => timeoutGuardService.collectSolana(trader.trader_id, { timeout_ms: 999 }),
+  /invalid_rpc_timeout_ms/
+);
+assert.equal(invalidTimeoutDbCalls, 0, 'invalid timeout must fail before DB access');
+assert.equal(invalidTimeoutRpcCalls, 0, 'invalid timeout must fail before RPC access');
 
 const nonShadowPool = {
   async query() { return { rows: [{ ...trader, mode: 'LIVE' }] }; }
