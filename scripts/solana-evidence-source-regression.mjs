@@ -146,4 +146,5 @@ assert.equal(empty.reason, 'no_verifiable_chain_activity');
 assert.equal(empty.source_reference, null);
 assert.equal(empty.provenance.collection_complete, true);
 assert.throws(() => buildSolanaRpcProvenance({ walletAddress: 'bad', signatures: [] }), /invalid_solana_wallet/);
+assert.throws(() => buildSolanaRpcProvenance({ walletAddress: '2'.repeat(32), signatures: [] }), /invalid_solana_wallet/);
 console.log('solana evidence source regression: PASS');
