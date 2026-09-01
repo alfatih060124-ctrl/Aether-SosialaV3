@@ -49,12 +49,19 @@ assert.throws(()=>new AuditedShadowDispatcher({ dispatcher:new ShadowDispatcherO
 assert.throws(()=>new AuditedShadowDispatcher({ dispatcher:Object.create(ShadowDispatcher.prototype) }),/shadow_dispatcher_injection_forbidden/);
 assert.throws(()=>new AuditedShadowDispatcher({ dispatcherOptions:{ dispatch:async()=>raw } }),/invalid_shadow_dispatcher_options/);
 assert.throws(()=>new AuditedShadowDispatcher({ dispatcherOptions:{ quoteHook:'not-a-function' } }),/invalid_shadow_dispatcher_options/);
+let observedHookReceiver = 'not-called';
 const hookedTicks = [Date.parse('2026-09-01T10:00:01.000Z'), Date.parse('2026-09-01T10:00:02.000Z')];
 const hooked = new AuditedShadowDispatcher({
-  dispatcherOptions:{ quoteHook:async()=>({ok:true,shadow:true}) },
+  dispatcherOptions:{
+    quoteHook:async function () {
+      observedHookReceiver = this;
+      return {ok:true,shadow:true};
+    }
+  },
   clock:()=>hookedTicks.shift()
 });
 const hookedResult = await hooked.dispatch(intent,{ risk,now:Date.parse('2026-09-01T10:00:05.000Z') });
+assert.equal(observedHookReceiver,undefined,'audited hook must not receive ShadowDispatcher as this');
 assert.equal(hookedResult.audit.dispatcher,'ShadowDispatcher');
 assert.equal(hookedResult.execution_dispatched,false);
 assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:{...raw,intent_id:'10000000-0000-0000-0000-000000000099'},started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/execution_audit_intent_mismatch/);
