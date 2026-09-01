@@ -59,6 +59,10 @@ function blocked(candidate, checked, code) {
   };
 }
 
+function sameText(left, right) {
+  return String(left ?? '').trim() === String(right ?? '').trim();
+}
+
 /**
  * Coordinate already-collected accounting sources into a reconciliation-ready trade.
  *
@@ -86,6 +90,29 @@ export function coordinateReconciliationSources({
   if (!balanceInventory) missingSources.push('FULL_WALLET_BALANCE_INVENTORY');
   if (!tradeValuationSnapshot) missingSources.push('TRADE_USD_VALUATION');
   if (missingSources.length) return pending(candidate, checked, missingSources);
+
+  // Slot/time agreement is insufficient by itself. Every transaction-scoped source must
+  // bind back to the exact source transaction and accounting candidate being promoted.
+  if (!sameText(networkFeeSnapshot.source_reference, candidate.source_signature)) {
+    return blocked(candidate, checked, 'network_fee_transaction_mismatch');
+  }
+  if (!sameText(explicitFeeScan.transaction_signature, candidate.source_signature)) {
+    return blocked(candidate, checked, 'explicit_fee_scan_transaction_mismatch');
+  }
+  for (const fee of explicitFees) {
+    if (!sameText(fee?.transaction_signature, candidate.source_signature)) {
+      return blocked(candidate, checked, 'explicit_fee_transaction_mismatch');
+    }
+  }
+  if (!sameText(balanceInventory.transaction_signature, candidate.source_signature)) {
+    return blocked(candidate, checked, 'wallet_inventory_transaction_mismatch');
+  }
+  if (!sameText(tradeValuationSnapshot.trade_event_id, candidate.event_id)) {
+    return blocked(candidate, checked, 'trade_valuation_event_mismatch');
+  }
+  if (!sameText(tradeValuationSnapshot.accounting_hash, checked.accountingHash)) {
+    return blocked(candidate, checked, 'trade_valuation_accounting_hash_mismatch');
+  }
 
   let feeSnapshot;
   try {
