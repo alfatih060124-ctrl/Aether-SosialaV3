@@ -35,25 +35,6 @@ function assertCanonicalShadowDispatcher(dispatcher) {
   return dispatcher;
 }
 
-function assertDispatcherOptions(options) {
-  if (options === undefined) return {};
-  if (!options || typeof options !== 'object' || Array.isArray(options)) throw new Error('invalid_shadow_dispatcher_options');
-  const allowed = new Set(['quoteHook','simulationHook','authorizationHook','confirmationHook','reconciliationHook']);
-  const detached = {};
-  for (const [key, value] of Object.entries(options)) {
-    if (!allowed.has(key)) throw new Error('invalid_shadow_dispatcher_options');
-    if (value !== undefined && typeof value !== 'function') throw new Error('invalid_shadow_dispatcher_options');
-    if (typeof value === 'function') {
-      // ShadowDispatcher invokes hooks as instance properties (`this.quoteHook(...)`).
-      // Never expose that receiver to caller-provided hooks: otherwise a hook could
-      // mutate `this.dispatch` and later execute an unaudited implementation while
-      // the envelope still records the canonical ShadowDispatcher identity.
-      detached[key] = (...args) => Reflect.apply(value, undefined, args);
-    }
-  }
-  return Object.freeze(detached);
-}
-
 export function buildExecutionAuditEnvelope({ intent, result, started_at, completed_at, dispatcher = CANONICAL_SHADOW_DISPATCHER } = {}) {
   assertCanonicalExecutionIntent(intent);
   assertShadowResult(result);
@@ -120,12 +101,12 @@ export function buildExecutionAuditEnvelope({ intent, result, started_at, comple
 
 export class AuditedShadowDispatcher {
   constructor({ dispatcher, dispatcherOptions, clock = () => Date.now() } = {}) {
-    // Never accept a dispatcher instance here. Even a ShadowDispatcher subclass can
-    // override dispatch() while still passing instanceof checks and then be falsely
-    // recorded as the canonical ShadowDispatcher. Accept only detached hook options
-    // and construct the concrete boundary implementation inside this trust boundary.
+    // The audited boundary must not execute caller-provided dispatcher code or hooks.
+    // A detached hook can still perform external side effects through its closure before
+    // returning a fail-closed-looking result, making the audit envelope untrustworthy.
     if (dispatcher !== undefined) throw new Error('shadow_dispatcher_injection_forbidden');
-    this.dispatcher = new ShadowDispatcher(assertDispatcherOptions(dispatcherOptions));
+    if (dispatcherOptions !== undefined) throw new Error('shadow_dispatcher_hooks_forbidden');
+    this.dispatcher = new ShadowDispatcher();
     this.clock = clock;
   }
 
