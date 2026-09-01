@@ -24,6 +24,11 @@ function strictOptionalBoundedInt(value, fallback, min, max, reason) {
   return value;
 }
 
+function strictBoundedInt(value, min, max, reason) {
+  if (!Number.isSafeInteger(value) || value < min || value > max) throw new Error(reason);
+  return value;
+}
+
 function optionalNumber(value) {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
@@ -58,7 +63,7 @@ function projection(row) {
 export function createSolanaJsonRpcCaller({ rpcUrl, fetchImpl = globalThis.fetch, timeoutMs = 8000 } = {}) {
   const endpoint = safeRpcUrl(rpcUrl);
   if (typeof fetchImpl !== 'function') throw new Error('fetch_unavailable');
-  const timeout = boundedInt(timeoutMs, 8000, 1000, 30000);
+  const timeout = strictBoundedInt(timeoutMs, 1000, 30000, 'invalid_rpc_timeout_ms');
   let rpcId = 0;
 
   return async (method, params = []) => {
@@ -108,11 +113,12 @@ export function createAutomaticEvidenceService(pool, {
     async collectSolana(traderId, input = {}) {
       const limit = strictOptionalBoundedInt(input.limit, 100, 1, 1000, 'invalid_rpc_page_size');
       const maxPages = strictOptionalBoundedInt(input.max_pages, 3, 1, 20, 'invalid_rpc_max_pages');
+      const timeoutMs = strictOptionalBoundedInt(input.timeout_ms, 8000, 1000, 30000, 'invalid_rpc_timeout_ms');
       const trader = await loadApprovedTrader(traderId);
       const rpcCall = createSolanaJsonRpcCaller({
         rpcUrl,
         fetchImpl,
-        timeoutMs: boundedInt(input.timeout_ms, 8000, 1000, 30000)
+        timeoutMs
       });
       const collected = await collectSolanaRpcEvidence({
         walletAddress: trader.wallet_address,
