@@ -53,6 +53,16 @@ function normalizeConfirmationStatus(value) {
   return status;
 }
 
+function normalizeEndpointLabel(value) {
+  if (value === null || value === undefined || value === '') return 'solana-rpc';
+  if (typeof value !== 'string') throw new Error('invalid_rpc_endpoint_label');
+  const label = value.trim();
+  if (!label || label.length > 128 || /[\u0000-\u001f\u007f]/.test(label)) {
+    throw new Error('invalid_rpc_endpoint_label');
+  }
+  return label;
+}
+
 function canonicalJsonValue(value) {
   if (value === null || typeof value !== 'object') return value;
   if (Array.isArray(value)) return value.map(canonicalJsonValue);
@@ -102,12 +112,17 @@ export function buildSolanaRpcProvenance({
 }) {
   const wallet = assertWallet(walletAddress);
   const canonical = canonicalSignatures(signatures);
+  const normalizedEndpointLabel = normalizeEndpointLabel(endpointLabel);
   const normalizedPagesFetched = Number.isInteger(pagesFetched) && pagesFetched >= 0 ? pagesFetched : 0;
   const normalizedPageSize = Number.isInteger(pageSize) && pageSize > 0 ? pageSize : 100;
   const complete = collectionComplete === true;
   const sourceHash = crypto.createHash('sha256').update(JSON.stringify({
-    v: 3,
+    v: 4,
     wallet,
+    source: {
+      type: 'SOLANA_RPC',
+      endpoint_label: normalizedEndpointLabel
+    },
     signatures: canonical,
     collection: {
       pages_fetched: normalizedPagesFetched,
@@ -116,10 +131,10 @@ export function buildSolanaRpcProvenance({
     }
   })).digest('hex');
   return {
-    schema_version: 3,
+    schema_version: 4,
     source_type: 'SOLANA_RPC',
     wallet_address: wallet,
-    rpc_endpoint_label: String(endpointLabel || '').trim() || 'solana-rpc',
+    rpc_endpoint_label: normalizedEndpointLabel,
     pages_fetched: normalizedPagesFetched,
     page_size: normalizedPageSize,
     collection_complete: complete,

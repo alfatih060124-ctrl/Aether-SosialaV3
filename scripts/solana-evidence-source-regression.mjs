@@ -28,7 +28,8 @@ assert.equal(result.published, false);
 assert.equal(result.evidence_status, 'NOT_RECORDED');
 assert.equal(result.reason, 'reconciled_trade_performance_required');
 assert.equal(result.source_reference, signature);
-assert.equal(result.provenance.schema_version, 3);
+assert.equal(result.provenance.schema_version, 4);
+assert.equal(result.provenance.rpc_endpoint_label, 'synthetic-rpc-test-only');
 assert.equal(result.provenance.pages_fetched, 1);
 assert.equal(result.provenance.page_size, 100);
 assert.equal(result.provenance.collection_complete, true);
@@ -56,6 +57,17 @@ const reordered = buildSolanaRpcProvenance({
 assert.equal(reordered.source_hash, result.provenance.source_hash);
 assert.equal(reordered.newest_signature, signature);
 assert.equal(reordered.oldest_signature, failedSignature);
+
+const differentEndpoint = buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  endpointLabel: 'synthetic-rpc-alternate-test-only',
+  signatures: [
+    { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, { Detail: { a: 1, b: 2 }, Custom: 1 }] }, confirmationStatus: 'finalized' },
+    { signature, slot: 123, blockTime: 1788190000, err: null, confirmationStatus: 'finalized' },
+    { signature: olderSignature, slot: 122, blockTime: 1788189990, err: null, confirmationStatus: 'finalized' }
+  ]
+});
+assert.notEqual(differentEndpoint.source_hash, result.provenance.source_hash);
 
 const equivalentDuplicate = buildSolanaRpcProvenance({
   walletAddress: wallet,
@@ -147,6 +159,12 @@ assert.throws(() => buildSolanaRpcProvenance({
   walletAddress: wallet,
   signatures: [{ signature, slot: 123, blockTime: 1788190000, err: null, confirmationStatus: 'mystery' }]
 }), /invalid_rpc_confirmation_status/);
+
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  endpointLabel: 'bad\nlabel',
+  signatures: []
+}), /invalid_rpc_endpoint_label/);
 
 await assert.rejects(
   collectSolanaRpcEvidence({
