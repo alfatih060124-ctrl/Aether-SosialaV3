@@ -19,3 +19,5 @@ jobs:
         run: node scripts/fifo-accounting-regression.mjs
       - name: Run fee equity reconciliation promoter gate
         run: node scripts/reconciliation-promoter-regression.mjs
+      - name: Run Solana network fee source gate
+        run: node scripts/solana-network-fee-regression.mjs
