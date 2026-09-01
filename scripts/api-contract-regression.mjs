@@ -51,6 +51,7 @@ assert.equal(API_CONTRACT.invariants.publication_requires_prior_verification, tr
 assert.equal(API_CONTRACT.invariants.copy_mandate_requires_published_verified_trader, true);
 assert.equal(API_CONTRACT.invariants.auto_trade_execution_dispatched, false);
 assert.equal(API_CONTRACT.invariants.shadow_simulation_never_authorizes_live, true);
+assert.equal(API_CONTRACT.invariants.shadow_simulation_requires_api_token, true);
 
 for (const literal of [
   "route==='/api/health'",
@@ -85,5 +86,9 @@ assert.ok(server.includes("execution_dispatched:false"));
 assert.ok(server.includes("verification_authorized:false"));
 assert.ok(server.includes("publication_authorized:false"));
 assert.ok(server.includes("live_execution_authorized:false"));
+assert.ok(
+  server.includes("route==='/api/shadow/simulate'){if(!auth(req))return send(res,401,{error:'unauthorized'});"),
+  'direct PRIMARY_VM shadow simulation must require API_TOKEN before any simulation work'
+);
 
 console.log('api contract regression: PASS');
