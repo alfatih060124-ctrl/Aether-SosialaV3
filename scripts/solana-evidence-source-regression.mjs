@@ -16,7 +16,7 @@ const result = await collectSolanaRpcEvidence({
     return [
       { signature: olderSignature, slot: 122, blockTime: 1788189990, err: null, confirmationStatus: 'finalized' },
       { signature, slot: 123, blockTime: 1788190000, err: null, confirmationStatus: 'finalized' },
-      { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, 'Custom'] }, confirmationStatus: 'finalized' },
+      { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, { Custom: 1, Detail: { b: 2, a: 1 } }] }, confirmationStatus: 'finalized' },
       { signature, slot: 123, blockTime: 1788190000, err: null, confirmationStatus: 'finalized' }
     ];
   }
@@ -48,7 +48,7 @@ const reordered = buildSolanaRpcProvenance({
   walletAddress: wallet,
   endpointLabel: 'synthetic-rpc-test-only',
   signatures: [
-    { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, 'Custom'] }, confirmationStatus: 'finalized' },
+    { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, { Detail: { a: 1, b: 2 }, Custom: 1 }] }, confirmationStatus: 'finalized' },
     { signature, slot: 123, blockTime: 1788190000, err: null, confirmationStatus: 'finalized' },
     { signature: olderSignature, slot: 122, blockTime: 1788189990, err: null, confirmationStatus: 'finalized' }
   ]
@@ -56,6 +56,16 @@ const reordered = buildSolanaRpcProvenance({
 assert.equal(reordered.source_hash, result.provenance.source_hash);
 assert.equal(reordered.newest_signature, signature);
 assert.equal(reordered.oldest_signature, failedSignature);
+
+const equivalentDuplicate = buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [
+    { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, { Custom: 1, Detail: { b: 2, a: 1 } }] } },
+    { signature: failedSignature, slot: 121, blockTime: 1788189980, err: { InstructionError: [0, { Detail: { a: 1, b: 2 }, Custom: 1 }] } }
+  ]
+});
+assert.equal(equivalentDuplicate.signatures_observed, 1);
+assert.equal(equivalentDuplicate.failed_signatures_observed, 1);
 
 const paginatedCalls = [];
 const paginated = await collectSolanaRpcEvidence({
