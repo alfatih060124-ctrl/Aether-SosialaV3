@@ -49,6 +49,22 @@ assert.throws(()=>new AuditedShadowDispatcher({ dispatcher:new ShadowDispatcherO
 assert.throws(()=>new AuditedShadowDispatcher({ dispatcher:Object.create(ShadowDispatcher.prototype) }),/shadow_dispatcher_injection_forbidden/);
 assert.throws(()=>new AuditedShadowDispatcher({ dispatcherOptions:{ dispatch:async()=>raw } }),/invalid_shadow_dispatcher_options/);
 assert.throws(()=>new AuditedShadowDispatcher({ dispatcherOptions:{ quoteHook:'not-a-function' } }),/invalid_shadow_dispatcher_options/);
+assert.throws(()=>new AuditedShadowDispatcher({ clock:'not-a-function' }),/invalid_execution_audit_clock/);
+
+let observedClockReceiver = 'not-called';
+const guardedClockTicks = [Date.parse('2026-09-01T10:00:01.000Z'), Date.parse('2026-09-01T10:00:02.000Z')];
+const guardedClock = new AuditedShadowDispatcher({
+  clock:function () {
+    observedClockReceiver = this;
+    return guardedClockTicks.shift();
+  }
+});
+const guardedClockResult = await guardedClock.dispatch(intent,{ risk,now:Date.parse('2026-09-01T10:00:05.000Z') });
+assert.equal(observedClockReceiver,undefined,'audit clock must not receive AuditedShadowDispatcher as this');
+assert.equal('dispatcher' in guardedClock,false,'canonical ShadowDispatcher must not be exposed as a public property');
+assert.equal(guardedClockResult.execution_dispatched,false);
+assert.equal(guardedClockResult.audit.dispatcher,'ShadowDispatcher');
+
 let observedHookReceiver = 'not-called';
 const hookedTicks = [Date.parse('2026-09-01T10:00:01.000Z'), Date.parse('2026-09-01T10:00:02.000Z')];
 const hooked = new AuditedShadowDispatcher({
