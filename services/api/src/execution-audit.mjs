@@ -35,21 +35,6 @@ function assertCanonicalShadowDispatcher(dispatcher) {
   return dispatcher;
 }
 
-function assertDispatcherOptions(options) {
-  if (options === undefined) return {};
-  if (!options || typeof options !== 'object' || Array.isArray(options)) throw new Error('invalid_shadow_dispatcher_options');
-  const allowed = new Set(['quoteHook','simulationHook','authorizationHook','confirmationHook','reconciliationHook']);
-  const detached = {};
-  for (const [key, value] of Object.entries(options)) {
-    if (!allowed.has(key)) throw new Error('invalid_shadow_dispatcher_options');
-    if (value !== undefined && typeof value !== 'function') throw new Error('invalid_shadow_dispatcher_options');
-    if (typeof value === 'function') {
-      detached[key] = (...args) => Reflect.apply(value, undefined, args);
-    }
-  }
-  return Object.freeze(detached);
-}
-
 export function buildExecutionAuditEnvelope({ intent, result, started_at, completed_at, dispatcher = CANONICAL_SHADOW_DISPATCHER } = {}) {
   assertCanonicalExecutionIntent(intent);
   assertShadowResult(result);
@@ -119,11 +104,13 @@ export class AuditedShadowDispatcher {
   #clock;
 
   constructor({ dispatcher, dispatcherOptions, clock = () => Date.now() } = {}) {
-    // Keep the canonical dispatcher private: no caller callback may obtain a reference
-    // and mutate dispatch() while the audit envelope still claims ShadowDispatcher.
+    // The audited boundary must not execute caller-provided dispatcher code or hooks.
+    // Even detached callbacks can perform external side effects through closure state
+    // before returning a fail-closed-looking result, invalidating the audit claim.
     if (dispatcher !== undefined) throw new Error('shadow_dispatcher_injection_forbidden');
+    if (dispatcherOptions !== undefined) throw new Error('shadow_dispatcher_hooks_forbidden');
     if (typeof clock !== 'function') throw new Error('invalid_execution_audit_clock');
-    this.#dispatcher = new ShadowDispatcher(assertDispatcherOptions(dispatcherOptions));
+    this.#dispatcher = new ShadowDispatcher();
     this.#clock = (...args) => Reflect.apply(clock, undefined, args);
   }
 
