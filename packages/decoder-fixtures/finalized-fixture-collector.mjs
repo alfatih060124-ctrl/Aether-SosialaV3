@@ -141,14 +141,19 @@ export async function captureFinalizedFixture({
   if (!Number.isSafeInteger(transactionResult.blockTime) || transactionResult.blockTime <= 0) throw new Error('invalid_transaction_block_time');
   if (!transactionResult.meta || transactionResult.meta.err !== null) throw new Error('transaction_meta_not_successful');
 
+  const transactionSignatures = transactionResult?.transaction?.signatures;
+  if (!Array.isArray(transactionSignatures) || !transactionSignatures.includes(normalizedSignature)) {
+    throw new Error('transaction_signature_mismatch');
+  }
+
   const programIds = executedProgramIds(transactionResult);
   if (!programIds.includes(normalizedProgramId)) throw new Error('required_dex_program_not_executed');
 
   const evidence = {
     capture_schema_version: 1,
     capture_kind: 'SOLANA_FINALIZED_TRANSACTION',
-    fixture_class: 'VERIFIED_ONCHAIN',
-    review_state: 'RAW_CAPTURE',
+    fixture_class: 'RAW_CAPTURE',
+    review_state: 'PENDING_REVIEW',
     countable_for_live_manifest: false,
     expected: normalizedExpected,
     dex: normalizedDex,
@@ -167,6 +172,7 @@ export async function captureFinalizedFixture({
       network_submission: false,
       signer_used: false,
       live_execution_authorized: false,
+      promotion_required_before_live_counting: true,
     },
   };
 
