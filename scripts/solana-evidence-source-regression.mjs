@@ -28,7 +28,7 @@ assert.equal(result.published, false);
 assert.equal(result.evidence_status, 'NOT_RECORDED');
 assert.equal(result.reason, 'reconciled_trade_performance_required');
 assert.equal(result.source_reference, signature);
-assert.equal(result.provenance.schema_version, 4);
+assert.equal(result.provenance.schema_version, 5);
 assert.equal(result.provenance.rpc_endpoint_label, 'synthetic-rpc-test-only');
 assert.equal(result.provenance.pages_fetched, 1);
 assert.equal(result.provenance.page_size, 100);
@@ -165,6 +165,36 @@ assert.throws(() => buildSolanaRpcProvenance({
   endpointLabel: 'bad\nlabel',
   signatures: []
 }), /invalid_rpc_endpoint_label/);
+
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [],
+  pagesFetched: -1
+}), /invalid_rpc_pages_fetched/);
+
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [],
+  pagesFetched: 21
+}), /invalid_rpc_pages_fetched/);
+
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [],
+  pageSize: 0
+}), /invalid_rpc_page_size/);
+
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [],
+  pageSize: 1001
+}), /invalid_rpc_page_size/);
+
+assert.throws(() => buildSolanaRpcProvenance({
+  walletAddress: wallet,
+  signatures: [],
+  collectionComplete: 'true'
+}), /invalid_rpc_collection_complete/);
 
 await assert.rejects(
   collectSolanaRpcEvidence({
