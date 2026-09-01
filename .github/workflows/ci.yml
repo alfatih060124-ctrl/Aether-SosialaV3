@@ -36,6 +36,7 @@ jobs:
           node --check packages/reconciliation-accounting/fifo.mjs
           node --check packages/reconciliation-accounting/promoter.mjs
           node --check packages/reconciliation-accounting/solana-network-fee.mjs
+          node --check packages/reconciliation-accounting/geckoterminal-sol-usd.mjs
           node --check services/api/src/repositories/signal-intelligence.mjs
           node --check services/api/src/repositories/core.mjs
           node --check services/api/src/repositories/admin.mjs
@@ -57,6 +58,7 @@ jobs:
           node --check scripts/fifo-accounting-regression.mjs
           node --check scripts/reconciliation-promoter-regression.mjs
           node --check scripts/solana-network-fee-regression.mjs
+          node --check scripts/historical-sol-usd-regression.mjs
           node --check scripts/product-audit-separation-regression.mjs
           node --check scripts/execution-boundary-regression.mjs
           node --check scripts/market-intelligence-regression.mjs
@@ -102,6 +104,8 @@ jobs:
         run: node scripts/reconciliation-promoter-regression.mjs
       - name: Solana network fee source regression
         run: node scripts/solana-network-fee-regression.mjs
+      - name: Historical SOL USD valuation regression
+        run: node scripts/historical-sol-usd-regression.mjs
       - name: Product audit separation regression
         run: node scripts/product-audit-separation-regression.mjs
       - name: Execution boundary regression
