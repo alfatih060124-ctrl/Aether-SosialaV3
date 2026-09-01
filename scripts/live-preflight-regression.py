@@ -92,7 +92,7 @@ def run_case(manifest: dict | None, *, env_overrides: dict[str, str] | None = No
 
 def expect_fail(manifest, reason, *, env_overrides=None):
     code, payload = run_case(manifest, env_overrides=env_overrides)
-    assert code == 2, (reason, code, payload, proc.stderr if "proc" in locals() else "")
+    assert code == 2, (reason, code, payload)
     assert payload["eligible_for_operator_activation"] is False
     assert payload["reason"] == reason, payload
 
@@ -116,6 +116,23 @@ def main():
     incomplete = valid_manifest()
     incomplete["coverage"].pop()
     expect_fail(incomplete, "required_target_coverage_incomplete")
+
+    omitted_family = valid_manifest()
+    omitted_family["required_targets"] = omitted_family["required_targets"][:-1]
+    omitted_family["coverage"] = omitted_family["coverage"][:-1]
+    expect_fail(omitted_family, "missing_required_dex_family:orca")
+
+    placeholder = valid_manifest()
+    placeholder["required_targets"][0]["version"] = "REPLACE_WITH_EXACT_DEPLOYED_VERSION"
+    expect_fail(placeholder, "placeholder_version_not_allowed")
+
+    bool_count = valid_manifest()
+    bool_count["coverage"][0]["positive_verified"] = True
+    expect_fail(bool_count, "invalid_positive_fixture_count")
+
+    bool_rate = valid_manifest()
+    bool_rate["coverage"][0]["regression_pass_rate"] = True
+    expect_fail(bool_rate, "invalid_regression_pass_rate")
 
     secret = valid_manifest()
     secret["api_token"] = "must-not-be-here"
