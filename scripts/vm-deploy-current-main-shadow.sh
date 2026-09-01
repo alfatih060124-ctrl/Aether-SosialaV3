@@ -77,10 +77,10 @@ if grep -Eq 'EXECUTION_MODE:[[:space:]]*LIVE|LIVE_ENABLED:[[:space:]]*"?true"?' 
   fail "compose contains LIVE enablement"
 fi
 
-say "building candidate API image"
-docker compose --env-file "$ENV_FILE" build api
-CANDIDATE_IMAGE="$(docker compose --env-file "$ENV_FILE" images -q api | head -1)"
-[ -n "$CANDIDATE_IMAGE" ] || fail "candidate API image could not be resolved"
+say "building explicitly tagged candidate API image"
+CANDIDATE_IMAGE="aether-current-main-candidate:${TARGET_SHA}"
+docker build -t "$CANDIDATE_IMAGE" .
+docker image inspect "$CANDIDATE_IMAGE" >/dev/null 2>&1 || fail "candidate API image tag could not be resolved"
 
 SMOKE_NAME="aether-current-main-smoke-$$"
 cleanup_smoke(){ docker rm -f "$SMOKE_NAME" >/dev/null 2>&1 || true; }
@@ -114,7 +114,7 @@ cleanup_smoke
 trap - EXIT INT TERM
 
 say "recreating PRIMARY_VM API from approved image/source"
-docker compose --env-file "$ENV_FILE" up -d --force-recreate api
+docker compose --env-file "$ENV_FILE" up -d --build --force-recreate api
 
 say "waiting for database-backed readiness and migrations"
 ready=0
