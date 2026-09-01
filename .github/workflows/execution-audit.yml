@@ -1,0 +1,29 @@
+name: Execution Audit Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/execution-audit.mjs'
+      - 'services/api/src/execution-boundary.mjs'
+      - 'scripts/execution-audit-regression.mjs'
+      - '.github/workflows/execution-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  execution-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: |
+          node --check services/api/src/execution-audit.mjs
+          node --check scripts/execution-audit-regression.mjs
+      - name: Run fail-closed execution audit regression
+        run: node scripts/execution-audit-regression.mjs
