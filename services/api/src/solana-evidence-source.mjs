@@ -197,8 +197,10 @@ export async function collectSolanaRpcEvidence({
 } = {}) {
   const wallet = assertWallet(walletAddress);
   if (typeof rpcCall !== 'function') throw new Error('solana_rpc_call_required');
-  const safeLimit = Math.max(1, Math.min(1000, Number.isInteger(limit) ? limit : 100));
-  const safeMaxPages = Math.max(1, Math.min(20, Number.isInteger(maxPages) ? maxPages : 3));
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new Error('invalid_rpc_page_size');
+  if (!Number.isSafeInteger(maxPages) || maxPages < 1 || maxPages > 20) throw new Error('invalid_rpc_max_pages');
+  const safeLimit = limit;
+  const safeMaxPages = maxPages;
   const normalizedCommitment = normalizeCommitment(commitment);
   const rows = [];
   let before;
