@@ -1,0 +1,33 @@
+name: Reconciliation Completeness Regression
+on:
+  pull_request:
+    paths:
+      - 'packages/reconciliation-accounting/additional-fees.mjs'
+      - 'packages/reconciliation-accounting/wallet-equity.mjs'
+      - 'packages/reconciliation-accounting/promoter.mjs'
+      - 'scripts/reconciliation-completeness-regression.mjs'
+      - '.github/workflows/reconciliation-completeness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/reconciliation-accounting/additional-fees.mjs'
+      - 'packages/reconciliation-accounting/wallet-equity.mjs'
+      - 'packages/reconciliation-accounting/promoter.mjs'
+      - 'scripts/reconciliation-completeness-regression.mjs'
+      - '.github/workflows/reconciliation-completeness.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        run: |
+          node --check packages/reconciliation-accounting/additional-fees.mjs
+          node --check packages/reconciliation-accounting/wallet-equity.mjs
+          node --check scripts/reconciliation-completeness-regression.mjs
+      - name: Additional fees and full-wallet equity regression
+        run: node scripts/reconciliation-completeness-regression.mjs
