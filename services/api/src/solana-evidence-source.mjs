@@ -10,6 +10,14 @@ function assertWallet(value) {
   return wallet;
 }
 
+function canonicalJsonValue(value) {
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(canonicalJsonValue);
+  const normalized = {};
+  for (const key of Object.keys(value).sort()) normalized[key] = canonicalJsonValue(value[key]);
+  return normalized;
+}
+
 function canonicalSignatures(rows = []) {
   if (!Array.isArray(rows)) throw new Error('invalid_rpc_signature_response');
   const deduped = new Map();
@@ -22,7 +30,7 @@ function canonicalSignatures(rows = []) {
       signature,
       slot: Number.isSafeInteger(row?.slot) && row.slot >= 0 ? row.slot : null,
       block_time: Number.isSafeInteger(rawBlockTime) ? rawBlockTime : null,
-      err: row?.err ?? null,
+      err: canonicalJsonValue(row?.err ?? null),
       confirmation_status: typeof rawConfirmationStatus === 'string' ? rawConfirmationStatus.trim() || null : null
     };
     const existing = deduped.get(signature);
