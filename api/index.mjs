@@ -131,7 +131,7 @@ function sendUpstream(res, upstream) {
 
 function marketError(res, error) {
   const code = error instanceof Error ? error.message : 'market_provider_unavailable';
-  if (code === 'invalid_token_mint' || code === 'token_mint_required') {
+  if (code === 'invalid_token_mint' || code === 'token_mint_required' || code === 'invalid_market_discovery_view') {
     return json(res, 400, { error: code, read_only: true, live_execution_authorized: false });
   }
   if (code === 'market_token_not_found') {
@@ -140,10 +140,10 @@ function marketError(res, error) {
   if (code === 'market_provider_rate_limited') {
     return json(res, 503, { error: code, retryable: true, read_only: true, live_execution_authorized: false });
   }
-  if (['market_provider_unavailable','market_provider_timeout','provider_network_down'].includes(code)) {
+  if (['market_provider_unavailable', 'market_provider_timeout', 'provider_network_down'].includes(code)) {
     return json(res, 503, { error: 'market_provider_unavailable', retryable: true, read_only: true, live_execution_authorized: false });
   }
-  if (['market_provider_canonical_mismatch','invalid_market_provider_payload','market_provider_target_invalid'].includes(code)) {
+  if (['market_provider_canonical_mismatch', 'invalid_market_provider_payload', 'market_provider_target_invalid'].includes(code)) {
     return json(res, 502, { error: code, read_only: true, live_execution_authorized: false });
   }
   return json(res, 503, { error: 'market_intelligence_unavailable', read_only: true, live_execution_authorized: false });
@@ -158,6 +158,15 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (req.method === 'GET' && path === '/api/market/discovery') {
+      try {
+        const data = await marketIntelligence.getDiscovery(requestUrl.searchParams.get('view') || 'trending');
+        return json(res, 200, data);
+      } catch (error) {
+        return marketError(res, error);
+      }
+    }
+
     if (req.method === 'GET' && path === '/api/market/token') {
       const mint = requestUrl.searchParams.get('mint');
       if (!mint) return marketError(res, new Error('token_mint_required'));
@@ -169,7 +178,7 @@ export default async function handler(req, res) {
       }
     }
 
-    if (path === '/api/market/token') {
+    if (path === '/api/market/token' || path === '/api/market/discovery') {
       return json(res, 405, { error: 'method_not_allowed', read_only: true, live_execution_authorized: false });
     }
 
