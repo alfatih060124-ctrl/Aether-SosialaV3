@@ -5,6 +5,7 @@ const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const SIGNATURE_BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,100}$/;
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const CONFIRMATION_STATUSES = new Set(['processed', 'confirmed', 'finalized']);
+const QUERY_COMMITMENTS = new Set(['confirmed', 'finalized']);
 
 function decodedBase58ByteLength(value) {
   let decoded = 0n;
@@ -51,6 +52,13 @@ function normalizeConfirmationStatus(value) {
   const status = value.trim();
   if (!CONFIRMATION_STATUSES.has(status)) throw new Error('invalid_rpc_confirmation_status');
   return status;
+}
+
+function normalizeCommitment(value) {
+  if (typeof value !== 'string') throw new Error('invalid_rpc_commitment');
+  const commitment = value.trim();
+  if (!QUERY_COMMITMENTS.has(commitment)) throw new Error('invalid_rpc_commitment');
+  return commitment;
 }
 
 function normalizeEndpointLabel(value) {
@@ -123,27 +131,31 @@ export function buildSolanaRpcProvenance({
   endpointLabel = 'solana-rpc',
   pagesFetched = 1,
   pageSize = 100,
-  collectionComplete = true
+  collectionComplete = true,
+  commitment = 'finalized'
 }) {
   const wallet = assertWallet(walletAddress);
   const canonical = canonicalSignatures(signatures);
   const normalizedEndpointLabel = normalizeEndpointLabel(endpointLabel);
   const collection = normalizeCollectionMetadata({ pagesFetched, pageSize, collectionComplete });
+  const normalizedCommitment = normalizeCommitment(commitment);
   const sourceHash = crypto.createHash('sha256').update(JSON.stringify({
-    v: 5,
+    v: 6,
     wallet,
     source: {
       type: 'SOLANA_RPC',
-      endpoint_label: normalizedEndpointLabel
+      endpoint_label: normalizedEndpointLabel,
+      commitment: normalizedCommitment
     },
     signatures: canonical,
     collection
   })).digest('hex');
   return {
-    schema_version: 5,
+    schema_version: 6,
     source_type: 'SOLANA_RPC',
     wallet_address: wallet,
     rpc_endpoint_label: normalizedEndpointLabel,
+    rpc_commitment: normalizedCommitment,
     pages_fetched: collection.pages_fetched,
     page_size: collection.page_size,
     collection_complete: collection.complete,
@@ -161,19 +173,21 @@ export async function collectSolanaRpcEvidence({
   rpcCall,
   limit = 100,
   maxPages = 3,
-  endpointLabel
+  endpointLabel,
+  commitment = 'finalized'
 } = {}) {
   const wallet = assertWallet(walletAddress);
   if (typeof rpcCall !== 'function') throw new Error('solana_rpc_call_required');
   const safeLimit = Math.max(1, Math.min(1000, Number.isInteger(limit) ? limit : 100));
   const safeMaxPages = Math.max(1, Math.min(20, Number.isInteger(maxPages) ? maxPages : 3));
+  const normalizedCommitment = normalizeCommitment(commitment);
   const rows = [];
   let before;
   let pagesFetched = 0;
   let collectionComplete = false;
 
   for (let page = 0; page < safeMaxPages; page += 1) {
-    const options = { limit: safeLimit };
+    const options = { limit: safeLimit, commitment: normalizedCommitment };
     if (before) options.before = before;
     const pageResult = await rpcCall('getSignaturesForAddress', [wallet, options]);
     if (!Array.isArray(pageResult)) throw new Error('invalid_rpc_signature_response');
@@ -199,7 +213,8 @@ export async function collectSolanaRpcEvidence({
     endpointLabel,
     pagesFetched,
     pageSize: safeLimit,
-    collectionComplete
+    collectionComplete,
+    commitment: normalizedCommitment
   });
 
   // Signatures prove observable chain activity, not realized trading performance.
