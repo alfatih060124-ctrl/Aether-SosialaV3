@@ -47,23 +47,16 @@ class ShadowDispatcherOverride extends ShadowDispatcher {
 }
 assert.throws(()=>new AuditedShadowDispatcher({ dispatcher:new ShadowDispatcherOverride() }),/shadow_dispatcher_injection_forbidden/);
 assert.throws(()=>new AuditedShadowDispatcher({ dispatcher:Object.create(ShadowDispatcher.prototype) }),/shadow_dispatcher_injection_forbidden/);
-assert.throws(()=>new AuditedShadowDispatcher({ dispatcherOptions:{ dispatch:async()=>raw } }),/invalid_shadow_dispatcher_options/);
-assert.throws(()=>new AuditedShadowDispatcher({ dispatcherOptions:{ quoteHook:'not-a-function' } }),/invalid_shadow_dispatcher_options/);
-let observedHookReceiver = 'not-called';
-const hookedTicks = [Date.parse('2026-09-01T10:00:01.000Z'), Date.parse('2026-09-01T10:00:02.000Z')];
-const hooked = new AuditedShadowDispatcher({
-  dispatcherOptions:{
-    quoteHook:async function () {
-      observedHookReceiver = this;
-      return {ok:true,shadow:true};
-    }
-  },
-  clock:()=>hookedTicks.shift()
-});
-const hookedResult = await hooked.dispatch(intent,{ risk,now:Date.parse('2026-09-01T10:00:05.000Z') });
-assert.equal(observedHookReceiver,undefined,'audited hook must not receive ShadowDispatcher as this');
-assert.equal(hookedResult.audit.dispatcher,'ShadowDispatcher');
-assert.equal(hookedResult.execution_dispatched,false);
+assert.throws(()=>new AuditedShadowDispatcher({ dispatcherOptions:{} }),/shadow_dispatcher_hooks_forbidden/);
+let hookInvoked = false;
+assert.throws(()=>new AuditedShadowDispatcher({ dispatcherOptions:{ quoteHook:async()=>{
+  hookInvoked = true;
+  return {ok:true,shadow:true,network_submission:false};
+} } }),/shadow_dispatcher_hooks_forbidden/);
+assert.equal(hookInvoked,false,'caller hook must never execute inside audited dispatch trust boundary');
+assert.throws(()=>new AuditedShadowDispatcher({ dispatcherOptions:{ authorizationHook:async()=>({ok:true,live_execution_authorized:false}) } }),/shadow_dispatcher_hooks_forbidden/);
+assert.throws(()=>new AuditedShadowDispatcher({ dispatcherOptions:{ confirmationHook:async()=>({ok:true,signature:null}) } }),/shadow_dispatcher_hooks_forbidden/);
+assert.throws(()=>new AuditedShadowDispatcher({ dispatcherOptions:{ reconciliationHook:async()=>({ok:true}) } }),/shadow_dispatcher_hooks_forbidden/);
 assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:{...raw,intent_id:'10000000-0000-0000-0000-000000000099'},started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/execution_audit_intent_mismatch/);
 assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:{...raw,execution_dispatched:true},started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/shadow_execution_dispatch_flag_violation/);
 assert.throws(()=>buildExecutionAuditEnvelope({ intent,result:{...raw,network_submission:true},started_at:'2026-09-01T10:00:01.000Z',completed_at:'2026-09-01T10:00:02.000Z' }),/shadow_network_submission_violation/);
