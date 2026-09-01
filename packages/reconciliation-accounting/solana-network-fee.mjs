@@ -4,7 +4,7 @@ const SIGNATURE_BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,100}$/;
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const HASH_RE = /^[a-f0-9]{64}$/;
 const LAMPORTS_PER_SOL = 1_000_000_000n;
-const MAX_PRICE_TIME_DRIFT_MS = 5 * 60 * 1000;
+const REQUIRED_PRICE_CANDLE_SECONDS = 60;
 
 function decodedBase58ByteLength(value) {
   let decoded = 0n;
@@ -157,14 +157,28 @@ export async function collectSolanaNetworkFeeObservation({
 
 export function valueSolanaNetworkFeeObservation({ observation, solUsdSnapshot } = {}) {
   const checked = verifySolanaNetworkFeeObservation(observation);
+  if (checked.blockTimeUnix === null) throw new Error('solana_fee_block_time_required_for_valuation');
   if (!solUsdSnapshot || typeof solUsdSnapshot !== 'object') throw new Error('sol_usd_snapshot_required');
   if (solUsdSnapshot.source_type !== 'SOL_USD_PRICE_V1') throw new Error('invalid_sol_usd_source_type');
+  if (solUsdSnapshot.read_only !== true || solUsdSnapshot.reconciliation_ready !== false || solUsdSnapshot.evidence_ready !== false) {
+    throw new Error('sol_usd_boundary_violation');
+  }
+  if (solUsdSnapshot.verified !== false || solUsdSnapshot.published !== false || solUsdSnapshot.live_execution_authorized !== false) {
+    throw new Error('sol_usd_boundary_violation');
+  }
   const priceReference = text(solUsdSnapshot.source_reference, 'sol_usd_source_reference', 8, 300);
   const priceHash = hashText(solUsdSnapshot.source_hash, 'sol_usd_source_hash');
   const anchorSlot = safeInt(solUsdSnapshot.anchor_slot, 'sol_usd_anchor_slot');
   if (anchorSlot !== checked.sourceSlot) throw new Error('sol_usd_anchor_slot_mismatch');
+  const transactionBlockTimeUnix = safeInt(solUsdSnapshot.transaction_block_time_unix, 'sol_usd_transaction_block_time_unix');
+  if (transactionBlockTimeUnix !== checked.blockTimeUnix) throw new Error('sol_usd_transaction_time_mismatch');
+  const candleTimestampUnix = safeInt(solUsdSnapshot.candle_timestamp_unix, 'sol_usd_candle_timestamp_unix');
+  const candleIntervalSeconds = safeInt(solUsdSnapshot.candle_interval_seconds, 'sol_usd_candle_interval_seconds', 1, 3600);
+  if (candleIntervalSeconds !== REQUIRED_PRICE_CANDLE_SECONDS) throw new Error('sol_usd_candle_interval_invalid');
+  if (!(candleTimestampUnix <= checked.blockTimeUnix && checked.blockTimeUnix < candleTimestampUnix + candleIntervalSeconds)) {
+    throw new Error('sol_usd_candle_time_mismatch');
+  }
   const priceObserved = isoTime(solUsdSnapshot.observed_at, 'sol_usd_observed_at');
-  if (Math.abs(priceObserved.ms - checked.observedMs) > MAX_PRICE_TIME_DRIFT_MS) throw new Error('sol_usd_time_mismatch');
   if (solUsdSnapshot.currency !== 'USD_MICRO_PER_SOL') throw new Error('sol_usd_currency_invalid');
   const priceUsdMicroPerSol = safeInt(solUsdSnapshot.price_usd_micro_per_sol, 'price_usd_micro_per_sol', 1);
 
@@ -173,11 +187,14 @@ export function valueSolanaNetworkFeeObservation({ observation, solUsdSnapshot }
   if (networkFeeMinorBig > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('network_fee_usd_overflow');
   const networkFeeMinor = Number(networkFeeMinorBig);
   const sourceHash = hash({
-    schema_version: 1,
+    schema_version: 2,
     source_type: 'SOLANA_NETWORK_FEE_USD_V1',
     solana_fee_source_hash: checked.sourceHash,
     sol_usd_source_hash: priceHash,
     source_slot: checked.sourceSlot,
+    transaction_block_time_unix: checked.blockTimeUnix,
+    candle_timestamp_unix: candleTimestampUnix,
+    candle_interval_seconds: candleIntervalSeconds,
     network_fee_lamports: checked.networkFeeLamports,
     price_usd_micro_per_sol: priceUsdMicroPerSol,
     network_fee_minor: networkFeeMinor,
@@ -185,11 +202,14 @@ export function valueSolanaNetworkFeeObservation({ observation, solUsdSnapshot }
   });
 
   return {
-    schema_version: 1,
+    schema_version: 2,
     source_type: 'SOLANA_NETWORK_FEE_USD_V1',
     source_reference: checked.sourceReference,
     source_hash: sourceHash,
     source_slot: checked.sourceSlot,
+    transaction_block_time_unix: checked.blockTimeUnix,
+    candle_timestamp_unix: candleTimestampUnix,
+    candle_interval_seconds: candleIntervalSeconds,
     observed_at: checked.observedAt,
     network_fee_lamports: checked.networkFeeLamports,
     network_fee_minor: networkFeeMinor,
@@ -209,6 +229,9 @@ export function valueSolanaNetworkFeeObservation({ observation, solUsdSnapshot }
       sol_usd_source_reference: priceReference,
       sol_usd_source_hash: priceHash,
       sol_usd_anchor_slot: anchorSlot,
+      transaction_block_time_unix: transactionBlockTimeUnix,
+      candle_timestamp_unix: candleTimestampUnix,
+      candle_interval_seconds: candleIntervalSeconds,
       sol_usd_observed_at: priceObserved.iso,
       price_usd_micro_per_sol: priceUsdMicroPerSol
     }
