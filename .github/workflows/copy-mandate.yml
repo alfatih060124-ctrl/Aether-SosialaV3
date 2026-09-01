@@ -1,0 +1,18 @@
+name: Copy Mandate Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/copy-mandate.mjs'
+      - 'scripts/copy-mandate-regression.mjs'
+      - '.github/workflows/copy-mandate.yml'
+
+jobs:
+  copy-mandate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/copy-mandate-regression.mjs
