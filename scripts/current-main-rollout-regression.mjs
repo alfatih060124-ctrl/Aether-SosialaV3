@@ -18,6 +18,7 @@ assert.doesNotMatch(source, /source\s+[^\n]*\.env/);
 assert.doesNotMatch(source, /LIVE_ENABLED=true/);
 assert.doesNotMatch(source, /OPERATOR_APPROVED=true/);
 assert.doesNotMatch(source, /FIXTURE_GATE_PASSED=true/);
+assert.doesNotMatch(source, /docker compose[^\n]*images -q api/);
 
 for (const invariant of [
   '^EXECUTION_MODE=SHADOW$',
@@ -31,8 +32,8 @@ for (const invariant of [
 const backupIndex = source.indexOf('creating verified pre-deploy database backup');
 const fetchIndex = source.indexOf('fetching approved main revision');
 const mergeIndex = source.indexOf('git merge --ff-only');
-const buildIndex = source.indexOf('building candidate API image');
-const recreateIndex = source.indexOf('up -d --force-recreate api');
+const buildIndex = source.indexOf('building explicitly tagged candidate API image');
+const recreateIndex = source.indexOf('up -d --build --force-recreate api');
 const migrationIndex = source.indexOf('verifying migration set exactly matches repository');
 const localSafetyIndex = source.indexOf('verifying local SHADOW/fail-closed runtime');
 const publicSafetyIndex = source.indexOf('verifying public SHADOW endpoints');
@@ -50,7 +51,10 @@ assert.ok(localSafetyIndex < publicSafetyIndex, 'local runtime must pass before 
 
 assert.match(source, /pg_dump/);
 assert.match(source, /pg_restore -l/);
-assert.match(source, /docker compose[^\n]*build api/);
+assert.match(source, /CANDIDATE_IMAGE="aether-current-main-candidate:\$\{TARGET_SHA\}"/);
+assert.match(source, /docker build -t "\$CANDIDATE_IMAGE" \./);
+assert.match(source, /docker image inspect "\$CANDIDATE_IMAGE"/);
+assert.match(source, /up -d --build --force-recreate api/);
 assert.match(source, /--read-only/);
 assert.match(source, /no-new-privileges:true/);
 assert.match(source, /isolated candidate unexpectedly reported database readiness/);
