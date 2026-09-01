@@ -2,12 +2,25 @@
 import fs from 'node:fs';
 import { captureFinalizedFixture } from '../packages/decoder-fixtures/finalized-fixture-collector.mjs';
 
+const ALLOWED_ARGS = new Set([
+  'rpc-url',
+  'signature',
+  'dex',
+  'version',
+  'program-id',
+  'expected',
+  'rpc-label',
+  'out',
+]);
+
 function parseArgs(argv) {
   const values = {};
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (!arg.startsWith('--')) throw new Error(`unexpected_argument:${arg}`);
     const key = arg.slice(2);
+    if (!ALLOWED_ARGS.has(key)) throw new Error(`unsupported_argument:${key}`);
+    if (Object.prototype.hasOwnProperty.call(values, key)) throw new Error(`duplicate_argument:${key}`);
     const next = argv[index + 1];
     if (!next || next.startsWith('--')) throw new Error(`missing_argument_value:${key}`);
     values[key] = next;
@@ -71,8 +84,10 @@ async function main() {
     fs.writeFileSync(args.out, rendered, { encoding: 'utf8', flag: 'wx' });
     process.stdout.write(JSON.stringify({
       ok: true,
+      notice: 'RAW_CAPTURE_ONLY_NOT_LIVE_EVIDENCE',
       output_file: args.out,
       evidence_sha256: fixture.evidence_sha256,
+      fixture_class: fixture.fixture_class,
       review_state: fixture.review_state,
       countable_for_live_manifest: fixture.countable_for_live_manifest,
       live_execution_authorized: false,
