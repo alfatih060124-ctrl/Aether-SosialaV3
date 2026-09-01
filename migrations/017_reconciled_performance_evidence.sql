@@ -30,6 +30,34 @@ CREATE TABLE IF NOT EXISTS trader_reconciled_trades (
 CREATE INDEX IF NOT EXISTS idx_trader_reconciled_trades_trader
   ON trader_reconciled_trades(trader_id, executed_at, trade_event_id);
 
+-- Evidence V1 intentionally has a bounded per-trader ledger. This prevents a caller from
+-- silently calculating only the first 5,000 rows. An explicit batching/epoch scheme must
+-- replace this guard before a trader can exceed this bound. Advisory locking makes the cap
+-- deterministic even if multiple reconciliation requests arrive concurrently.
+CREATE OR REPLACE FUNCTION aether_guard_reconciled_trade_limit()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  existing_count bigint;
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended(NEW.trader_id::text, 0));
+  SELECT count(*) INTO existing_count
+  FROM trader_reconciled_trades
+  WHERE trader_id = NEW.trader_id;
+  IF existing_count >= 5000 THEN
+    RAISE EXCEPTION 'reconciliation_evidence_row_limit'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_aether_reconciled_trade_limit ON trader_reconciled_trades;
+CREATE TRIGGER trg_aether_reconciled_trade_limit
+BEFORE INSERT ON trader_reconciled_trades
+FOR EACH ROW EXECUTE FUNCTION aether_guard_reconciled_trade_limit();
+
 ALTER TABLE trader_evidence_collection_runs
   ADD COLUMN IF NOT EXISTS trades_count integer,
   ADD COLUMN IF NOT EXISTS total_return_bps integer,
