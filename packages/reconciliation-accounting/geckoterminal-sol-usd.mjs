@@ -129,7 +129,8 @@ export async function collectHistoricalSolUsdSnapshot({
   const pool = address(poolAddress, 'geckoterminal_pool_address');
   const slot = safeInt(anchorSlot, 'sol_usd_anchor_slot');
   const blockTime = safeInt(transactionBlockTimeUnix, 'transaction_block_time_unix');
-  const observedAt = iso(clock() instanceof Date ? clock().toISOString() : clock(), 'sol_usd_observed_at');
+  const clockValue = clock();
+  const observedAt = iso(clockValue instanceof Date ? clockValue.toISOString() : clockValue, 'sol_usd_observed_at');
 
   const poolResult = await getJson(fetchImpl, `/api/v2/networks/solana/pools/${encodeURIComponent(pool)}?include=base_token%2Cquote_token`, timeoutMs);
   const returnedPool = poolResult.body?.data;
