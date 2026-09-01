@@ -21,3 +21,5 @@ jobs:
         run: node scripts/reconciliation-promoter-regression.mjs
       - name: Run Solana network fee source gate
         run: node scripts/solana-network-fee-regression.mjs
+      - name: Run historical SOL USD valuation gate
+        run: node scripts/historical-sol-usd-regression.mjs
