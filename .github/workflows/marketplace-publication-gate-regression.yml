@@ -5,6 +5,8 @@ on:
     paths:
       - 'services/api/src/marketplace-publication-gate.mjs'
       - 'services/api/src/marketplace-publication-gate.regression.mjs'
+      - 'services/api/src/marketplace-publication-repository.regression.mjs'
+      - 'services/api/src/repositories/marketplace.mjs'
       - '.github/workflows/marketplace-publication-gate-regression.yml'
   workflow_dispatch:
 
@@ -18,3 +20,5 @@ jobs:
           node-version: '20'
       - name: Run marketplace publication gate regression
         run: node services/api/src/marketplace-publication-gate.regression.mjs
+      - name: Run production repository integration regression
+        run: node services/api/src/marketplace-publication-repository.regression.mjs
