@@ -149,6 +149,7 @@ export async function collectSolanaTransactionEvidence({
       rpc_commitment: normalizedCommitment,
       request_started_at: requestStartedAt,
       observed_at: observedAt,
+      requested_wallet: wallet,
       request_signature_hash: buildHash({ signature: requestedSignature }),
       transaction_found: false
     };
@@ -187,6 +188,7 @@ export async function collectSolanaTransactionEvidence({
     rpc_commitment: normalizedCommitment,
     request_started_at: requestStartedAt,
     observed_at: observedAt,
+    requested_wallet: wallet,
     source_reference: sourceReference,
     transaction: transactionRecord
   };
@@ -213,6 +215,7 @@ export function verifySolanaTransactionEvidence(result) {
     }
     const provenance = result.provenance;
     if (!provenance || typeof provenance !== 'object') return false;
+    canonicalWallet(provenance.requested_wallet);
     const { source_hash: suppliedHash, ...payload } = provenance;
     if (!/^[0-9a-f]{64}$/.test(suppliedHash || '')) return false;
     if (buildHash(payload) !== suppliedHash) return false;
