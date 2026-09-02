@@ -84,6 +84,6 @@ assert.equal(loaded.policy_id, row.policy_id);
 assert.deepEqual(queries[0].params, [row.policy_id]);
 assert.match(queries[0].sql, /WHERE policy_id=\$1/);
 assert.doesNotMatch(queries[0].sql, /follower_user_id=\$1/);
-assert.throws(() => repository.getByPolicyId(''), /policy_id_required/);
+await assert.rejects(() => repository.getByPolicyId(''), /policy_id_required/);
 
 console.log('Copy Mandate Runtime Regression: PASS');
