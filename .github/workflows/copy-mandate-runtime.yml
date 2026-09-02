@@ -1,0 +1,20 @@
+name: Copy Mandate Runtime Regression
+
+on:
+  pull_request:
+    paths:
+      - 'migrations/019_copy_mandate_canonical_runtime.sql'
+      - 'services/api/src/copy-mandate.mjs'
+      - 'services/api/src/copy-mandate-runtime.mjs'
+      - 'scripts/copy-mandate-runtime-regression.mjs'
+      - '.github/workflows/copy-mandate-runtime.yml'
+
+jobs:
+  copy-mandate-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/copy-mandate-runtime-regression.mjs
