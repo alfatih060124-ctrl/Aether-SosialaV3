@@ -53,9 +53,43 @@ assert.throws(() => applyApprovedFeeConfig(approved, { role: 'FEE_CONFIG_APPLIER
 
 const applied = applyApprovedFeeConfig(approved, applier);
 assert.equal(applied.config.performance_fee_bps, 1500);
+assert.equal(applied.change.status, 'APPLIED');
+assert.equal(applied.change.applied, true);
 assert.equal(applied.audit.requested_by, 'operator-1');
 assert.equal(applied.audit.approved_by, 'approver-1');
 assert.equal(applied.audit.applied_by, 'applier-1');
 assert.equal(applied.audit.live_execution_authorized, false);
+assert.equal(applied.audit.network_submission_authorized, false);
+assert.equal(applied.audit.signer_required, false);
+assert.throws(() => applyApprovedFeeConfig(applied.change, applier), /approved_fee_change_required/);
+
+const forgedLiveChange = {
+  ...approved,
+  proposed: {
+    ...approved.proposed,
+    mode: 'LIVE',
+    live_execution_authorized: true,
+  },
+};
+assert.throws(() => applyApprovedFeeConfig(forgedLiveChange, applier), /shadow_mode_required|live_execution_must_remain_false/);
+
+const forgedSignerChange = {
+  ...approved,
+  proposed: {
+    ...approved.proposed,
+    signer_required: true,
+  },
+};
+assert.throws(() => applyApprovedFeeConfig(forgedSignerChange, applier), /signer_must_remain_false/);
+
+const forgedFeeChange = {
+  ...approved,
+  proposed: {
+    ...approved.proposed,
+    performance_fee_bps: 9000,
+    execution_fee_bps: 2000,
+  },
+};
+assert.throws(() => applyApprovedFeeConfig(forgedFeeChange, applier), /combined_fee_exceeds_100_percent/);
 
 console.log('fee control regression: ok');
