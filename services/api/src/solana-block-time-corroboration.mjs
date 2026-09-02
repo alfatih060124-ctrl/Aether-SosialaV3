@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]+$/;
 const SOURCE_REFERENCE_RE = /^solana_rpc:([1-9A-HJ-NP-Za-km-z]+)@([0-9]+)$/;
+const ENDPOINT_LABEL_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 function decodedBase58ByteLength(value) {
   let decoded = 0n;
@@ -41,10 +42,9 @@ function canonicalTimestamp(value, name) {
 
 function canonicalEndpointLabel(value) {
   if (value === undefined) return 'solana-rpc';
-  if (typeof value !== 'string' || value !== value.trim() || value.length < 1 || value.length > 128) {
+  if (typeof value !== 'string' || value !== value.trim() || !ENDPOINT_LABEL_RE.test(value)) {
     throw new Error('invalid_rpc_endpoint_label');
   }
-  if (/[\u0000-\u001f\u007f]/.test(value)) throw new Error('invalid_rpc_endpoint_label');
   return value;
 }
 
