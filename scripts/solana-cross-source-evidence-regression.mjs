@@ -88,6 +88,24 @@ assert.throws(
 
 assert.throws(
   () => buildSolanaCrossSourceEvidence({
+    rpc: { ...rpc, observed_at: '2026-09-02T07:59:59.999Z' },
+    solscan,
+    collected_at: '2026-09-02T08:00:15.000Z',
+  }),
+  /cross_source_observed_before_block_time/,
+);
+
+assert.throws(
+  () => buildSolanaCrossSourceEvidence({
+    rpc,
+    solscan: { ...solscan, observed_at: '2026-09-02T07:59:59.999Z' },
+    collected_at: '2026-09-02T08:00:15.000Z',
+  }),
+  /cross_source_observed_before_block_time/,
+);
+
+assert.throws(
+  () => buildSolanaCrossSourceEvidence({
     rpc,
     solscan,
     collected_at: '2026-09-02T08:00:11.000Z',
