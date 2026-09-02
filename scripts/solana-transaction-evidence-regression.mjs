@@ -6,8 +6,9 @@ import {
 
 // SYNTHETIC / TEST-ONLY fixtures only. These are not production signatures, tx hashes, wallets, or trader metrics.
 const syntheticSignature = '1'.repeat(64);
+const alternateSignature = '3'.repeat(88);
 const syntheticWallet = '1'.repeat(32);
-const otherWallet = '2'.repeat(32);
+const otherWallet = '2'.repeat(44);
 
 function clockSequence(...values) {
   let index = 0;
@@ -81,7 +82,7 @@ assert.equal(failed.published, false);
 await assert.rejects(() => collectSolanaTransactionEvidence({
   signature: syntheticSignature,
   walletAddress: syntheticWallet,
-  rpcCall: async () => ({ ...response, transaction: { ...response.transaction, signatures: ['2'.repeat(64)] } }),
+  rpcCall: async () => ({ ...response, transaction: { ...response.transaction, signatures: [alternateSignature] } }),
   clock: clockSequence('2026-09-02T16:00:00.000Z', '2026-09-02T16:00:00.100Z')
 }), /rpc_transaction_signature_mismatch/);
 
