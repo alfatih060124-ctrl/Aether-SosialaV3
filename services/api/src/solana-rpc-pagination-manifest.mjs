@@ -60,7 +60,7 @@ function canonicalJson(value) {
   if (typeof value !== 'object') throw new Error('invalid_rpc_error_json');
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) throw new Error('invalid_rpc_error_json');
-  const result = {};
+  const result = Object.create(null);
   for (const key of Object.keys(value).sort()) {
     if (value[key] === undefined) throw new Error('invalid_rpc_error_json');
     result[key] = canonicalJson(value[key]);
