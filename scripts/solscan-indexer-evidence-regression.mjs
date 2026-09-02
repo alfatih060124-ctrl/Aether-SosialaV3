@@ -8,8 +8,8 @@ const SIG_B = `${'1'.repeat(63)}3`;
 const SIG_C = `${'1'.repeat(63)}4`;
 
 const rows = [
-  { tx_hash: SIG_A, slot: 300, block_time: 1_780_000_300, fee: 5000, status: 'Success' },
-  { tx_hash: SIG_B, slot: 299, block_time: 1_780_000_200, fee: 6000, status: 'Fail' }
+  { trans_id: SIG_A, block_id: 300, block_time: 1_780_000_300, fee: 5000, status: 'Success' },
+  { trans_id: SIG_B, block_id: 299, block_time: 1_780_000_200, fee: 6000, status: 'Fail' }
 ];
 
 const collected = await collectSolscanIndexerEvidence({
@@ -26,7 +26,7 @@ const collected = await collectSolscanIndexerEvidence({
 
 assert.equal(collected.collection_status, 'PENDING_DATA');
 assert.equal(collected.reason, 'reconciled_trade_performance_required');
-assert.equal(collected.source_type, 'SOLSCAN_INDEXER');
+assert.equal(collected.source_type, 'SOLSCAN');
 assert.equal(collected.source_reference, SIG_A);
 assert.equal(collected.metrics_available, false);
 assert.equal(collected.trades_count, null);
@@ -37,6 +37,7 @@ assert.equal(collected.reputation_score, null);
 assert.equal(collected.verified, false);
 assert.equal(collected.published, false);
 assert.equal(collected.live_execution_authorized, false);
+assert.equal(collected.provenance.source_type, 'SOLSCAN');
 assert.equal(collected.provenance.provider, 'SOLSCAN_PRO_API');
 assert.equal(collected.provenance.endpoint, '/v2.0/account/transactions');
 assert.equal(collected.provenance.collection_complete, true);
@@ -69,9 +70,19 @@ await assert.rejects(
     walletAddress: WALLET,
     limit: 20,
     maxPages: 3,
-    pageCall: async () => [{ ...rows[0], tx_hash: 'not-a-solana-signature' }]
+    pageCall: async () => [{ ...rows[0], trans_id: 'not-a-solana-signature' }]
   }),
   /invalid_solscan_tx_hash/
+);
+
+await assert.rejects(
+  collectSolscanIndexerEvidence({
+    walletAddress: WALLET,
+    limit: 20,
+    maxPages: 3,
+    pageCall: async () => [{ ...rows[0], block_id: Number.MAX_SAFE_INTEGER + 1 }]
+  }),
+  /invalid_solscan_slot/
 );
 
 const empty = await collectSolscanIndexerEvidence({
@@ -94,11 +105,12 @@ const caller = createSolscanAccountTransactionsCaller({
   fetchImpl: async (url, options) => {
     capturedUrl = url;
     capturedHeaders = options.headers;
-    return { ok: true, json: async () => ({ success: true, data: [{ ...rows[0], tx_hash: SIG_C }] }) };
+    return { ok: true, json: async () => ({ success: true, data: [{ ...rows[0], trans_id: SIG_C }] }) };
   }
 });
 const apiRows = await caller({ address: WALLET, before: SIG_A, limit: 20 });
 assert.equal(apiRows.length, 1);
+assert.equal(apiRows[0].trans_id, SIG_C);
 assert.equal(capturedUrl.origin, 'https://pro-api.solscan.io');
 assert.equal(capturedUrl.pathname, '/v2.0/account/transactions');
 assert.equal(capturedUrl.searchParams.get('address'), WALLET);
