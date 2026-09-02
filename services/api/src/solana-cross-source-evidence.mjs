@@ -74,7 +74,7 @@ function canonicalObservedAt(value) {
 
 function normalizeRecord(source, input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) fail('invalid_cross_source_record');
-  return {
+  const record = {
     source,
     signature: canonicalSignature(input.signature),
     slot: canonicalSlot(input.slot),
@@ -82,6 +82,12 @@ function normalizeRecord(source, input) {
     status: canonicalStatus(input.status, source),
     observed_at: canonicalObservedAt(input.observed_at),
   };
+
+  if (record.block_time !== null && Date.parse(record.observed_at) < record.block_time * 1000) {
+    fail('cross_source_observed_before_block_time');
+  }
+
+  return record;
 }
 
 function sha256(value) {
