@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import {
   collectSolanaSignatureStatusEvidence,
   verifySolanaSignatureStatusEvidence
@@ -6,6 +7,16 @@ import {
 
 // SYNTHETIC / TEST-ONLY fixtures. These are not production signatures, tx hashes, trades, or trader metrics.
 const syntheticSignature = '1'.repeat(64);
+const alternateSyntheticSignature = `${'1'.repeat(63)}2`;
+
+function hash(payload) {
+  return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+}
+
+function rehashProvenance(result) {
+  const { source_hash: _ignored, ...payload } = result.provenance;
+  result.provenance.source_hash = hash(payload);
+}
 
 function clockSequence(...values) {
   let index = 0;
@@ -36,6 +47,7 @@ const collected = await collectSolanaSignatureStatusEvidence({
 assert.equal(collected.collection_status, 'PENDING_DATA');
 assert.equal(collected.reason, 'reconciliation_required_for_performance');
 assert.equal(collected.source_reference, `solana_rpc:${syntheticSignature}@4990`);
+assert.equal(collected.provenance.requested_signature, syntheticSignature);
 assert.equal(collected.metrics_available, false);
 assert.equal(collected.trades_count, null);
 assert.equal(collected.total_return_bps, null);
@@ -54,6 +66,7 @@ const notFound = await collectSolanaSignatureStatusEvidence({
 });
 assert.equal(notFound.reason, 'signature_status_not_found');
 assert.equal(notFound.source_reference, null);
+assert.equal(notFound.provenance.requested_signature, syntheticSignature);
 assert.equal(verifySolanaSignatureStatusEvidence(notFound), true);
 
 const belowRequired = await collectSolanaSignatureStatusEvidence({
@@ -111,5 +124,17 @@ assert.equal(verifySolanaSignatureStatusEvidence(tampered), false);
 const selfConsistentReasonTamper = structuredClone(collected);
 selfConsistentReasonTamper.reason = 'confirmation_below_required';
 assert.equal(verifySolanaSignatureStatusEvidence(selfConsistentReasonTamper), false);
+
+const selfConsistentSignatureSwap = structuredClone(collected);
+selfConsistentSignatureSwap.source_reference = `solana_rpc:${alternateSyntheticSignature}@4990`;
+selfConsistentSignatureSwap.provenance.source_reference = selfConsistentSignatureSwap.source_reference;
+selfConsistentSignatureSwap.provenance.request_signature_hash = hash({ signature: alternateSyntheticSignature });
+rehashProvenance(selfConsistentSignatureSwap);
+assert.equal(verifySolanaSignatureStatusEvidence(selfConsistentSignatureSwap), false);
+
+const selfConsistentNotFoundRequestTamper = structuredClone(notFound);
+selfConsistentNotFoundRequestTamper.provenance.request_signature_hash = hash({ signature: alternateSyntheticSignature });
+rehashProvenance(selfConsistentNotFoundRequestTamper);
+assert.equal(verifySolanaSignatureStatusEvidence(selfConsistentNotFoundRequestTamper), false);
 
 console.log('solana signature status evidence regression: ok');
