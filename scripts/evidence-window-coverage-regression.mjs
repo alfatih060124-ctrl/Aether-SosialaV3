@@ -52,6 +52,17 @@ for (const [name, mutate] of [
   assert.throws(() => buildEvidenceWindowCoverage(candidate), undefined, name);
 }
 
+const subsecondEnd = structuredClone(fixture);
+subsecondEnd.window_end_at = '2026-09-01T01:00:00.999Z';
+subsecondEnd.observed_at = '2026-09-01T01:00:05.000Z';
+assert.throws(
+  () => buildEvidenceWindowCoverage(subsecondEnd),
+  /source_does_not_cover_window_end/,
+  'second-resolution source evidence must cover the full subsecond end instant',
+);
+subsecondEnd.sources[0].latest_block_time = 1788224401;
+assert.equal(verifyEvidenceWindowCoverage(buildEvidenceWindowCoverage(subsecondEnd)), true);
+
 const tampered = structuredClone(first);
 tampered.sources[0].latest_block_time += 1;
 assert.equal(verifyEvidenceWindowCoverage(tampered), false, 'tampered coverage must fail verification');
