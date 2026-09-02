@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { calculateReconciledMetrics } from '../services/api/src/trader-evidence-collector.mjs';
+import { calculateReconciledMetrics, normalizeEvidenceReference } from '../services/api/src/trader-evidence-collector.mjs';
 
 // SYNTHETIC / TEST-ONLY fixtures. These values are not production trader evidence.
 const aggregateBoundary = calculateReconciledMetrics([
@@ -47,5 +47,22 @@ assert.throws(
   }]),
   /invalid_trade_0_realized_pnl_minor/
 );
+
+const validSignature = '1'.repeat(64);
+assert.deepEqual(
+  normalizeEvidenceReference({ sourceType: 'SOLANA_RPC', reference: validSignature }),
+  { source_type: 'SOLANA_RPC', source_reference: validSignature }
+);
+
+for (const reference of [
+  'not-a-signature',
+  '1'.repeat(63),
+  '0'.repeat(64)
+]) {
+  assert.throws(
+    () => normalizeEvidenceReference({ sourceType: 'SOLANA_RPC', reference }),
+    /invalid_solana_signature|invalid_verification_reference/
+  );
+}
 
 console.log('exact reconciled metrics regression: PASS');
