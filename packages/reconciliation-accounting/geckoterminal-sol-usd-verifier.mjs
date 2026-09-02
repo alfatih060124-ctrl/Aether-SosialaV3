@@ -60,8 +60,25 @@ function sha256(value) {
 function canonicalUrl(value, name) {
   let url;
   try { url = new URL(String(value ?? '')); } catch { throw new Error(`invalid_${name}`); }
-  if (url.origin !== PROVIDER_ORIGIN) throw new Error(`invalid_${name}`);
-  return url.toString();
+  if (url.origin !== PROVIDER_ORIGIN || url.username || url.password || url.hash) throw new Error(`invalid_${name}`);
+  return url;
+}
+
+function assertExactParams(url, expected, name) {
+  const actualEntries = [...url.searchParams.entries()];
+  const expectedEntries = Object.entries(expected).map(([key, value]) => [key, String(value)]);
+  if (actualEntries.length !== expectedEntries.length) throw new Error(`${name}_mismatch`);
+  for (const [key, value] of expectedEntries) {
+    const values = url.searchParams.getAll(key);
+    if (values.length !== 1 || values[0] !== value) throw new Error(`${name}_mismatch`);
+  }
+}
+
+function microPriceFromClose(close) {
+  const scaled = close * 1_000_000;
+  const rounded = Math.round(scaled);
+  if (!Number.isSafeInteger(rounded) || rounded < 1) throw new Error('sol_usd_price_overflow');
+  return rounded;
 }
 
 export function verifyHistoricalSolUsdSnapshot(snapshot) {
@@ -91,6 +108,7 @@ export function verifyHistoricalSolUsdSnapshot(snapshot) {
   const close = positiveFinite(candle.close, 'sol_usd_candle_close');
   const volume = nonNegativeFiniteOrNull(candle.volume, 'sol_usd_candle_volume');
   if (high < low || high < Math.max(open, close) || low > Math.min(open, close)) throw new Error('invalid_sol_usd_candle_range');
+  if (price !== microPriceFromClose(close)) throw new Error('sol_usd_price_candle_mismatch');
 
   const expectedReference = `GECKOTERMINAL:${pool}:minute:1:${candleTime}:${snapshot.token_side}`;
   if (snapshot.source_reference !== expectedReference) throw new Error('sol_usd_source_reference_mismatch');
@@ -130,8 +148,18 @@ export function verifyHistoricalSolUsdSnapshot(snapshot) {
   }
   const poolUrl = canonicalUrl(provenance.pool_url, 'sol_usd_pool_url');
   const ohlcvUrl = canonicalUrl(provenance.ohlcv_url, 'sol_usd_ohlcv_url');
-  if (!poolUrl.includes(`/api/v2/networks/solana/pools/${pool}`)) throw new Error('sol_usd_pool_url_mismatch');
-  if (!ohlcvUrl.includes(`/api/v2/networks/solana/pools/${pool}/ohlcv/minute`)) throw new Error('sol_usd_ohlcv_url_mismatch');
+  if (poolUrl.pathname !== `/api/v2/networks/solana/pools/${pool}`) throw new Error('sol_usd_pool_url_mismatch');
+  assertExactParams(poolUrl, { include: 'base_token,quote_token' }, 'sol_usd_pool_url');
+
+  if (ohlcvUrl.pathname !== `/api/v2/networks/solana/pools/${pool}/ohlcv/minute`) throw new Error('sol_usd_ohlcv_url_mismatch');
+  assertExactParams(ohlcvUrl, {
+    aggregate: '1',
+    before_timestamp: blockTime + CANDLE_SECONDS,
+    limit: '2',
+    currency: 'usd',
+    token: snapshot.token_side,
+    include_empty_intervals: 'true'
+  }, 'sol_usd_ohlcv_url');
 
   return Object.freeze({
     source_reference: expectedReference,
@@ -143,6 +171,6 @@ export function verifyHistoricalSolUsdSnapshot(snapshot) {
     candle_interval_seconds: interval,
     price_usd_micro_per_sol: price,
     observed_at: observed.iso,
-    provenance: Object.freeze({ provider_origin: PROVIDER_ORIGIN, api_version: API_VERSION, pool_url: poolUrl, ohlcv_url: ohlcvUrl })
+    provenance: Object.freeze({ provider_origin: PROVIDER_ORIGIN, api_version: API_VERSION, pool_url: poolUrl.toString(), ohlcv_url: ohlcvUrl.toString() })
   });
 }
