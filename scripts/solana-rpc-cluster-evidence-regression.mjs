@@ -5,9 +5,9 @@ import {
   verifySolanaRpcClusterEvidence,
 } from '../services/api/src/solana-rpc-cluster-evidence.mjs';
 
-// SYNTHETIC / TEST-ONLY Base58-shaped genesis hashes. They are not production source references.
+// SYNTHETIC / TEST-ONLY 32-byte Base58 genesis hashes. They are not production source references.
 const EXPECTED = '11111111111111111111111111111111';
-const OTHER = '22222222222222222222222222222222';
+const OTHER = '4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi';
 const times = [new Date('2026-01-01T00:00:00.000Z'), new Date('2026-01-01T00:00:01.000Z')];
 
 const rpc = {
@@ -51,6 +51,20 @@ assert.equal(mismatch.drawdown_bps, null);
 assert.equal(mismatch.reputation_score, null);
 assert.equal(verifySolanaRpcClusterEvidence(mismatch), true);
 
+for (const malformedGenesisHash of [
+  '22222222222222222222222222222222',
+  '1111111111111111111111111111111',
+  '0'.repeat(32),
+]) {
+  assert.throws(() => buildSolanaRpcClusterEvidence({
+    expected_genesis_hash: malformedGenesisHash,
+    returned_genesis_hash: EXPECTED,
+    rpc_endpoint_label: 'synthetic-rpc',
+    request_started_at: '2026-01-01T00:00:00.000Z',
+    observed_at: '2026-01-01T00:00:01.000Z',
+  }), /32-byte Base58 hash/);
+}
+
 assert.throws(() => buildSolanaRpcClusterEvidence({
   expected_genesis_hash: EXPECTED,
   returned_genesis_hash: EXPECTED,
@@ -69,5 +83,6 @@ assert.throws(() => buildSolanaRpcClusterEvidence({
 
 assert.equal(verifySolanaRpcClusterEvidence({ ...evidence, verified: true }), false);
 assert.equal(verifySolanaRpcClusterEvidence({ ...evidence, returned_genesis_hash: OTHER }), false);
+assert.equal(verifySolanaRpcClusterEvidence({ ...evidence, returned_genesis_hash: '22222222222222222222222222222222' }), false);
 
 console.log('Solana RPC cluster identity evidence regression passed');
