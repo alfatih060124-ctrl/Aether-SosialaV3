@@ -99,6 +99,10 @@ assert.throws(()=>verifySolanaNetworkFeeObservation(tampered),/solana_fee_source
 assert.throws(()=>verifySolanaNetworkFeeObservation({...observation,schema_version:2}),/invalid_solana_fee_schema_version/);
 assert.throws(()=>verifySolanaNetworkFeeObservation({
   ...observation,
+  observed_at:'2026-09-01T05:14:59.000Z'
+}),/solana_fee_observed_before_block_time/);
+assert.throws(()=>verifySolanaNetworkFeeObservation({
+  ...observation,
   observed_at:'2026-09-01T05:15:01.000Z'
 }),/solana_fee_source_hash_mismatch/);
 assert.throws(()=>verifySolanaNetworkFeeObservation({
@@ -132,6 +136,11 @@ const noBlockTime=await collectSolanaNetworkFeeObservation({
 });
 assert.throws(()=>valueSolanaNetworkFeeObservation({observation:noBlockTime,solUsdSnapshot:priceSnapshot}),/solana_fee_block_time_required_for_valuation/);
 
+await assert.rejects(()=>collectSolanaNetworkFeeObservation({
+  signature:SIGNATURE,
+  rpcCall,
+  clock:()=>new Date('2026-09-01T05:14:59.000Z')
+}),/solana_fee_observed_before_block_time/);
 await assert.rejects(()=>collectSolanaNetworkFeeObservation({signature:'not-base58',rpcCall}),/invalid_solana_signature/);
 await assert.rejects(()=>collectSolanaNetworkFeeObservation({signature:SIGNATURE,rpcCall:async()=>null}),/solana_transaction_not_found/);
 await assert.rejects(()=>collectSolanaNetworkFeeObservation({signature:SIGNATURE,rpcCall:async()=>({slot:SLOT,blockTime:BLOCK_TIME,meta:{err:{InstructionError:[0,'Custom']},fee:5000}})}),/solana_transaction_failed/);
