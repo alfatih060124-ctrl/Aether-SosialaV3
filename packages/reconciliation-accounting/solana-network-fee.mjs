@@ -5,7 +5,7 @@ const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvw
 const HASH_RE = /^[a-f0-9]{64}$/;
 const LAMPORTS_PER_SOL = 1_000_000_000n;
 const REQUIRED_PRICE_CANDLE_SECONDS = 60;
-const SOLANA_FEE_SCHEMA_VERSION = 2;
+const SOLANA_FEE_SCHEMA_VERSION = 3;
 const RPC_METHOD = 'getTransaction';
 const RPC_COMMITMENT = 'confirmed';
 const MAX_SUPPORTED_TRANSACTION_VERSION = 0;
@@ -82,6 +82,7 @@ function observationHashPayload(observation) {
     source_type: 'SOLANA_TRANSACTION_FEE_LAMPORTS_V1',
     source_reference: observation.source_reference,
     source_slot: observation.source_slot,
+    observed_at: observation.observed_at,
     block_time_unix: observation.block_time_unix,
     network_fee_lamports: observation.network_fee_lamports,
     provenance: observation.provenance
@@ -110,6 +111,7 @@ export function verifySolanaNetworkFeeObservation(observation) {
   const expectedHash = hash(observationHashPayload({
     source_reference: sourceReference,
     source_slot: sourceSlot,
+    observed_at: observed.iso,
     block_time_unix: blockTimeUnix,
     network_fee_lamports: networkFeeLamports,
     provenance
@@ -158,6 +160,7 @@ export async function collectSolanaNetworkFeeObservation({
   const sourceHash = hash(observationHashPayload({
     source_reference: sourceReference,
     source_slot: sourceSlot,
+    observed_at: observed.iso,
     block_time_unix: blockTimeUnix,
     network_fee_lamports: networkFeeLamports,
     provenance
