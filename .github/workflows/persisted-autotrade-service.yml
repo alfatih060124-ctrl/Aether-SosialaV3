@@ -1,0 +1,26 @@
+name: Persisted Auto Trade Service Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/persisted-autotrade-service.mjs'
+      - 'services/api/src/copy-mandate-autotrade-adapter.mjs'
+      - 'services/api/src/copy-mandate-runtime.mjs'
+      - 'services/api/src/copy-mandate.mjs'
+      - 'services/api/src/auto-trade-engine.mjs'
+      - 'scripts/persisted-autotrade-service-regression.mjs'
+      - '.github/workflows/persisted-autotrade-service.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/persisted-autotrade-service-regression.mjs
