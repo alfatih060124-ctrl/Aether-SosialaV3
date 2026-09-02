@@ -1,0 +1,22 @@
+name: Fee Control Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/fee-control.mjs'
+      - 'services/api/src/fee-control.regression.mjs'
+      - '.github/workflows/fee-control-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fee-control-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node services/api/src/fee-control.regression.mjs
