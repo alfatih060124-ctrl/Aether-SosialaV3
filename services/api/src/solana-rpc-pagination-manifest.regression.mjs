@@ -99,8 +99,10 @@ const reservedKeyRecord = buildSolanaRpcPaginationManifest({
   pages: reservedKeyPages,
   collectedAt: '2026-09-02T10:00:00.000Z'
 });
-assert.equal(Object.hasOwn(reservedKeyRecord.provenance.pages[0].rows[0].err, '__proto__'), true);
-assert.deepEqual(reservedKeyRecord.provenance.pages[0].rows[0].err.__proto__, { polluted: true });
+const canonicalReservedErr = reservedKeyRecord.provenance.pages[0].rows[0].err;
+assert.equal(Object.getPrototypeOf(canonicalReservedErr), null);
+assert.equal(Object.hasOwn(canonicalReservedErr, '__proto__'), true);
+assert.equal(canonicalReservedErr.__proto__.polluted, true);
 assert.notEqual(reservedKeyRecord.manifest_hash, record.manifest_hash);
 assert.equal(verifySolanaRpcPaginationManifest(reservedKeyRecord), true);
 assert.equal({}.polluted, undefined);
