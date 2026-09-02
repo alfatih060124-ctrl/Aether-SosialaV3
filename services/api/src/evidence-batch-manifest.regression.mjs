@@ -42,6 +42,32 @@ assert.notEqual(changedHash.manifest_hash, first.manifest_hash, 'source hash mus
 const changedTime = buildEvidenceBatchManifest([a, b], { collected_at: '2026-01-01T00:05:01.000Z' });
 assert.notEqual(changedTime.manifest_hash, first.manifest_hash, 'collection time must be manifest-bound');
 
+const validSignature = '1'.repeat(64);
+const rpc = {
+  ...a,
+  source_type: 'SOLANA_RPC',
+  source_reference: `solana_rpc:${validSignature}@123`,
+};
+assert.equal(buildEvidenceBatchManifest([rpc], { collected_at: collectedAt }).evidence_count, 1);
+
+for (const source_reference of [
+  'not-a-signature',
+  'solana_rpc:not-a-signature@123',
+  `solana_rpc:${'1'.repeat(63)}@123`,
+  `solana_rpc:${'0'.repeat(64)}@123`,
+  `solana_rpc:${validSignature}@01`,
+  `solana_rpc:${validSignature}@9007199254740992`,
+]) {
+  assert.throws(
+    () => buildEvidenceBatchManifest([{ ...rpc, source_reference }], { collected_at: collectedAt }),
+    (error) => error?.code === 'invalid_evidence_source_reference',
+  );
+}
+assert.throws(
+  () => buildEvidenceBatchManifest([{ ...rpc, source_type: 'SOLSCAN' }], { collected_at: collectedAt }),
+  (error) => error?.code === 'invalid_evidence_source_reference',
+);
+
 assert.throws(
   () => buildEvidenceBatchManifest([a, a], { collected_at: collectedAt }),
   (error) => error?.code === 'duplicate_evidence_source_reference',
