@@ -1,5 +1,7 @@
 import { evaluatePersistedCopyMandateAutoTrade } from './persisted-autotrade-service.mjs';
 
+const CANONICAL_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 function requireObject(value, error) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(error);
   return value;
@@ -37,7 +39,7 @@ export async function evaluateAuthenticatedAutoTradeRoute({
   const body = requireObject(requestBody, 'autotrade_request_body_required');
   rejectCallerAuthority(body);
 
-  if (typeof body.policy_id !== 'string' || body.policy_id.trim() === '' || body.policy_id !== body.policy_id.trim()) {
+  if (typeof body.policy_id !== 'string' || !CANONICAL_UUID_RE.test(body.policy_id)) {
     throw new Error('invalid_policy_id');
   }
   if (body.position !== undefined && (!body.position || typeof body.position !== 'object' || Array.isArray(body.position))) {
