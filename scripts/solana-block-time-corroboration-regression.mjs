@@ -81,6 +81,24 @@ await assert.rejects(() => collectSolanaBlockTimeCorroboration({
   rpcCall: async () => 1788368400
 }), /invalid_source_reference/);
 
+for (const endpointLabel of [
+  'https://rpc.example.invalid/?api-key=test-only-placeholder',
+  'solana-rpc?token=test-only-placeholder',
+  'user@test-rpc',
+  'solana/rpc'
+]) {
+  await assert.rejects(() => collectSolanaBlockTimeCorroboration({
+    sourceReference,
+    expectedBlockTime: 1788368400,
+    endpointLabel,
+    rpcCall: async () => 1788368400
+  }), /invalid_rpc_endpoint_label/);
+}
+
+const endpointTamper = structuredClone(corroborated);
+endpointTamper.provenance.rpc_endpoint_label = 'https://rpc.example.invalid/?api-key=test-only-placeholder';
+assert.equal(verifySolanaBlockTimeCorroboration(endpointTamper), false);
+
 await assert.rejects(() => collectSolanaBlockTimeCorroboration({
   sourceReference,
   expectedBlockTime: 1788368400,
