@@ -1,0 +1,22 @@
+name: Auto Trade Persistence Boundary Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/autotrade-persistence-boundary.mjs'
+      - 'scripts/autotrade-persistence-boundary-regression.mjs'
+      - '.github/workflows/autotrade-persistence-boundary.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/autotrade-persistence-boundary-regression.mjs
