@@ -88,4 +88,21 @@ const unsafeBoundary = structuredClone(record);
 unsafeBoundary.verified = true;
 assert.throws(() => verifySolanaRpcPaginationManifest(unsafeBoundary), /unsafe_rpc_evidence_boundary/);
 
+const reservedKeyPages = fixturePages();
+reservedKeyPages[0].rows[0].err = JSON.parse('{"__proto__":{"polluted":true}}');
+const reservedKeyRecord = buildSolanaRpcPaginationManifest({
+  walletAddress: wallet,
+  endpointLabel: 'synthetic-test-rpc',
+  commitment: 'finalized',
+  pageSize: 2,
+  maxPages: 3,
+  pages: reservedKeyPages,
+  collectedAt: '2026-09-02T10:00:00.000Z'
+});
+assert.equal(Object.hasOwn(reservedKeyRecord.provenance.pages[0].rows[0].err, '__proto__'), true);
+assert.deepEqual(reservedKeyRecord.provenance.pages[0].rows[0].err.__proto__, { polluted: true });
+assert.notEqual(reservedKeyRecord.manifest_hash, record.manifest_hash);
+assert.equal(verifySolanaRpcPaginationManifest(reservedKeyRecord), true);
+assert.equal({}.polluted, undefined);
+
 console.log('Solana RPC pagination manifest regression: PASS');
