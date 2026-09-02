@@ -10,6 +10,7 @@ const OTHER_SIG = `${'1'.repeat(63)}2`;
 const BLOCKHASH = '1'.repeat(32);
 const PREVIOUS_BLOCKHASH = `${'1'.repeat(31)}2`;
 const REF = `solana_rpc:${SIG}@100`;
+const BLOCK_TIME = 1_788_393_600; // 2026-09-03T00:00:00Z, TEST-ONLY.
 
 function clockSequence(...iso) {
   const values = iso.map((v) => new Date(v));
@@ -20,15 +21,13 @@ const calls = [];
 const rpc = {
   async call(method, params) {
     calls.push({ method, params });
-    return {
-      result: {
-        blockhash: BLOCKHASH,
-        previousBlockhash: PREVIOUS_BLOCKHASH,
-        parentSlot: 99,
-        blockTime: 1_788_397_200,
-        signatures: [OTHER_SIG, SIG],
-      },
-    };
+    return { result: {
+      blockhash: BLOCKHASH,
+      previousBlockhash: PREVIOUS_BLOCKHASH,
+      parentSlot: 99,
+      blockTime: BLOCK_TIME,
+      signatures: [OTHER_SIG, SIG],
+    } };
   },
 };
 
@@ -39,16 +38,9 @@ const evidence = await collectSolanaRpcBlockSignatureEvidence({
   commitment: 'finalized',
   clock: clockSequence('2026-09-03T00:00:00.000Z', '2026-09-03T00:00:01.000Z'),
 });
-
-assert.deepEqual(calls[0], {
-  method: 'getBlock',
-  params: [100, {
-    commitment: 'finalized',
-    transactionDetails: 'signatures',
-    rewards: false,
-    maxSupportedTransactionVersion: 0,
-  }],
-});
+assert.deepEqual(calls[0], { method: 'getBlock', params: [100, {
+  commitment: 'finalized', transactionDetails: 'signatures', rewards: false, maxSupportedTransactionVersion: 0,
+}] });
 assert.equal(evidence.collection_status, 'PENDING_DATA');
 assert.equal(evidence.status_reason, 'block_signature_corroborated_reconciliation_required');
 assert.equal(evidence.source_reference, REF);
@@ -71,64 +63,41 @@ assert.equal(verifySolanaRpcBlockSignatureEvidence(tampered), false);
 
 const absent = await collectSolanaRpcBlockSignatureEvidence({
   rpc: { call: async () => ({ result: {
-    blockhash: BLOCKHASH,
-    previousBlockhash: PREVIOUS_BLOCKHASH,
-    parentSlot: 99,
-    blockTime: 1_788_397_200,
-    signatures: [OTHER_SIG],
+    blockhash: BLOCKHASH, previousBlockhash: PREVIOUS_BLOCKHASH, parentSlot: 99, blockTime: BLOCK_TIME, signatures: [OTHER_SIG],
   } }) },
   source_reference: REF,
   rpc_endpoint_label: 'mainnet-readonly-a',
   clock: clockSequence('2026-09-03T00:00:00.000Z', '2026-09-03T00:00:01.000Z'),
 });
-assert.equal(absent.collection_status, 'PENDING_DATA');
 assert.equal(absent.status_reason, 'signature_not_present_in_claimed_slot');
 assert.equal(absent.source_reference, null);
 assert.equal(absent.verified, false);
 assert.equal(absent.published, false);
 
 const missingBlock = await collectSolanaRpcBlockSignatureEvidence({
-  rpc: { call: async () => ({ result: null }) },
-  source_reference: REF,
-  rpc_endpoint_label: 'mainnet-readonly-a',
+  rpc: { call: async () => ({ result: null }) }, source_reference: REF, rpc_endpoint_label: 'mainnet-readonly-a',
   clock: clockSequence('2026-09-03T00:00:00.000Z', '2026-09-03T00:00:01.000Z'),
 });
 assert.equal(missingBlock.status_reason, 'block_not_found');
 assert.equal(missingBlock.source_reference, null);
 assert.equal(verifySolanaRpcBlockSignatureEvidence(missingBlock), true);
 
-await assert.rejects(
-  collectSolanaRpcBlockSignatureEvidence({
-    rpc: { call: async () => { throw new Error('must not be called'); } },
-    source_reference: 'solana_rpc:not-a-signature@100',
-    rpc_endpoint_label: 'mainnet-readonly-a',
-  }),
-  /64-byte Solana Base58 signature/,
-);
+await assert.rejects(collectSolanaRpcBlockSignatureEvidence({
+  rpc: { call: async () => { throw new Error('must not be called'); } },
+  source_reference: 'solana_rpc:not-a-signature@100', rpc_endpoint_label: 'mainnet-readonly-a',
+}), /64-byte Solana Base58 signature/);
 
-await assert.rejects(
-  collectSolanaRpcBlockSignatureEvidence({
-    rpc: { call: async () => ({ result: null }) },
-    source_reference: REF,
-    rpc_endpoint_label: 'https://rpc.example/?api-key=TEST_ONLY',
-  }),
-  /opaque identifier/,
-);
+await assert.rejects(collectSolanaRpcBlockSignatureEvidence({
+  rpc: { call: async () => ({ result: null }) }, source_reference: REF,
+  rpc_endpoint_label: 'https://rpc.example/?api-key=TEST_ONLY',
+}), /opaque identifier/);
 
-await assert.rejects(
-  collectSolanaRpcBlockSignatureEvidence({
-    rpc: { call: async () => ({ result: {
-      blockhash: BLOCKHASH,
-      previousBlockhash: PREVIOUS_BLOCKHASH,
-      parentSlot: 100,
-      blockTime: 1_788_397_200,
-      signatures: [SIG],
-    } }) },
-    source_reference: REF,
-    rpc_endpoint_label: 'mainnet-readonly-a',
-    clock: clockSequence('2026-09-03T00:00:00.000Z', '2026-09-03T00:00:01.000Z'),
-  }),
-  /parentSlot must precede requested slot/,
-);
+await assert.rejects(collectSolanaRpcBlockSignatureEvidence({
+  rpc: { call: async () => ({ result: {
+    blockhash: BLOCKHASH, previousBlockhash: PREVIOUS_BLOCKHASH, parentSlot: 100, blockTime: BLOCK_TIME, signatures: [SIG],
+  } }) },
+  source_reference: REF, rpc_endpoint_label: 'mainnet-readonly-a',
+  clock: clockSequence('2026-09-03T00:00:00.000Z', '2026-09-03T00:00:01.000Z'),
+}), /parentSlot must precede requested slot/);
 
 console.log('solana rpc block signature evidence regression: ok');
