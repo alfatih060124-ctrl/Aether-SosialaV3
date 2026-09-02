@@ -1,0 +1,22 @@
+name: Execution Rental SQL Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/server.mjs'
+      - 'services/api/src/execution-rental-sql.regression.mjs'
+      - '.github/workflows/execution-rental-sql-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  execution-rental-sql-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node services/api/src/execution-rental-sql.regression.mjs
