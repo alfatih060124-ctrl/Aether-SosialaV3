@@ -36,6 +36,15 @@ function finiteSigned(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function safeImageUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 function tokenId(mint) { return `solana_${mint}`; }
 function relationId(pool, side) { return pool?.relationships?.[`${side}_token`]?.data?.id || null; }
 
@@ -79,7 +88,7 @@ function includedToken(included, mint) {
   if (!row) return null;
   const attrs = row.attributes || {};
   if (attrs.address && normalizeSolanaMint(attrs.address) !== mint) throw new Error('market_provider_canonical_mismatch');
-  return { mint, name: attrs.name || null, symbol: attrs.symbol || null };
+  return { mint, name: attrs.name || null, symbol: attrs.symbol || null, image_url: safeImageUrl(attrs.image_url) };
 }
 
 function tokenIdentity(info, poolsPayload, mint) {
@@ -89,7 +98,8 @@ function tokenIdentity(info, poolsPayload, mint) {
   return {
     mint,
     name: infoAttrs?.name || fromIncluded?.name || null,
-    symbol: infoAttrs?.symbol || fromIncluded?.symbol || null
+    symbol: infoAttrs?.symbol || fromIncluded?.symbol || null,
+    image_url: safeImageUrl(infoAttrs?.image_url) || fromIncluded?.image_url || null
   };
 }
 
@@ -126,9 +136,9 @@ function transactionCount(attrs) {
 
 function discoveryToken(included, pool, side) {
   const mint = mintFromRelationId(relationId(pool, side));
-  if (!mint) return { mint: null, name: null, symbol: null };
+  if (!mint) return { mint: null, name: null, symbol: null, image_url: null };
   const token = includedToken(included, mint);
-  return token || { mint, name: null, symbol: null };
+  return token || { mint, name: null, symbol: null, image_url: null };
 }
 
 function normalizeDiscoveryPool(pool, included) {
