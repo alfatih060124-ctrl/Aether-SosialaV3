@@ -54,8 +54,19 @@ assert.equal(collected.reputation_score, null);
 assert.equal(collected.verified, false);
 assert.equal(collected.published, false);
 assert.equal(collected.live_execution_authorized, false);
+assert.equal(collected.provenance.requested_wallet, syntheticWallet);
 assert.match(collected.provenance.source_hash, /^[0-9a-f]{64}$/);
 assert.equal(verifySolanaTransactionEvidence(collected), true);
+
+const sameTransactionOtherWallet = await collectSolanaTransactionEvidence({
+  signature: syntheticSignature,
+  walletAddress: otherWallet,
+  rpcCall: async () => response,
+  clock: clockSequence('2026-09-02T16:00:00.000Z', '2026-09-02T16:00:00.100Z')
+});
+assert.equal(sameTransactionOtherWallet.provenance.requested_wallet, otherWallet);
+assert.notEqual(sameTransactionOtherWallet.provenance.source_hash, collected.provenance.source_hash);
+assert.equal(verifySolanaTransactionEvidence(sameTransactionOtherWallet), true);
 
 const notFound = await collectSolanaTransactionEvidence({
   signature: syntheticSignature,
@@ -67,7 +78,17 @@ assert.equal(notFound.collection_status, 'PENDING_DATA');
 assert.equal(notFound.reason, 'transaction_not_found_at_requested_commitment');
 assert.equal(notFound.source_reference, null);
 assert.equal(notFound.provenance.transaction_found, false);
+assert.equal(notFound.provenance.requested_wallet, syntheticWallet);
 assert.equal(verifySolanaTransactionEvidence(notFound), true);
+
+const notFoundOtherWallet = await collectSolanaTransactionEvidence({
+  signature: syntheticSignature,
+  walletAddress: otherWallet,
+  rpcCall: async () => null,
+  clock: clockSequence('2026-09-02T16:00:00.000Z', '2026-09-02T16:00:00.100Z')
+});
+assert.notEqual(notFoundOtherWallet.provenance.source_hash, notFound.provenance.source_hash);
+assert.equal(verifySolanaTransactionEvidence(notFoundOtherWallet), true);
 
 const failed = await collectSolanaTransactionEvidence({
   signature: syntheticSignature,
@@ -103,5 +124,9 @@ await assert.rejects(() => collectSolanaTransactionEvidence({
 const tampered = structuredClone(collected);
 tampered.provenance.transaction.fee_lamports = 9999;
 assert.equal(verifySolanaTransactionEvidence(tampered), false);
+
+const invalidWalletEvidence = structuredClone(collected);
+invalidWalletEvidence.provenance.requested_wallet = 'not-a-wallet';
+assert.equal(verifySolanaTransactionEvidence(invalidWalletEvidence), false);
 
 console.log('solana transaction evidence regression: ok');
