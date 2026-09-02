@@ -15,7 +15,7 @@ function canonicalSession(session) {
 
 function rejectCallerAuthority(body) {
   for (const field of ['mandate', 'follower_user_id', 'trader_id', 'runtime_risk', 'live_execution_authorized', 'network_submission_authorized', 'signer_required']) {
-    if (Object.prototype.hasOwnProperty.call(body, field)) throw new Error(`autotrade_caller_authority_forbidden:${field}`);
+    if (Object.prototype.hasOwnProperty.call(body, field)) throw new Error('invalid_autotrade_caller_authority');
   }
 }
 
