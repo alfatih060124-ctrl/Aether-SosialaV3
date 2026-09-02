@@ -41,6 +41,33 @@ const same = buildEvidenceSourceObservationReceipt({
 });
 assert.equal(same.receipt_hash, receipt.receipt_hash);
 
+const validSignature = '1'.repeat(64);
+for (const source_type of ['SOLANA_RPC', 'SOLSCAN']) {
+  const prefix = source_type.toLowerCase();
+  const solanaReceipt = buildEvidenceSourceObservationReceipt({
+    ...receipt,
+    source_type,
+    source_reference: `${prefix}:${validSignature}@123`,
+  });
+  assert.equal(verifyEvidenceSourceObservationReceipt(solanaReceipt), true);
+  assert.equal(solanaReceipt.live_execution_authorized, false);
+}
+
+for (const [source_type, source_reference, error] of [
+  ['SOLANA_RPC', 'not-a-signature', /invalid_source_reference/],
+  ['SOLSCAN', `solscan:${'1'.repeat(63)}@123`, /invalid_source_reference_signature/],
+  ['SOLANA_RPC', `solana_rpc:${'0'.repeat(64)}@123`, /invalid_source_reference/],
+  ['SOLANA_RPC', `solscan:${validSignature}@123`, /source_reference_type_mismatch/],
+  ['SOLSCAN', `solscan:${validSignature}@00123`, /invalid_source_reference_slot/],
+  ['SOLSCAN', `solscan:${validSignature}@9007199254740992`, /invalid_source_reference_slot/],
+]) {
+  assert.throws(() => buildEvidenceSourceObservationReceipt({
+    ...receipt,
+    source_type,
+    source_reference,
+  }), error);
+}
+
 assert.throws(() => buildEvidenceSourceObservationReceipt({
   ...receipt,
   observed_at: '2026-09-02T11:59:59.000Z',
