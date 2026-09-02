@@ -1,10 +1,34 @@
 const SOURCE_TYPES = new Set(['SOLANA_RPC', 'SOLSCAN', 'INTERNAL_RECONCILIATION']);
+const SIGNATURE_BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,100}$/;
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 function requireString(value, field) {
   if (typeof value !== 'string' || value.length === 0 || value !== value.trim()) {
     throw new Error(`invalid_${field}`);
   }
   return value;
+}
+
+function decodedBase58ByteLength(value) {
+  let decoded = 0n;
+  for (const char of value) {
+    const digit = BASE58_ALPHABET.indexOf(char);
+    if (digit < 0) return -1;
+    decoded = decoded * 58n + BigInt(digit);
+  }
+  let significantBytes = 0;
+  for (let current = decoded; current > 0n; current >>= 8n) significantBytes += 1;
+  let leadingZeroBytes = 0;
+  while (leadingZeroBytes < value.length && value[leadingZeroBytes] === '1') leadingZeroBytes += 1;
+  return leadingZeroBytes + significantBytes;
+}
+
+function requireSolanaSignature(value) {
+  const signature = requireString(value, 'signature');
+  if (!SIGNATURE_BASE58.test(signature) || decodedBase58ByteLength(signature) !== 64) {
+    throw new Error('invalid_signature');
+  }
+  return signature;
 }
 
 function requireSafeInteger(value, field) {
@@ -18,7 +42,7 @@ export function normalizeEvidenceSourceReference(input) {
   if (!SOURCE_TYPES.has(source_type)) throw new Error('unsupported_source_type');
 
   if (source_type === 'SOLANA_RPC' || source_type === 'SOLSCAN') {
-    const signature = requireString(input.signature, 'signature');
+    const signature = requireSolanaSignature(input.signature);
     const slot = requireSafeInteger(input.slot, 'slot');
     return Object.freeze({ source_type, signature, slot });
   }
