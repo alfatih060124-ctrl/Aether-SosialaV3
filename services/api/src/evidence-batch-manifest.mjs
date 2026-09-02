@@ -3,11 +3,54 @@ import { createHash } from 'node:crypto';
 const SCHEMA = 'aether.evidence_batch_manifest.v1';
 const SOURCE_TYPES = new Set(['SOLANA_RPC', 'SOLSCAN', 'INTERNAL_RECONCILIATION']);
 const SHA256_RE = /^[0-9a-f]{64}$/;
+const SIGNATURE_BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,100}$/;
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const CANONICAL_SLOT_RE = /^(0|[1-9][0-9]*)$/;
 
 function fail(code) {
   const error = new Error(code);
   error.code = code;
   throw error;
+}
+
+function decodedBase58ByteLength(value) {
+  let decoded = 0n;
+  for (const char of value) {
+    const digit = BASE58_ALPHABET.indexOf(char);
+    if (digit < 0) return -1;
+    decoded = decoded * 58n + BigInt(digit);
+  }
+  let significantBytes = 0;
+  for (let current = decoded; current > 0n; current >>= 8n) significantBytes += 1;
+  let leadingZeroBytes = 0;
+  while (leadingZeroBytes < value.length && value[leadingZeroBytes] === '1') leadingZeroBytes += 1;
+  return leadingZeroBytes + significantBytes;
+}
+
+function requireCanonicalSourceReference(sourceType, sourceReference) {
+  if (typeof sourceReference !== 'string' || sourceReference.trim() !== sourceReference || sourceReference.length === 0) {
+    fail('invalid_evidence_source_reference');
+  }
+
+  if (sourceType !== 'SOLANA_RPC' && sourceType !== 'SOLSCAN') return sourceReference;
+
+  const prefix = `${sourceType.toLowerCase()}:`;
+  if (!sourceReference.startsWith(prefix)) fail('invalid_evidence_source_reference');
+  const remainder = sourceReference.slice(prefix.length);
+  const separator = remainder.lastIndexOf('@');
+  if (separator <= 0 || remainder.indexOf('@') !== separator) fail('invalid_evidence_source_reference');
+
+  const signature = remainder.slice(0, separator);
+  const slotText = remainder.slice(separator + 1);
+  if (!SIGNATURE_BASE58_RE.test(signature) || decodedBase58ByteLength(signature) !== 64) {
+    fail('invalid_evidence_source_reference');
+  }
+  if (!CANONICAL_SLOT_RE.test(slotText)) fail('invalid_evidence_source_reference');
+  const slot = Number(slotText);
+  if (!Number.isSafeInteger(slot) || slot < 0 || String(slot) !== slotText) {
+    fail('invalid_evidence_source_reference');
+  }
+  return sourceReference;
 }
 
 function canonicalTimestamp(value) {
@@ -29,10 +72,7 @@ function canonicalRecord(record) {
   const sourceType = record.source_type;
   if (!SOURCE_TYPES.has(sourceType)) fail('unsupported_evidence_source_type');
 
-  const sourceReference = record.source_reference;
-  if (typeof sourceReference !== 'string' || sourceReference.trim() !== sourceReference || sourceReference.length === 0) {
-    fail('invalid_evidence_source_reference');
-  }
+  const sourceReference = requireCanonicalSourceReference(sourceType, record.source_reference);
 
   const sourceHash = record.source_hash;
   if (typeof sourceHash !== 'string' || !SHA256_RE.test(sourceHash)) {
