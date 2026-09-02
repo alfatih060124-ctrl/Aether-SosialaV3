@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 
 const SOURCES = new Set(['SOLANA_RPC','SOLSCAN','INDEXER','INTERNAL_RECONCILIATION']);
+const SOLANA_SIGNATURE_BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,100}$/;
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 function int(value, name, min, max) {
   const n = Number(value);
@@ -12,6 +14,27 @@ function text(value, name, min, max) {
   const s = String(value ?? '').trim();
   if (s.length < min || s.length > max) throw new Error(`invalid_${name}`);
   return s;
+}
+
+function decodedBase58ByteLength(value) {
+  let decoded = 0n;
+  for (const char of value) {
+    const digit = BASE58_ALPHABET.indexOf(char);
+    if (digit < 0) return -1;
+    decoded = decoded * 58n + BigInt(digit);
+  }
+  let significantBytes = 0;
+  for (let current = decoded; current > 0n; current >>= 8n) significantBytes += 1;
+  let leadingZeroBytes = 0;
+  while (leadingZeroBytes < value.length && value[leadingZeroBytes] === '1') leadingZeroBytes += 1;
+  return leadingZeroBytes + significantBytes;
+}
+
+function requireSolanaSignature(value) {
+  if (!SOLANA_SIGNATURE_BASE58.test(value) || decodedBase58ByteLength(value) !== 64) {
+    throw new Error('invalid_solana_signature');
+  }
+  return value;
 }
 
 function floorDiv(numerator, denominator) {
@@ -36,7 +59,7 @@ export function normalizeEvidenceReference({ sourceType, reference }) {
   const source = String(sourceType || '').trim().toUpperCase();
   if (!SOURCES.has(source)) throw new Error('invalid_verification_source');
   const ref = text(reference, 'verification_reference', 8, 300);
-  if (source === 'SOLANA_RPC' && !/^[1-9A-HJ-NP-Za-km-z]{32,100}$/.test(ref)) throw new Error('invalid_solana_signature');
+  if (source === 'SOLANA_RPC') requireSolanaSignature(ref);
   return { source_type: source, source_reference: ref };
 }
 
