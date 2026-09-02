@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 
 const SUPPORTED_SOURCES = new Set(['SOLANA_RPC', 'SOLSCAN', 'INTERNAL_RECONCILIATION']);
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const SOLANA_REFERENCE_RE = /^(solana_rpc|solscan):([1-9A-HJ-NP-Za-km-z]{32,100})@([0-9]+)$/;
 
 function fail(code) {
   const error = new Error(code);
@@ -20,10 +22,33 @@ function canonicalSourceType(value) {
   return value;
 }
 
-function canonicalReference(value) {
+function decodedBase58ByteLength(value) {
+  let decoded = 0n;
+  for (const char of value) {
+    const digit = BASE58_ALPHABET.indexOf(char);
+    if (digit < 0) return -1;
+    decoded = decoded * 58n + BigInt(digit);
+  }
+  let significantBytes = 0;
+  for (let current = decoded; current > 0n; current >>= 8n) significantBytes += 1;
+  let leadingZeroBytes = 0;
+  while (leadingZeroBytes < value.length && value[leadingZeroBytes] === '1') leadingZeroBytes += 1;
+  return leadingZeroBytes + significantBytes;
+}
+
+function canonicalReference(sourceType, value) {
   if (typeof value !== 'string' || value.length === 0 || value.trim() !== value || value.length > 512) {
     fail('invalid_source_reference');
   }
+  if (sourceType !== 'SOLANA_RPC' && sourceType !== 'SOLSCAN') return value;
+
+  const match = SOLANA_REFERENCE_RE.exec(value);
+  if (!match) fail('invalid_source_reference');
+  const [, prefix, signature, slotText] = match;
+  if (prefix !== sourceType.toLowerCase()) fail('source_reference_type_mismatch');
+  if (decodedBase58ByteLength(signature) !== 64) fail('invalid_source_reference_signature');
+  const slot = Number(slotText);
+  if (!Number.isSafeInteger(slot) || slot < 0 || String(slot) !== slotText) fail('invalid_source_reference_slot');
   return value;
 }
 
@@ -66,10 +91,11 @@ export function buildEvidenceSourceObservationReceipt({
   collected_at,
   http_status,
 }) {
+  const canonical_source_type = canonicalSourceType(source_type);
   const payload = {
     schema: 'aether.evidence_source_observation_receipt.v1',
-    source_type: canonicalSourceType(source_type),
-    source_reference: canonicalReference(source_reference),
+    source_type: canonical_source_type,
+    source_reference: canonicalReference(canonical_source_type, source_reference),
     source_hash: canonicalHash(source_hash),
     source_origin: canonicalOrigin(source_origin),
     request_method: 'GET',
