@@ -36,6 +36,20 @@ assert.throws(() => createFeeConfig({
   live_execution_authorized: false,
 }, operator), /invalid_performance_fee_bps/);
 
+assert.throws(() => createFeeConfig({
+  mode: 'SHADOW',
+  performance_fee_bps: 1200,
+  execution_fee_bps: 25,
+  live_execution_authorized: false,
+}, { role: 'FEE_CONFIG_OPERATOR', actor_id: ' operator-1' }), /actor_id_required/);
+
+assert.throws(() => createFeeConfig({
+  mode: 'SHADOW',
+  performance_fee_bps: 1200,
+  execution_fee_bps: 25,
+  live_execution_authorized: false,
+}, { role: 'FEE_CONFIG_OPERATOR', actor_id: '   ' }), /actor_id_required/);
+
 const change = proposeFeeConfigChange(current, {
   mode: 'SHADOW',
   performance_fee_bps: 1500,
@@ -46,10 +60,12 @@ const change = proposeFeeConfigChange(current, {
 assert.equal(change.status, 'PENDING_APPROVAL');
 assert.equal(change.applied, false);
 assert.throws(() => approveFeeConfigChange(change, { role: 'FEE_CONFIG_APPROVER', actor_id: 'operator-1' }), /separation_of_duties_required/);
+assert.throws(() => approveFeeConfigChange(change, { role: 'FEE_CONFIG_APPROVER', actor_id: ' operator-1' }), /approver_id_required/);
 
 const approved = approveFeeConfigChange(change, approver);
 assert.equal(approved.status, 'APPROVED');
 assert.throws(() => applyApprovedFeeConfig(approved, { role: 'FEE_CONFIG_APPLIER', actor_id: 'approver-1' }), /separation_of_duties_required/);
+assert.throws(() => applyApprovedFeeConfig(approved, { role: 'FEE_CONFIG_APPLIER', actor_id: ' approver-1' }), /applier_id_required/);
 
 const applied = applyApprovedFeeConfig(approved, applier);
 assert.equal(applied.config.performance_fee_bps, 1500);
