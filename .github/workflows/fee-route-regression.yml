@@ -1,0 +1,23 @@
+name: Fee Route Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/server.mjs'
+      - 'services/api/src/fee-route.regression.mjs'
+      - '.github/workflows/fee-route-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fee-route-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check services/api/src/server.mjs
+      - run: node services/api/src/fee-route.regression.mjs
