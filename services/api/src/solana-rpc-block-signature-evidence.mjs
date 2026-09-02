@@ -25,16 +25,12 @@ function decodeBase58(text) {
 }
 
 function canonicalSignature(value, field = 'signature') {
-  if (typeof value !== 'string' || decodeBase58(value).length !== 64) {
-    throw new TypeError(`${field} must be a 64-byte Solana Base58 signature`);
-  }
+  if (typeof value !== 'string' || decodeBase58(value).length !== 64) throw new TypeError(`${field} must be a 64-byte Solana Base58 signature`);
   return value;
 }
 
 function canonicalHash32(value, field) {
-  if (typeof value !== 'string' || decodeBase58(value).length !== 32) {
-    throw new TypeError(`${field} must be a 32-byte Solana Base58 hash`);
-  }
+  if (typeof value !== 'string' || decodeBase58(value).length !== 32) throw new TypeError(`${field} must be a 32-byte Solana Base58 hash`);
   return value;
 }
 
@@ -75,14 +71,7 @@ function normalizeSignatures(values) {
   return values.map((value, index) => canonicalSignature(value, `signatures[${index}]`));
 }
 
-export function buildSolanaRpcBlockSignatureEvidence({
-  source_reference,
-  rpc_endpoint_label,
-  commitment,
-  request_started_at,
-  observed_at,
-  block,
-}) {
+export function buildSolanaRpcBlockSignatureEvidence({ source_reference, rpc_endpoint_label, commitment, request_started_at, observed_at, block }) {
   const ref = parseReference(source_reference);
   const endpoint = canonicalEndpointLabel(rpc_endpoint_label);
   if (!['confirmed', 'finalized'].includes(commitment)) throw new TypeError('commitment must be confirmed or finalized');
@@ -96,8 +85,7 @@ export function buildSolanaRpcBlockSignatureEvidence({
   let previous_blockhash = null;
   let parent_slot = null;
   let block_time = null;
-  let signatures_count = 0;
-  let signatures_hash = null;
+  let block_signatures = [];
 
   if (block !== null) {
     if (!block || typeof block !== 'object') throw new TypeError('block must be object or null');
@@ -110,10 +98,8 @@ export function buildSolanaRpcBlockSignatureEvidence({
       block_time = block.blockTime;
       if (block_time * 1000 > Date.parse(observed)) throw new RangeError('blockTime cannot be after observed_at');
     }
-    const signatures = normalizeSignatures(block.signatures);
-    signatures_count = signatures.length;
-    signatures_hash = hashCanonical(signatures);
-    signatureFound = signatures.includes(ref.signature);
+    block_signatures = normalizeSignatures(block.signatures);
+    signatureFound = block_signatures.includes(ref.signature);
     blockFound = true;
   }
 
@@ -134,8 +120,9 @@ export function buildSolanaRpcBlockSignatureEvidence({
     previous_blockhash,
     parent_slot,
     block_time,
-    signatures_count,
-    signatures_hash,
+    block_signatures,
+    signatures_count: block_signatures.length,
+    signatures_hash: blockFound ? hashCanonical(block_signatures) : null,
     request_started_at: started,
     observed_at: observed,
   };
@@ -144,11 +131,7 @@ export function buildSolanaRpcBlockSignatureEvidence({
     ...provenance,
     provenance_hash: hashCanonical(provenance),
     collection_status: 'PENDING_DATA',
-    status_reason: !blockFound
-      ? 'block_not_found'
-      : signatureFound
-        ? 'block_signature_corroborated_reconciliation_required'
-        : 'signature_not_present_in_claimed_slot',
+    status_reason: !blockFound ? 'block_not_found' : signatureFound ? 'block_signature_corroborated_reconciliation_required' : 'signature_not_present_in_claimed_slot',
     source_reference: signatureFound ? ref.source_reference : null,
     metrics_available: false,
     trades_count: null,
@@ -162,33 +145,18 @@ export function buildSolanaRpcBlockSignatureEvidence({
   };
 }
 
-export async function collectSolanaRpcBlockSignatureEvidence({
-  rpc,
-  source_reference,
-  rpc_endpoint_label,
-  commitment = 'finalized',
-  clock = () => new Date(),
-}) {
+export async function collectSolanaRpcBlockSignatureEvidence({ rpc, source_reference, rpc_endpoint_label, commitment = 'finalized', clock = () => new Date() }) {
   if (!rpc || typeof rpc.call !== 'function') throw new TypeError('rpc.call is required');
   const ref = parseReference(source_reference);
   canonicalEndpointLabel(rpc_endpoint_label);
   if (!['confirmed', 'finalized'].includes(commitment)) throw new TypeError('commitment must be confirmed or finalized');
   if (typeof clock !== 'function') throw new TypeError('clock must be a function');
-
   const started = clock();
   if (!(started instanceof Date) || Number.isNaN(started.getTime())) throw new TypeError('clock must return valid Date');
-  const response = await rpc.call('getBlock', [ref.slot, {
-    commitment,
-    transactionDetails: 'signatures',
-    rewards: false,
-    maxSupportedTransactionVersion: 0,
-  }]);
+  const response = await rpc.call('getBlock', [ref.slot, { commitment, transactionDetails: 'signatures', rewards: false, maxSupportedTransactionVersion: 0 }]);
   const observed = clock();
   if (!(observed instanceof Date) || Number.isNaN(observed.getTime())) throw new TypeError('clock must return valid Date');
-  if (!response || typeof response !== 'object' || !Object.prototype.hasOwnProperty.call(response, 'result')) {
-    throw new TypeError('getBlock response must contain result');
-  }
-
+  if (!response || typeof response !== 'object' || !Object.prototype.hasOwnProperty.call(response, 'result')) throw new TypeError('getBlock response must contain result');
   return buildSolanaRpcBlockSignatureEvidence({
     source_reference: ref.source_reference,
     rpc_endpoint_label,
@@ -207,9 +175,8 @@ export function verifySolanaRpcBlockSignatureEvidence(evidence) {
       previousBlockhash: evidence.previous_blockhash,
       parentSlot: evidence.parent_slot,
       blockTime: evidence.block_time,
-      signatures: evidence._verification_signatures,
+      signatures: evidence.block_signatures,
     } : null;
-    if (evidence.block_found && !Array.isArray(evidence._verification_signatures)) return false;
     const rebuilt = buildSolanaRpcBlockSignatureEvidence({
       source_reference: evidence.requested_source_reference,
       rpc_endpoint_label: evidence.rpc_endpoint_label,
