@@ -1,0 +1,21 @@
+name: Solana RPC Cluster Evidence Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-rpc-cluster-evidence.mjs'
+      - 'scripts/solana-rpc-cluster-evidence-regression.mjs'
+      - '.github/workflows/solana-rpc-cluster-evidence.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: node --check services/api/src/solana-rpc-cluster-evidence.mjs && node --check scripts/solana-rpc-cluster-evidence-regression.mjs
+      - name: Run regression
+        run: node scripts/solana-rpc-cluster-evidence-regression.mjs
