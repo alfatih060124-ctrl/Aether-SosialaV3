@@ -65,7 +65,7 @@ export function buildEvidenceWindowCoverage(input) {
   }
 
   const windowStartSec = Math.floor(start.ms / 1000);
-  const windowEndSec = Math.floor(end.ms / 1000);
+  const windowEndSec = Math.ceil(end.ms / 1000);
   for (const source of sources) {
     if (source.earliest_block_time > windowStartSec) fail('source_does_not_cover_window_start');
     if (source.latest_block_time < windowEndSec) fail('source_does_not_cover_window_end');
