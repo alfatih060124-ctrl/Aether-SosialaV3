@@ -1,5 +1,12 @@
 import { createCopyMandate, assertCopyMandateAllowsIntent } from './copy-mandate.mjs';
 
+const CANONICAL_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+function canonicalPolicyId(value) {
+  if (typeof value !== 'string' || !CANONICAL_UUID_RE.test(value)) throw new Error('invalid_policy_id');
+  return value;
+}
+
 function requireRow(row) {
   if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error('copy_mandate_not_found');
   return row;
@@ -65,14 +72,14 @@ export function createCopyMandateRuntimeRepository(pool) {
   if (!pool || typeof pool.query !== 'function') throw new Error('copy_mandate_repository_pool_required');
   return Object.freeze({
     async getByPolicyId(policyId) {
-      if (typeof policyId !== 'string' || policyId.trim() === '') throw new Error('policy_id_required');
+      const canonicalId = canonicalPolicyId(policyId);
       const result = await pool.query(
         `SELECT policy_id,follower_user_id,trader_id,enabled,status,mode,live_execution_authorized,
                 max_copy_amount_usd,max_position_amount_usd,allocation_bps,max_slippage_bps,
                 max_daily_loss_bps,stop_drawdown_bps,policy_type,policy_value,consent_version,consented_at
            FROM copy_policies
           WHERE policy_id=$1`,
-        [policyId.trim()]
+        [canonicalId]
       );
       return result.rows[0] ?? null;
     }

@@ -6,7 +6,7 @@ import {
 } from '../services/api/src/copy-mandate-runtime.mjs';
 
 const row = {
-  policy_id: 'mandate-runtime-001',
+  policy_id: '11111111-2222-3333-4444-555555555555',
   follower_user_id: 'follower-001',
   trader_id: 'trader-001',
   enabled: true,
@@ -84,6 +84,9 @@ assert.equal(loaded.policy_id, row.policy_id);
 assert.deepEqual(queries[0].params, [row.policy_id]);
 assert.match(queries[0].sql, /WHERE policy_id=\$1/);
 assert.doesNotMatch(queries[0].sql, /follower_user_id=\$1/);
-await assert.rejects(() => repository.getByPolicyId(''), /policy_id_required/);
+for (const invalidId of ['', 'not-a-uuid', ' 11111111-2222-3333-4444-555555555555', '11111111-2222-3333-4444-55555555555g']) {
+  await assert.rejects(() => repository.getByPolicyId(invalidId), /invalid_policy_id/);
+}
+assert.equal(queries.length, 1, 'invalid policy IDs must fail before database access');
 
 console.log('Copy Mandate Runtime Regression: PASS');
