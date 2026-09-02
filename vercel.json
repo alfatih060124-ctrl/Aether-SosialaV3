@@ -2,9 +2,11 @@
   "version": 2,
   "builds": [
     { "src": "api/index.mjs", "use": "@vercel/node" },
+    { "src": "api/chart.mjs", "use": "@vercel/node" },
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
+    { "src": "/api/market/chart/?", "dest": "/api/chart.mjs" },
     { "src": "/api/(.*)", "dest": "/api/index.mjs" },
     { "src": "/aether-mark.svg", "dest": "/public/aether-mark.svg" },
     { "src": "/favicon.svg", "dest": "/public/favicon.svg" },
