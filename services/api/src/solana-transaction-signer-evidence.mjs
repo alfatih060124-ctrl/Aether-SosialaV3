@@ -137,6 +137,7 @@ export async function collectSolanaTransactionSignerEvidence({
       found: false,
       slot: null,
       block_time: null,
+      account_keys: [],
       signer_keys: [],
       trader_signed: false,
       source_reference: null,
@@ -155,6 +156,7 @@ export async function collectSolanaTransactionSignerEvidence({
 
   const accountKeys = normalizeParsedAccountKeys(payload.result.transaction.message);
   if (!accountKeys.some((entry) => entry.pubkey === wallet)) throw new Error('trader_wallet_not_in_transaction');
+  const accountKeyPubkeys = accountKeys.map((entry) => entry.pubkey);
   const signerKeys = normalizeSignerKeys(accountKeys);
   if (signerKeys.length === 0) throw new Error('transaction_signer_keys_empty');
   const traderSigned = signerKeys.includes(wallet);
@@ -171,6 +173,7 @@ export async function collectSolanaTransactionSignerEvidence({
     found: true,
     slot,
     block_time: blockTime,
+    account_keys: accountKeyPubkeys,
     signer_keys: signerKeys,
     trader_signed: traderSigned,
     source_reference: sourceReference,
@@ -202,18 +205,21 @@ export function verifySolanaTransactionSignerEvidence(evidence) {
     const started = canonicalIso(p.request_started_at, 'request_started_at');
     const observed = canonicalIso(p.observed_at, 'observed_at');
     if (observed.ms < started.ms || typeof p.found !== 'boolean' || typeof p.trader_signed !== 'boolean') return false;
-    if (!Array.isArray(p.signer_keys) || !Array.isArray(evidence.signer_keys)) return false;
+    if (!Array.isArray(p.account_keys) || !Array.isArray(p.signer_keys) || !Array.isArray(evidence.signer_keys)) return false;
+    const normalizedAccountKeys = p.account_keys.map((key) => canonicalSolanaKey(key, 'account_key', 32));
+    if (new Set(normalizedAccountKeys).size !== normalizedAccountKeys.length) return false;
     const normalizedSigners = [...new Set(p.signer_keys.map((key) => canonicalSolanaKey(key, 'signer_key', 32)))].sort();
     if (normalizedSigners.length !== p.signer_keys.length || JSON.stringify(normalizedSigners) !== JSON.stringify(p.signer_keys)) return false;
+    if (!normalizedSigners.every((key) => normalizedAccountKeys.includes(key))) return false;
     if (JSON.stringify(evidence.signer_keys) !== JSON.stringify(p.signer_keys) || evidence.trader_signed !== p.trader_signed) return false;
 
     if (!p.found) {
-      if (p.slot !== null || p.block_time !== null || p.signer_keys.length !== 0 || p.trader_signed !== false || p.source_reference !== null || evidence.source_reference !== null) return false;
+      if (p.slot !== null || p.block_time !== null || p.account_keys.length !== 0 || p.signer_keys.length !== 0 || p.trader_signed !== false || p.source_reference !== null || evidence.source_reference !== null) return false;
     } else {
       canonicalSafeInteger(p.slot, 'slot');
       const blockTime = canonicalSafeInteger(p.block_time, 'block_time', { nullable: true });
       if (blockTime !== null && blockTime * 1000 > observed.ms) return false;
-      if (p.signer_keys.length === 0) return false;
+      if (p.account_keys.length === 0 || !p.account_keys.includes(wallet) || p.signer_keys.length === 0) return false;
       const derivedTraderSigned = p.signer_keys.includes(wallet);
       if (derivedTraderSigned !== p.trader_signed) return false;
       const expectedReference = derivedTraderSigned ? `solana_rpc:${signature}@${p.slot}` : null;
