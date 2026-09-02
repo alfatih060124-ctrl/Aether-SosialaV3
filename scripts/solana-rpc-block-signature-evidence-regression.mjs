@@ -84,7 +84,7 @@ assert.equal(verifySolanaRpcBlockSignatureEvidence(missingBlock), true);
 
 await assert.rejects(collectSolanaRpcBlockSignatureEvidence({
   rpc: { call: async () => { throw new Error('must not be called'); } },
-  source_reference: 'solana_rpc:not-a-signature@100', rpc_endpoint_label: 'mainnet-readonly-a',
+  source_reference: `solana_rpc:${'1'.repeat(63)}@100`, rpc_endpoint_label: 'mainnet-readonly-a',
 }), /64-byte Solana Base58 signature/);
 
 await assert.rejects(collectSolanaRpcBlockSignatureEvidence({
