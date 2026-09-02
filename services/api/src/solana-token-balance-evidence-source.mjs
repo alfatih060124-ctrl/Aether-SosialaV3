@@ -189,6 +189,8 @@ export function verifySolanaTokenBalanceEvidence(evidence) {
     if (Date.parse(p.observed_at) < Date.parse(p.request_started_at)) return false;
     if (p.transaction_found === false) return evidence.source_reference === null;
     const slot = safeInt(p.slot, 'rpc_slot');
+    const blockTime = safeInt(p.block_time, 'rpc_block_time', true);
+    if (blockTime !== null && Date.parse(p.observed_at) < blockTime * 1000) return false;
     const canonicalRef = `solana_rpc:${p.requested_signature}@${slot}`;
     if (p.source_reference !== canonicalRef || evidence.source_reference !== canonicalRef) return false;
     if (p.transaction_succeeded === true) {
