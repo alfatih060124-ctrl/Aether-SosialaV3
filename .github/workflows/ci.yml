@@ -68,6 +68,7 @@ jobs:
           node --check scripts/api-contract-regression.mjs
           node --check scripts/current-main-rollout-regression.mjs
           node --check scripts/infrastructure-contract.mjs
+          node --check scripts/ui-english-language-regression.mjs
           bash -n scripts/vm-apply-routing.sh
           bash -n scripts/vm-apply-infrastructure-topology.sh
           bash -n scripts/vm-deploy-wallet-auth.sh
@@ -124,6 +125,8 @@ jobs:
         run: node scripts/marketplace-fixture-quarantine-regression.mjs
       - name: Current API contract regression
         run: node scripts/api-contract-regression.mjs
+      - name: English-only UI regression
+        run: node scripts/ui-english-language-regression.mjs
       - name: Caddy ingress validation
         run: docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Signal quality regression
