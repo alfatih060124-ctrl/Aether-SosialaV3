@@ -1,0 +1,27 @@
+name: Copy Mandate Auto Trade Adapter Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/copy-mandate.mjs'
+      - 'services/api/src/copy-mandate-runtime.mjs'
+      - 'services/api/src/copy-mandate-autotrade-adapter.mjs'
+      - 'services/api/src/auto-trade-engine.mjs'
+      - 'scripts/copy-mandate-autotrade-adapter-regression.mjs'
+      - '.github/workflows/copy-mandate-autotrade-adapter.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run fail-closed persisted mandate adapter regression
+        run: node scripts/copy-mandate-autotrade-adapter-regression.mjs
