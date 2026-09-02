@@ -205,6 +205,7 @@ export function verifySolanaTransactionProgramEvidence(evidence) {
   if (JSON.stringify(normalizedPrograms) !== JSON.stringify(p.program_ids)) return false;
   if (!p.found) {
     if (p.slot !== null || p.block_time !== null || p.source_reference !== null || p.program_ids.length !== 0 || evidence.source_reference !== null) return false;
+    if (Object.prototype.hasOwnProperty.call(evidence, 'program_ids') || Object.prototype.hasOwnProperty.call(evidence, 'reconciliation_required')) return false;
   } else {
     const slot = canonicalSafeInteger(p.slot, 'slot');
     const blockTime = canonicalSafeInteger(p.block_time, 'block_time', { nullable: true });
@@ -212,6 +213,8 @@ export function verifySolanaTransactionProgramEvidence(evidence) {
     if (p.program_ids.length === 0) return false;
     const expectedRef = `solana_rpc:${p.requested_signature}@${slot}`;
     if (p.source_reference !== expectedRef || evidence.source_reference !== expectedRef) return false;
+    if (!Array.isArray(evidence.program_ids) || JSON.stringify(evidence.program_ids) !== JSON.stringify(p.program_ids)) return false;
+    if (evidence.reconciliation_required !== true) return false;
   }
   return evidence.source_hash === hashJson(p);
 }
