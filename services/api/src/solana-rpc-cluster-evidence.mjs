@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 
 const SCHEMA = 'aether.solana_rpc.cluster_identity_evidence.v1';
-const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,64}$/;
+const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]+$/;
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const ENDPOINT_LABEL_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 function canonicalIso(value, field) {
@@ -13,9 +14,31 @@ function canonicalIso(value, field) {
   return value;
 }
 
+function decodedBase58Length(value) {
+  let bytes = [0];
+  for (const char of value) {
+    const digit = BASE58_ALPHABET.indexOf(char);
+    if (digit < 0) return -1;
+    let carry = digit;
+    for (let i = 0; i < bytes.length; i += 1) {
+      carry += bytes[i] * 58;
+      bytes[i] = carry & 0xff;
+      carry >>= 8;
+    }
+    while (carry > 0) {
+      bytes.push(carry & 0xff);
+      carry >>= 8;
+    }
+  }
+  let leadingZeros = 0;
+  while (leadingZeros < value.length && value[leadingZeros] === '1') leadingZeros += 1;
+  const significantBytes = bytes.length === 1 && bytes[0] === 0 ? 0 : bytes.length;
+  return leadingZeros + significantBytes;
+}
+
 function canonicalGenesisHash(value, field) {
-  if (typeof value !== 'string' || !BASE58_RE.test(value)) {
-    throw new TypeError(`${field} must be canonical Base58 text`);
+  if (typeof value !== 'string' || !BASE58_RE.test(value) || decodedBase58Length(value) !== 32) {
+    throw new TypeError(`${field} must be a canonical 32-byte Base58 hash`);
   }
   return value;
 }
