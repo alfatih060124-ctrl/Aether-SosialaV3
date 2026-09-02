@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -23,15 +23,15 @@
 <body>
 <main class="wrap">
   <header class="top"><div><div class="brandLockup"><img class="brandMark" src="/aether-mark.svg" alt=""><div><div class="brand">AETHER</div><div class="subbrand">Execution & Social Trading</div></div></div><a class="home" href="/">← Public landing page</a></div><div class="badge">PUBLIC • READ ONLY • SHADOW</div></header>
-  <section class="card hero"><div class="heroTag">AETHER Runtime</div><h1>SHADOW Runtime Dashboard</h1><p class="muted">Status runtime dan marketplace dapat dibaca publik. Semua operasi yang mengubah state, simulasi operator, Admin, dan execution tetap di primary VM dan tidak dirutekan melalui frontend publik.</p></section>
+  <section class="card hero"><div class="heroTag">AETHER Runtime</div><h1>SHADOW Runtime Dashboard</h1><p class="muted">Runtime and marketplace status are publicly readable. All state-changing operations, operator simulations, Admin controls, and execution remain on the primary VM and are not routed through the public frontend.</p></section>
   <section class="grid">
     <div class="card"><h2>Runtime</h2><div id="runtime">Checking…</div></div>
     <div class="card"><h2>Database</h2><div id="database">Checking…</div></div>
     <div class="card"><h2>Traders</h2><div id="traders">Checking…</div></div>
     <div class="card"><h2>Execution</h2><div id="execution">Checking…</div></div>
-    <div class="card"><h2>Safety</h2><div class="locked">🔒 LIVE EXECUTION LOCKED</div><p class="safetyNote">Public edge tidak memiliki credential service, signer, atau write route.</p></div>
+    <div class="card"><h2>Safety</h2><div class="locked">🔒 LIVE EXECUTION LOCKED</div><p class="safetyNote">The public edge has no service credentials, signer access, or write routes.</p></div>
   </section>
-  <section class="card section"><h2>Traffic Boundary</h2><div class="notice"><strong>Public layer = observability only.</strong> SHADOW simulation tetap tersedia untuk operator dan CI di jalur internal yang terlindungi. Tidak ada form publik yang dapat membuat trade event, execution request, perubahan fee, billing, atau konfigurasi wallet.</div></section>
+  <section class="card section"><h2>Traffic Boundary</h2><div class="notice"><strong>Public layer = observability only.</strong> SHADOW simulation remains available to operators and CI through protected internal paths. No public form can create trade events, execution requests, fee changes, billing changes, or wallet configuration changes.</div></section>
   <section class="card section"><h2>Active Marketplace Traders</h2><table><thead><tr><th>Trader</th><th>Verified</th><th>Return</th><th>Win Rate</th><th>Drawdown</th><th>Trades</th><th>Followers</th><th>Performance Fee</th><th>Execution Fee</th><th>Mode</th></tr></thead><tbody id="rows"></tbody></table></section>
 </main>
 <script>
