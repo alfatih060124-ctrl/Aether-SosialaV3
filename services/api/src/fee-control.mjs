@@ -1,5 +1,6 @@
 const FEE_CONFIG_SCHEMA = 'aether.fee_control.v1';
 const MAX_BPS = 10_000;
+const ACTOR_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
 
 function assertIntegerBps(name, value) {
   if (!Number.isSafeInteger(value) || value < 0 || value > MAX_BPS) {
@@ -7,10 +8,15 @@ function assertIntegerBps(name, value) {
   }
 }
 
+function canonicalActorId(value, errorName = 'actor_id_required') {
+  if (typeof value !== 'string' || !ACTOR_ID_RE.test(value)) throw new Error(errorName);
+  return value;
+}
+
 function assertRole(actor) {
   if (!actor || typeof actor !== 'object') throw new Error('actor_required');
   if (actor.role !== 'FEE_CONFIG_OPERATOR') throw new Error('fee_operator_role_required');
-  if (!actor.actor_id || typeof actor.actor_id !== 'string') throw new Error('actor_id_required');
+  canonicalActorId(actor.actor_id);
 }
 
 export function createFeeConfig(input, actor) {
@@ -59,14 +65,15 @@ export function proposeFeeConfigChange(current, proposed, actor) {
 export function approveFeeConfigChange(change, approver) {
   if (!change || change.schema !== 'aether.fee_control_change.v1') throw new Error('fee_change_required');
   if (!approver || approver.role !== 'FEE_CONFIG_APPROVER') throw new Error('fee_approver_role_required');
-  if (!approver.actor_id || typeof approver.actor_id !== 'string') throw new Error('approver_id_required');
-  if (change.requested_by === approver.actor_id) throw new Error('separation_of_duties_required');
+  const approverId = canonicalActorId(approver.actor_id, 'approver_id_required');
+  const requestedBy = canonicalActorId(change.requested_by, 'invalid_requested_by');
+  if (requestedBy === approverId) throw new Error('separation_of_duties_required');
   if (change.status !== 'PENDING_APPROVAL' || change.applied) throw new Error('fee_change_not_approvable');
 
   return Object.freeze({
     ...change,
     status: 'APPROVED',
-    approved_by: approver.actor_id,
+    approved_by: approverId,
     applied: false,
   });
 }
@@ -74,8 +81,10 @@ export function approveFeeConfigChange(change, approver) {
 export function applyApprovedFeeConfig(change, actor) {
   if (!change || change.status !== 'APPROVED') throw new Error('approved_fee_change_required');
   if (!actor || actor.role !== 'FEE_CONFIG_APPLIER') throw new Error('fee_applier_role_required');
-  if (!actor.actor_id || typeof actor.actor_id !== 'string') throw new Error('applier_id_required');
-  if (actor.actor_id === change.requested_by || actor.actor_id === change.approved_by) {
+  const applierId = canonicalActorId(actor.actor_id, 'applier_id_required');
+  const requestedBy = canonicalActorId(change.requested_by, 'invalid_requested_by');
+  const approvedBy = canonicalActorId(change.approved_by, 'invalid_approved_by');
+  if (applierId === requestedBy || applierId === approvedBy) {
     throw new Error('separation_of_duties_required');
   }
 
@@ -83,9 +92,9 @@ export function applyApprovedFeeConfig(change, actor) {
     config: change.proposed,
     audit: Object.freeze({
       schema: 'aether.fee_control_audit.v1',
-      requested_by: change.requested_by,
-      approved_by: change.approved_by,
-      applied_by: actor.actor_id,
+      requested_by: requestedBy,
+      approved_by: approvedBy,
+      applied_by: applierId,
       mode: 'SHADOW',
       live_execution_authorized: false,
     }),
