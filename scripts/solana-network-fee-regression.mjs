@@ -32,9 +32,10 @@ assert.equal(rpcCalls.length,1);
 assert.equal(rpcCalls[0].method,'getTransaction');
 assert.equal(rpcCalls[0].params[0],SIGNATURE);
 assert.equal(rpcCalls[0].params[1].commitment,'confirmed');
-assert.equal(observation.schema_version,2);
+assert.equal(observation.schema_version,3);
 assert.equal(observation.source_type,'SOLANA_TRANSACTION_FEE_LAMPORTS_V1');
 assert.equal(observation.source_slot,SLOT);
+assert.equal(observation.observed_at,OBSERVED);
 assert.equal(observation.block_time_unix,BLOCK_TIME);
 assert.equal(observation.network_fee_lamports,5000);
 assert.equal(observation.status,'PENDING_SOL_USD_VALUATION');
@@ -95,7 +96,11 @@ assert.deepEqual(valued,valueSolanaNetworkFeeObservation({observation,solUsdSnap
 
 const tampered={...observation,network_fee_lamports:5001};
 assert.throws(()=>verifySolanaNetworkFeeObservation(tampered),/solana_fee_source_hash_mismatch/);
-assert.throws(()=>verifySolanaNetworkFeeObservation({...observation,schema_version:1}),/invalid_solana_fee_schema_version/);
+assert.throws(()=>verifySolanaNetworkFeeObservation({...observation,schema_version:2}),/invalid_solana_fee_schema_version/);
+assert.throws(()=>verifySolanaNetworkFeeObservation({
+  ...observation,
+  observed_at:'2026-09-01T05:15:01.000Z'
+}),/solana_fee_source_hash_mismatch/);
 assert.throws(()=>verifySolanaNetworkFeeObservation({
   ...observation,
   provenance:{...observation.provenance,rpc_endpoint_label:'tampered-rpc'}
