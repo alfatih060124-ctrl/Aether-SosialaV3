@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import {
   collectSolanaTransactionSignerEvidence,
   verifySolanaTransactionSignerEvidence,
@@ -12,6 +13,10 @@ const OBSERVED = '2026-01-01T00:00:05.000Z';
 
 function response(result) {
   return async () => ({ ok: true, async json() { return { jsonrpc: '2.0', id: 1, result }; } });
+}
+
+function hashJson(value) {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
 function txResult({ traderSigner = true, duplicate = false, blockTime = 1767225602 } = {}) {
@@ -86,7 +91,7 @@ assert.equal(verifySolanaTransactionSignerEvidence(signerTampered), false);
 
 const participantTampered = structuredClone(notSigner);
 participantTampered.provenance.account_keys = [OTHER];
-participantTampered.source_hash = '0'.repeat(64);
+participantTampered.source_hash = hashJson(participantTampered.provenance);
 assert.equal(verifySolanaTransactionSignerEvidence(participantTampered), false);
 
 await assert.rejects(
