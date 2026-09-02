@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import {
   collectSolanaTransactionSignerEvidence,
   verifySolanaTransactionSignerEvidence,
@@ -6,12 +7,16 @@ import {
 
 const SIGNATURE = '1'.repeat(64); // SYNTHETIC / TEST-ONLY: 64 zero bytes.
 const TRADER = '1'.repeat(32); // SYNTHETIC / TEST-ONLY: 32 zero bytes.
-const OTHER = `2${'1'.repeat(31)}`; // SYNTHETIC / TEST-ONLY only.
+const OTHER = `${'1'.repeat(31)}2`; // SYNTHETIC / TEST-ONLY: distinct 32-byte key.
 const STARTED = '2026-01-01T00:00:01.000Z';
 const OBSERVED = '2026-01-01T00:00:05.000Z';
 
 function response(result) {
   return async () => ({ ok: true, async json() { return { jsonrpc: '2.0', id: 1, result }; } });
+}
+
+function hashJson(value) {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
 function txResult({ traderSigner = true, duplicate = false, blockTime = 1767225602 } = {}) {
@@ -53,6 +58,7 @@ assert.equal(signed.reputation_score, null);
 assert.equal(signed.trader_signed, true);
 assert.equal(signed.source_reference, `solana_rpc:${SIGNATURE}@123`);
 assert.deepEqual(signed.signer_keys, [TRADER]);
+assert.deepEqual(signed.provenance.account_keys, [TRADER, OTHER]);
 assert.equal(signed.reconciliation_required, true);
 assert.equal(verifySolanaTransactionSignerEvidence(signed), true);
 
@@ -61,6 +67,7 @@ assert.equal(notSigner.collection_status, 'PENDING_DATA');
 assert.equal(notSigner.trader_signed, false);
 assert.equal(notSigner.source_reference, null);
 assert.deepEqual(notSigner.signer_keys, [OTHER]);
+assert.deepEqual(notSigner.provenance.account_keys, [TRADER, OTHER]);
 assert.equal(verifySolanaTransactionSignerEvidence(notSigner), true);
 
 const notFound = await collectSolanaTransactionSignerEvidence({ ...common, fetch_fn: response(null) });
@@ -68,6 +75,7 @@ assert.equal(notFound.collection_status, 'PENDING_DATA');
 assert.equal(notFound.trader_signed, false);
 assert.equal(notFound.source_reference, null);
 assert.deepEqual(notFound.signer_keys, []);
+assert.deepEqual(notFound.provenance.account_keys, []);
 assert.equal(verifySolanaTransactionSignerEvidence(notFound), true);
 
 const tampered = structuredClone(signed);
@@ -80,6 +88,11 @@ const signerTampered = structuredClone(signed);
 signerTampered.provenance.signer_keys = [OTHER];
 signerTampered.signer_keys = [OTHER];
 assert.equal(verifySolanaTransactionSignerEvidence(signerTampered), false);
+
+const participantTampered = structuredClone(notSigner);
+participantTampered.provenance.account_keys = [OTHER];
+participantTampered.source_hash = hashJson(participantTampered.provenance);
+assert.equal(verifySolanaTransactionSignerEvidence(participantTampered), false);
 
 await assert.rejects(
   collectSolanaTransactionSignerEvidence({
