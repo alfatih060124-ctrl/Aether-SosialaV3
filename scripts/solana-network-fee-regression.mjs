@@ -5,6 +5,7 @@ import {
   verifySolanaNetworkFeeObservation
 } from '../packages/reconciliation-accounting/solana-network-fee.mjs';
 
+// SYNTHETIC / TEST-ONLY fixture. Never use as production evidence.
 const SIGNATURE='1'.repeat(64);
 const SLOT=123456789;
 const OBSERVED='2026-09-01T05:15:00.000Z';
@@ -31,8 +32,10 @@ assert.equal(rpcCalls.length,1);
 assert.equal(rpcCalls[0].method,'getTransaction');
 assert.equal(rpcCalls[0].params[0],SIGNATURE);
 assert.equal(rpcCalls[0].params[1].commitment,'confirmed');
+assert.equal(observation.schema_version,3);
 assert.equal(observation.source_type,'SOLANA_TRANSACTION_FEE_LAMPORTS_V1');
 assert.equal(observation.source_slot,SLOT);
+assert.equal(observation.observed_at,OBSERVED);
 assert.equal(observation.block_time_unix,BLOCK_TIME);
 assert.equal(observation.network_fee_lamports,5000);
 assert.equal(observation.status,'PENDING_SOL_USD_VALUATION');
@@ -42,6 +45,12 @@ assert.equal(observation.evidence_ready,false);
 assert.equal(observation.verified,false);
 assert.equal(observation.published,false);
 assert.equal(observation.live_execution_authorized,false);
+assert.deepEqual(observation.provenance,{
+  rpc_endpoint_label:'fixture-solana-rpc',
+  rpc_method:'getTransaction',
+  commitment:'confirmed',
+  max_supported_transaction_version:0
+});
 assert.match(observation.source_hash,/^[a-f0-9]{64}$/);
 assert.doesNotThrow(()=>verifySolanaNetworkFeeObservation(observation));
 
@@ -81,11 +90,33 @@ assert.equal(valued.evidence_ready,false);
 assert.equal(valued.verified,false);
 assert.equal(valued.published,false);
 assert.equal(valued.live_execution_authorized,false);
+assert.deepEqual(valued.provenance.solana_rpc_provenance,observation.provenance);
 assert.match(valued.source_hash,/^[a-f0-9]{64}$/);
 assert.deepEqual(valued,valueSolanaNetworkFeeObservation({observation,solUsdSnapshot:priceSnapshot}));
 
 const tampered={...observation,network_fee_lamports:5001};
 assert.throws(()=>verifySolanaNetworkFeeObservation(tampered),/solana_fee_source_hash_mismatch/);
+assert.throws(()=>verifySolanaNetworkFeeObservation({...observation,schema_version:2}),/invalid_solana_fee_schema_version/);
+assert.throws(()=>verifySolanaNetworkFeeObservation({
+  ...observation,
+  observed_at:'2026-09-01T05:15:01.000Z'
+}),/solana_fee_source_hash_mismatch/);
+assert.throws(()=>verifySolanaNetworkFeeObservation({
+  ...observation,
+  provenance:{...observation.provenance,rpc_endpoint_label:'tampered-rpc'}
+}),/solana_fee_source_hash_mismatch/);
+assert.throws(()=>verifySolanaNetworkFeeObservation({
+  ...observation,
+  provenance:{...observation.provenance,rpc_method:'getBlock'}
+}),/invalid_solana_fee_rpc_method/);
+assert.throws(()=>verifySolanaNetworkFeeObservation({
+  ...observation,
+  provenance:{...observation.provenance,commitment:'processed'}
+}),/invalid_solana_fee_rpc_commitment/);
+assert.throws(()=>verifySolanaNetworkFeeObservation({
+  ...observation,
+  provenance:{...observation.provenance,max_supported_transaction_version:1}
+}),/invalid_solana_fee_transaction_version/);
 assert.throws(()=>valueSolanaNetworkFeeObservation({observation}),/sol_usd_snapshot_required/);
 assert.throws(()=>valueSolanaNetworkFeeObservation({observation,solUsdSnapshot:{...priceSnapshot,anchor_slot:SLOT+1}}),/sol_usd_anchor_slot_mismatch/);
 assert.throws(()=>valueSolanaNetworkFeeObservation({observation,solUsdSnapshot:{...priceSnapshot,transaction_block_time_unix:BLOCK_TIME+1}}),/sol_usd_transaction_time_mismatch/);
