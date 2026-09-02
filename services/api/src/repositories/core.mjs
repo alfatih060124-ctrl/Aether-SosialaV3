@@ -1,4 +1,7 @@
 import crypto from 'node:crypto';
+import { createCopyMandate } from '../copy-mandate.mjs';
+
+const COPY_MANDATE_CONSENT_VERSION = 'aether.copy_mandate.consent.v1';
 
 function boundedInt(value, name, min, max) {
   const n = Number(value);
@@ -32,6 +35,8 @@ export function createCoreRepositories(pool) {
       },
       async createForFollower(userId, input) {
         if (!userId) throw new Error('user_id_required');
+        if (input?.consent_accepted !== true) throw new Error('copy_mandate_consent_required');
+        if (input?.consent_version !== COPY_MANDATE_CONSENT_VERSION) throw new Error('invalid_consent_version');
         const traderId = String(input?.trader_id || '').trim();
         if (!traderId) throw new Error('trader_id_required');
         const trader = (await pool.query(
@@ -55,12 +60,33 @@ export function createCoreRepositories(pool) {
         const dailyLoss = boundedInt(input?.max_daily_loss_bps ?? 300, 'max_daily_loss_bps', 1, 5000);
         const stopDrawdown = boundedInt(input?.stop_drawdown_bps ?? 1500, 'stop_drawdown_bps', 1, 9000);
         const policyId = crypto.randomUUID();
+        const consentedAt = new Date().toISOString();
+        const canonical = createCopyMandate({
+          mandate_id: policyId,
+          follower_user_id: String(userId),
+          trader_id: traderId,
+          status: 'ACTIVE',
+          consent_version: COPY_MANDATE_CONSENT_VERSION,
+          consented_at: consentedAt,
+          policy_type: input?.policy_type,
+          value: input?.policy_value,
+          max_copy_amount_usd: maxCopy,
+          max_position_amount_usd: maxPosition,
+          execution_mode: 'SHADOW',
+          live_execution_authorized: false,
+          network_submission_authorized: false,
+          signer_required: false
+        });
         return (await pool.query(
           `INSERT INTO copy_policies(
              policy_id,follower_user_id,trader_id,enabled,max_copy_amount_usd,max_position_amount_usd,
-             mode,status,allocation_bps,max_slippage_bps,max_daily_loss_bps,stop_drawdown_bps,live_execution_authorized
-           ) VALUES($1,$2,$3,true,$4,$5,'SHADOW','ACTIVE',$6,$7,$8,$9,false) RETURNING *`,
-          [policyId,userId,traderId,maxCopy,maxPosition,allocation,slippage,dailyLoss,stopDrawdown]
+             mode,status,allocation_bps,max_slippage_bps,max_daily_loss_bps,stop_drawdown_bps,live_execution_authorized,
+             policy_type,policy_value,consent_version,consented_at
+           ) VALUES($1,$2,$3,true,$4,$5,'SHADOW','ACTIVE',$6,$7,$8,$9,false,$10,$11,$12,$13) RETURNING *`,
+          [
+            policyId,userId,traderId,maxCopy,maxPosition,allocation,slippage,dailyLoss,stopDrawdown,
+            canonical.policy.type,canonical.policy.value,canonical.consent_version,canonical.consented_at
+          ]
         )).rows[0];
       },
       async updateForFollower(userId, policyId, input) {
