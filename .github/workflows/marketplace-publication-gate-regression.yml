@@ -1,0 +1,20 @@
+name: Marketplace Publication Gate Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/marketplace-publication-gate.mjs'
+      - 'services/api/src/marketplace-publication-gate.regression.mjs'
+      - '.github/workflows/marketplace-publication-gate-regression.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run marketplace publication gate regression
+        run: node services/api/src/marketplace-publication-gate.regression.mjs
