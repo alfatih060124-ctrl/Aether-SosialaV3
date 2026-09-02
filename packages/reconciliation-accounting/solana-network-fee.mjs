@@ -5,6 +5,10 @@ const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvw
 const HASH_RE = /^[a-f0-9]{64}$/;
 const LAMPORTS_PER_SOL = 1_000_000_000n;
 const REQUIRED_PRICE_CANDLE_SECONDS = 60;
+const SOLANA_FEE_SCHEMA_VERSION = 2;
+const RPC_METHOD = 'getTransaction';
+const RPC_COMMITMENT = 'confirmed';
+const MAX_SUPPORTED_TRANSACTION_VERSION = 0;
 
 function decodedBase58ByteLength(value) {
   let decoded = 0n;
@@ -54,19 +58,39 @@ function isoTime(value, name) {
   return { ms, iso: new Date(ms).toISOString() };
 }
 
+function normalizeRpcProvenance(provenance) {
+  if (!provenance || typeof provenance !== 'object' || Array.isArray(provenance)) {
+    throw new Error('invalid_solana_fee_provenance');
+  }
+  const rpcEndpointLabel = text(provenance.rpc_endpoint_label, 'rpc_endpoint_label', 1, 120);
+  if (provenance.rpc_method !== RPC_METHOD) throw new Error('invalid_solana_fee_rpc_method');
+  if (provenance.commitment !== RPC_COMMITMENT) throw new Error('invalid_solana_fee_rpc_commitment');
+  if (provenance.max_supported_transaction_version !== MAX_SUPPORTED_TRANSACTION_VERSION) {
+    throw new Error('invalid_solana_fee_transaction_version');
+  }
+  return {
+    rpc_endpoint_label: rpcEndpointLabel,
+    rpc_method: RPC_METHOD,
+    commitment: RPC_COMMITMENT,
+    max_supported_transaction_version: MAX_SUPPORTED_TRANSACTION_VERSION
+  };
+}
+
 function observationHashPayload(observation) {
   return {
-    schema_version: 1,
+    schema_version: SOLANA_FEE_SCHEMA_VERSION,
     source_type: 'SOLANA_TRANSACTION_FEE_LAMPORTS_V1',
     source_reference: observation.source_reference,
     source_slot: observation.source_slot,
     block_time_unix: observation.block_time_unix,
-    network_fee_lamports: observation.network_fee_lamports
+    network_fee_lamports: observation.network_fee_lamports,
+    provenance: observation.provenance
   };
 }
 
 export function verifySolanaNetworkFeeObservation(observation) {
   if (!observation || typeof observation !== 'object') throw new Error('invalid_solana_fee_observation');
+  if (observation.schema_version !== SOLANA_FEE_SCHEMA_VERSION) throw new Error('invalid_solana_fee_schema_version');
   if (observation.source_type !== 'SOLANA_TRANSACTION_FEE_LAMPORTS_V1') throw new Error('invalid_solana_fee_source_type');
   if (observation.status !== 'PENDING_SOL_USD_VALUATION') throw new Error('invalid_solana_fee_observation_state');
   const sourceReference = signature(observation.source_reference);
@@ -76,6 +100,7 @@ export function verifySolanaNetworkFeeObservation(observation) {
     : safeInt(observation.block_time_unix, 'solana_fee_block_time_unix');
   const networkFeeLamports = safeInt(observation.network_fee_lamports, 'network_fee_lamports');
   const observed = isoTime(observation.observed_at, 'solana_fee_observed_at');
+  const provenance = normalizeRpcProvenance(observation.provenance);
   if (observation.promoter_ready !== false || observation.reconciliation_ready !== false || observation.evidence_ready !== false) {
     throw new Error('solana_fee_boundary_violation');
   }
@@ -86,10 +111,11 @@ export function verifySolanaNetworkFeeObservation(observation) {
     source_reference: sourceReference,
     source_slot: sourceSlot,
     block_time_unix: blockTimeUnix,
-    network_fee_lamports: networkFeeLamports
+    network_fee_lamports: networkFeeLamports,
+    provenance
   }));
   if (hashText(observation.source_hash, 'solana_fee_source_hash') !== expectedHash) throw new Error('solana_fee_source_hash_mismatch');
-  return { sourceReference, sourceSlot, blockTimeUnix, networkFeeLamports, observedAt: observed.iso, observedMs: observed.ms, sourceHash: expectedHash };
+  return { sourceReference, sourceSlot, blockTimeUnix, networkFeeLamports, observedAt: observed.iso, observedMs: observed.ms, sourceHash: expectedHash, provenance };
 }
 
 export async function collectSolanaNetworkFeeObservation({
@@ -105,11 +131,17 @@ export async function collectSolanaNetworkFeeObservation({
   const normalizedExpectedSlot = expectedSlot === null || expectedSlot === undefined
     ? null
     : safeInt(expectedSlot, 'expected_solana_fee_slot');
+  const provenance = normalizeRpcProvenance({
+    rpc_endpoint_label: endpointLabel || 'solana-rpc',
+    rpc_method: RPC_METHOD,
+    commitment: RPC_COMMITMENT,
+    max_supported_transaction_version: MAX_SUPPORTED_TRANSACTION_VERSION
+  });
 
-  const transaction = await rpcCall('getTransaction', [sourceReference, {
+  const transaction = await rpcCall(RPC_METHOD, [sourceReference, {
     encoding: 'json',
-    commitment: 'confirmed',
-    maxSupportedTransactionVersion: 0
+    commitment: RPC_COMMITMENT,
+    maxSupportedTransactionVersion: MAX_SUPPORTED_TRANSACTION_VERSION
   }]);
   if (!transaction || typeof transaction !== 'object') throw new Error('solana_transaction_not_found');
   const sourceSlot = safeInt(transaction.slot, 'solana_fee_source_slot');
@@ -127,11 +159,12 @@ export async function collectSolanaNetworkFeeObservation({
     source_reference: sourceReference,
     source_slot: sourceSlot,
     block_time_unix: blockTimeUnix,
-    network_fee_lamports: networkFeeLamports
+    network_fee_lamports: networkFeeLamports,
+    provenance
   }));
 
   return {
-    schema_version: 1,
+    schema_version: SOLANA_FEE_SCHEMA_VERSION,
     source_type: 'SOLANA_TRANSACTION_FEE_LAMPORTS_V1',
     source_reference: sourceReference,
     source_hash: sourceHash,
@@ -146,12 +179,7 @@ export async function collectSolanaNetworkFeeObservation({
     verified: false,
     published: false,
     live_execution_authorized: false,
-    provenance: {
-      rpc_endpoint_label: text(endpointLabel || 'solana-rpc', 'rpc_endpoint_label', 1, 120),
-      rpc_method: 'getTransaction',
-      commitment: 'confirmed',
-      max_supported_transaction_version: 0
-    }
+    provenance
   };
 }
 
@@ -226,6 +254,7 @@ export function valueSolanaNetworkFeeObservation({ observation, solUsdSnapshot }
     live_execution_authorized: false,
     provenance: {
       solana_fee_source_hash: checked.sourceHash,
+      solana_rpc_provenance: checked.provenance,
       sol_usd_source_reference: priceReference,
       sol_usd_source_hash: priceHash,
       sol_usd_anchor_slot: anchorSlot,
