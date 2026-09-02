@@ -3,8 +3,9 @@ import { canonicalEvidenceSourceReference, pendingEvidenceBoundary } from '../pa
 
 console.log('SYNTHETIC / TEST-ONLY source reference regression');
 
-const rpc = { source_type: 'SOLANA_RPC', signature: 'synthetic_signature_test_only', slot: 123 };
-assert.equal(canonicalEvidenceSourceReference(rpc), 'solana_rpc:synthetic_signature_test_only@123');
+const validSignature = '1'.repeat(64);
+const rpc = { source_type: 'SOLANA_RPC', signature: validSignature, slot: 123 };
+assert.equal(canonicalEvidenceSourceReference(rpc), `solana_rpc:${validSignature}@123`);
 
 const pending = pendingEvidenceBoundary(rpc);
 assert.equal(pending.collection_status, 'PENDING_DATA');
@@ -29,7 +30,10 @@ for (const bad of [
   { source_type: 'UNKNOWN', signature: 'x', slot: 1 },
   { source_type: 'SOLANA_RPC', signature: '', slot: 1 },
   { source_type: 'SOLANA_RPC', signature: ' x ', slot: 1 },
-  { source_type: 'SOLSCAN', signature: 'x', slot: Number.MAX_SAFE_INTEGER + 1 },
+  { source_type: 'SOLANA_RPC', signature: 'not-a-signature', slot: 1 },
+  { source_type: 'SOLSCAN', signature: '1'.repeat(63), slot: 1 },
+  { source_type: 'SOLSCAN', signature: '0'.repeat(64), slot: 1 },
+  { source_type: 'SOLSCAN', signature: validSignature, slot: Number.MAX_SAFE_INTEGER + 1 },
   { source_type: 'INTERNAL_RECONCILIATION', reconciliation_id: '' },
 ]) {
   assert.throws(() => canonicalEvidenceSourceReference(bad));
