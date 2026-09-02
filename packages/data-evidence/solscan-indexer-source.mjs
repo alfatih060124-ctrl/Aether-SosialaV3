@@ -59,8 +59,8 @@ function canonicalTransactions(rows) {
   for (const row of rows) {
     if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error('invalid_solscan_transaction_row');
     const tx = {
-      tx_hash: solanaIdentifier(row.tx_hash, 64, 'invalid_solscan_tx_hash'),
-      slot: safeInt(row.slot, 'invalid_solscan_slot'),
+      tx_hash: solanaIdentifier(row.trans_id, 64, 'invalid_solscan_tx_hash'),
+      slot: safeInt(row.block_id, 'invalid_solscan_slot'),
       block_time: safeInt(row.block_time, 'invalid_solscan_block_time'),
       fee_lamports: safeInt(row.fee, 'invalid_solscan_fee_lamports'),
       status: normalizeStatus(row.status)
@@ -137,7 +137,7 @@ export async function collectSolscanIndexerEvidence({ walletAddress, pageCall, l
       collectionComplete = true;
       break;
     }
-    const nextBefore = solanaIdentifier(pageRows.at(-1)?.tx_hash, 64, 'invalid_solscan_tx_hash');
+    const nextBefore = solanaIdentifier(pageRows.at(-1)?.trans_id, 64, 'invalid_solscan_tx_hash');
     if (nextBefore === before) throw new Error('solscan_pagination_stalled');
     before = nextBefore;
   }
@@ -145,7 +145,7 @@ export async function collectSolscanIndexerEvidence({ walletAddress, pageCall, l
   const transactions = canonicalTransactions(rows);
   const provenancePayload = {
     schema_version: 1,
-    source_type: 'SOLSCAN_INDEXER',
+    source_type: 'SOLSCAN',
     provider: 'SOLSCAN_PRO_API',
     endpoint: '/v2.0/account/transactions',
     wallet_address: wallet,
@@ -166,7 +166,7 @@ export async function collectSolscanIndexerEvidence({ walletAddress, pageCall, l
   return {
     collection_status: 'PENDING_DATA',
     reason: transactions.length ? 'reconciled_trade_performance_required' : 'no_verifiable_chain_activity',
-    source_type: 'SOLSCAN_INDEXER',
+    source_type: 'SOLSCAN',
     source_reference: transactions[0]?.tx_hash || null,
     provenance,
     metrics_available: false,
