@@ -1,0 +1,25 @@
+name: Historical SOL USD Verifier Regression
+
+on:
+  pull_request:
+    paths:
+      - 'packages/reconciliation-accounting/geckoterminal-sol-usd.mjs'
+      - 'packages/reconciliation-accounting/geckoterminal-sol-usd-verifier.mjs'
+      - 'scripts/historical-sol-usd-verifier-regression.mjs'
+      - '.github/workflows/historical-sol-usd-verifier-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run historical SOL USD verifier regression
+        run: node scripts/historical-sol-usd-verifier-regression.mjs
