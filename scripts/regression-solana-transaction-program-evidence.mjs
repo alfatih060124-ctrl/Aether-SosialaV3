@@ -58,10 +58,26 @@ const tampered = structuredClone(found);
 tampered.provenance.program_ids = [];
 assert.equal(verifySolanaTransactionProgramEvidence(tampered), false);
 
+const publicProgramsTampered = structuredClone(found);
+publicProgramsTampered.program_ids = [];
+assert.equal(verifySolanaTransactionProgramEvidence(publicProgramsTampered), false);
+
+const reconciliationFlagTampered = structuredClone(found);
+reconciliationFlagTampered.reconciliation_required = false;
+assert.equal(verifySolanaTransactionProgramEvidence(reconciliationFlagTampered), false);
+
 const notFound = await collectSolanaTransactionProgramEvidence({ ...common, fetch_fn: response(null) });
 assert.equal(notFound.collection_status, 'PENDING_DATA');
 assert.equal(notFound.source_reference, null);
 assert.equal(verifySolanaTransactionProgramEvidence(notFound), true);
+
+const notFoundPublicProgramsTampered = structuredClone(notFound);
+notFoundPublicProgramsTampered.program_ids = [PROGRAM];
+assert.equal(verifySolanaTransactionProgramEvidence(notFoundPublicProgramsTampered), false);
+
+const notFoundReconciliationFlagTampered = structuredClone(notFound);
+notFoundReconciliationFlagTampered.reconciliation_required = true;
+assert.equal(verifySolanaTransactionProgramEvidence(notFoundReconciliationFlagTampered), false);
 
 await assert.rejects(
   collectSolanaTransactionProgramEvidence({
