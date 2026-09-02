@@ -14,19 +14,21 @@ if (publicMark !== webMark) throw new Error('brand_mark_public_web_mismatch');
 
 for (const [needle, label] of [
   ['AETHER official mark', 'mark'],
-  ['Metallic A monogram', 'mark'],
-  ['id="orbit"', 'mark'],
-  ['id="orb"', 'mark'],
+  ['White A monogram with red orbital swoosh', 'mark'],
+  ['id="swoosh"', 'mark'],
+  ['#ef1826', 'mark'],
 ]) requireText(publicMark, needle, label);
+rejectText(publicMark, 'electric-blue orbital ring', 'mark');
 
 const favicon = read('public/favicon.svg');
-requireText(favicon, 'id="orbit"', 'favicon');
-requireText(favicon, 'id="orb"', 'favicon');
+requireText(favicon, 'White A monogram with red orbital swoosh', 'favicon');
+requireText(favicon, 'id="swoosh"', 'favicon');
 
 const og = read('public/og-aether.svg');
 requireText(og, 'AETHER — Trade with proof.', 'og');
 requireText(og, 'TRADE WITH PROOF.', 'og');
 requireText(og, 'SHADOW MODE', 'og');
+requireText(og, 'id="red-swoosh"', 'og');
 rejectText(og, 'V3', 'og');
 
 const publicPages = [

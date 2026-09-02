@@ -1,21 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
 <title id="title">AETHER official mark</title>
-<desc id="desc">Metallic A monogram with electric-blue orbital ring and orb.</desc>
+<desc id="desc">White A monogram with red orbital swoosh on black.</desc>
 <defs>
-  <linearGradient id="bg" x1="8" y1="8" x2="88" y2="88" gradientUnits="userSpaceOnUse"><stop stop-color="#05080f"/><stop offset=".55" stop-color="#081323"/><stop offset="1" stop-color="#03060b"/></linearGradient>
-  <linearGradient id="silver" x1="24" y1="20" x2="48" y2="76" gradientUnits="userSpaceOnUse"><stop stop-color="#ffffff"/><stop offset=".28" stop-color="#cdd5e2"/><stop offset=".62" stop-color="#68778d"/><stop offset="1" stop-color="#dce5f2"/></linearGradient>
-  <linearGradient id="blue" x1="45" y1="18" x2="72" y2="76" gradientUnits="userSpaceOnUse"><stop stop-color="#8ee7ff"/><stop offset=".28" stop-color="#2f9cff"/><stop offset=".68" stop-color="#2563eb"/><stop offset="1" stop-color="#173b8f"/></linearGradient>
-  <linearGradient id="orbit" x1="12" y1="70" x2="84" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#4f46e5"/><stop offset=".48" stop-color="#35c8ff"/><stop offset="1" stop-color="#87ecff"/></linearGradient>
-  <radialGradient id="orb" cx="35%" cy="30%" r="70%"><stop stop-color="#d9f8ff"/><stop offset=".25" stop-color="#63d8ff"/><stop offset=".72" stop-color="#2878ff"/><stop offset="1" stop-color="#153583"/></radialGradient>
-  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <linearGradient id="redOrbit" x1="44" y1="360" x2="486" y2="176" gradientUnits="userSpaceOnUse"><stop stop-color="#8f0008"/><stop offset=".18" stop-color="#ef1826"/><stop offset=".52" stop-color="#b90010"/><stop offset=".72" stop-color="#fff4f4"/><stop offset=".82" stop-color="#ff5160"/><stop offset="1" stop-color="#b70012"/></linearGradient>
+  <linearGradient id="backOrbit" x1="405" y1="108" x2="492" y2="275" gradientUnits="userSpaceOnUse"><stop stop-color="#6f7782" stop-opacity="0"/><stop offset=".42" stop-color="#d6d9de"/><stop offset=".68" stop-color="#fff"/><stop offset="1" stop-color="#ed4452"/></linearGradient>
+  <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
-<rect width="96" height="96" rx="22" fill="url(#bg)"/>
-<circle cx="48" cy="47" r="31" fill="none" stroke="#2e5d9f" stroke-opacity=".25" stroke-width="1.4"/>
-<path d="M22 71 42.8 22.5c1.1-2.5 2.8-3.8 5.2-3.8h3.1L72.8 71H59.2l-5-12.6H39.8L34.6 71H22Zm22.1-24h6.2L47.2 39l-3.1 8Z" fill="url(#silver)"/>
-<path d="M49.2 18.7h4.5L76 71H61.2L55 55.3H41.1l5.4-12.7h3.9l-3.1-8.3 1.9-15.6Z" fill="url(#blue)" opacity=".96"/>
-<path d="M14.5 58.8c10.4 7.7 28.7 8.7 45.4 1.8 13.3-5.5 21.9-14.3 24.6-22.7" fill="none" stroke="#112a54" stroke-width="5.8" stroke-linecap="round" opacity=".7"/>
-<path d="M14.5 57.2c10.4 7.8 28.6 8.6 45 1.8 13-5.4 21.6-14.1 24.3-22.4" fill="none" stroke="url(#orbit)" stroke-width="2.4" stroke-linecap="round" filter="url(#glow)"/>
-<path d="M17.8 39.5c6.9-14.8 22.8-24 40.3-22.2 8.6.9 16 4.1 21.6 9" fill="none" stroke="#9bdfff" stroke-opacity=".22" stroke-width="1.2" stroke-linecap="round"/>
-<circle cx="81.7" cy="29.2" r="5.1" fill="url(#orb)" filter="url(#glow)"/>
-<circle cx="80.1" cy="27.6" r="1.3" fill="#ffffff" opacity=".9"/>
+<rect width="512" height="512" fill="#000"/>
+<path d="M182.74 321.11H303.18L242.99 165.16 182.74 321.11ZM90 440V416.73H118.83L235.68 111.94H272.59L389.73 416.73H422V440H302.76V416.73H339.18L311.76 344.66H173.74L146.32 416.73H182.32V440H90Z" fill="#fff"/>
+<path id="orbit-back" d="M393 111C456 126 492 177 489 230C487 255 478 279 463 301" fill="none" stroke="url(#backOrbit)" stroke-width="3.2" stroke-linecap="round"/>
+<path d="M42 353C125 446 286 463 433 323" fill="none" stroke="#210004" stroke-opacity=".85" stroke-width="26" stroke-linecap="round" transform="translate(0 9)"/>
+<path id="swoosh" d="M42 347C127 437 285 451 434 314C461 289 482 261 496 232" fill="none" stroke="url(#redOrbit)" stroke-width="14" stroke-linecap="round" filter="url(#softGlow)"/>
+<path d="M214 431C300 418 374 377 437 312" fill="none" stroke="#fff" stroke-opacity=".30" stroke-width="4" stroke-linecap="round"/>
 </svg>
