@@ -135,6 +135,7 @@ export async function collectSolanaSignatureStatusEvidence({
     minimum_confirmation_status: minimumStatus,
     request_started_at: requestStartedAt,
     observed_at: observedAt,
+    requested_signature: requestedSignature,
     request_signature_hash: hash({ signature: requestedSignature }),
     context_slot: contextSlot
   };
@@ -201,7 +202,8 @@ export function verifySolanaSignatureStatusEvidence(result) {
     canonicalTimestamp(provenance.observed_at, 'observed_at');
     if (Date.parse(provenance.observed_at) < Date.parse(provenance.request_started_at)) return false;
     safeInteger(provenance.context_slot, 'rpc_context_slot');
-    if (!/^[0-9a-f]{64}$/.test(provenance.request_signature_hash || '')) return false;
+    const requestedSignature = canonicalSignature(provenance.requested_signature);
+    if (provenance.request_signature_hash !== hash({ signature: requestedSignature })) return false;
 
     if (provenance.status_found === false) {
       return result.source_reference === null && result.reason === 'signature_status_not_found';
@@ -210,6 +212,7 @@ export function verifySolanaSignatureStatusEvidence(result) {
     const parsed = /^solana_rpc:([^@]+)@(\d+)$/.exec(result.source_reference || '');
     if (!parsed) return false;
     const signature = canonicalSignature(parsed[1]);
+    if (signature !== requestedSignature) return false;
     const slot = safeInteger(provenance.status?.slot, 'rpc_status_slot');
     if (String(slot) !== parsed[2] || slot > provenance.context_slot) return false;
     safeInteger(provenance.status?.confirmations, 'rpc_confirmations', { nullable: true });
