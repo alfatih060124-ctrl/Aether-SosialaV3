@@ -13,7 +13,7 @@ api.aether.boats {
 
   @public_read {
     method GET
-    path /api/health /api/readiness /api/version /api/execution/status /api/signals/config /api/autotrade/status /api/trades /api/traders /api/traders/* /api/marketplace/fees /api/auth/session /api/account/wallet-portfolio /api/account/trader /api/account/copy-mandates /api/account/copy-trades
+    path /api/health /api/readiness /api/version /api/execution/status /api/signals/config /api/autotrade/status /api/trades /api/traders /api/traders/* /api/marketplace/fees /api/auth/session /api/account/wallet-portfolio /api/account/trader /api/account/copy-mandates /api/account/copy-trades /api/account/positions
   }
 
   handle @public_read {
