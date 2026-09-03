@@ -10,6 +10,6 @@ assert.doesNotMatch(repo, /live_execution_authorized\s*=\s*true/, 'Admin reposit
 
 assert.match(admin, /item\.status==='CANCELLED'[\s\S]*Terminal — cannot resume/, 'Admin UI must visibly mark cancelled mandates as terminal');
 assert.match(admin, /LIVE authorized=false/, 'Admin UI must expose fail-closed LIVE authorization state');
-assert.match(admin, /Mandate CANCELLED bersifat terminal/, 'Admin UI must explain terminal cancellation behavior');
+assert.match(admin, /CANCELLED mandates are terminal and cannot be reactivated\./, 'Admin UI must explain terminal cancellation behavior');
 
 console.log('Admin safety regression: PASS');
