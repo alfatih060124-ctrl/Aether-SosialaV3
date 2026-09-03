@@ -1,0 +1,23 @@
+name: Auto Trade Runtime Risk Source Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/autotrade-runtime-risk-source.mjs'
+      - 'scripts/autotrade-runtime-risk-source-regression.mjs'
+      - '.github/workflows/autotrade-runtime-risk-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/autotrade-runtime-risk-source-regression.mjs
