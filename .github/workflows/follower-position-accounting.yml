@@ -1,0 +1,25 @@
+name: Follower Position Accounting Regression
+
+on:
+  push:
+    branches: [main, integration/shadow-position-accounting-foundation]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check position accounting
+        run: |
+          node --check services/api/src/follower-position-accounting.mjs
+          node --check services/api/src/trusted-autotrade-runtime-risk.mjs
+          node --check scripts/follower-position-accounting-regression.mjs
+      - name: Run follower position accounting regression
+        run: node scripts/follower-position-accounting-regression.mjs
