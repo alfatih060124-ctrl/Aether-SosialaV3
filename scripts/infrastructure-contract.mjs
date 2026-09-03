@@ -171,7 +171,7 @@ requireText('account', account, '/api/account/copy-mandates');
 requireText('account', account, 'Create SHADOW Copy Mandate');
 requireText('account', account, 'provider.signMessage');
 requireText('account', account, 'Purpose: BECOME_TRADER');
-requireText('account', account, 'LIVE EXECUTION LOCKED');
+requireText('account', account, 'SHADOW MODE — LIVE execution is off.');
 forbidText('account', account, 'Become a Trader — next integration');
 forbidText('account', account, 'localStorage.setItem');
 forbidText('account', account, 'localStorage.getItem');
