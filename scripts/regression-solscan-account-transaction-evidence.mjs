@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { collectSolscanAccountTransactionEvidence, verifySolscanAccountTransactionEvidence } from '../services/api/src/solscan-account-transaction-evidence.mjs';
 
 // SYNTHETIC / TEST-ONLY fixtures. No production signature, tx hash, metric, or source reference is asserted here.
-const WALLET='1'.repeat(32), SIG1='1'.repeat(64), SIG2='1'.repeat(63)+'2', PROGRAM='2'.repeat(32);
+const WALLET='1'.repeat(32), OTHER_WALLET='1'.repeat(31)+'3', SIG1='1'.repeat(64), SIG2='1'.repeat(63)+'2', PROGRAM='1'.repeat(31)+'2';
 const requestedAt='2026-09-03T15:00:00.000Z', observedAt='2026-09-03T15:00:10.000Z';
 function rows(){return[{slot:700,fee:5000,status:'Success',signer:[WALLET],block_time:1788447600,tx_hash:SIG1,program_ids:[PROGRAM]},{slot:699,fee:7000,status:'Fail',signer:[WALLET],block_time:1788447599,tx_hash:SIG2,program_ids:[]}];}
 function queryWith(data){return async req=>{assert.deepEqual(req,{path:'/v2.0/account/transactions',address:WALLET,limit:20,before:null});return{success:true,data:structuredClone(data)};};}
@@ -13,7 +13,7 @@ const good=await collect(rows());assert.equal(good.collection_status,'PENDING_DA
 const empty=await collect([]);assert.equal(empty.evidence_count,0);assert.deepEqual(empty.rows,[]);assert.equal(verifySolscanAccountTransactionEvidence(empty),true);
 const duplicate=rows();duplicate[1].tx_hash=SIG1;await rejects(duplicate,'duplicate_tx_hash');
 const ascending=rows();ascending[1].slot=701;await rejects(ascending,'rows_not_descending');
-const foreign=rows();foreign[0].signer=['3'.repeat(32)];await rejects(foreign,'wallet_not_signer');
+const foreign=rows();foreign[0].signer=[OTHER_WALLET];await rejects(foreign,'wallet_not_signer');
 const future=rows();future[0].block_time=1788459999;await rejects(future,'future_block_time');
 const badStatus=rows();badStatus[0].status='Unknown';await rejects(badStatus,'invalid_transaction_status');
 const unsafeFee=rows();unsafeFee[0].fee=Number.MAX_SAFE_INTEGER+1;await rejects(unsafeFee,'invalid_fee_0');
