@@ -6,7 +6,7 @@ const SIG='1'.repeat(64);
 const WALLET='1'.repeat(32);
 const START='2026-09-03T10:00:00.000Z';
 const OBS='2026-09-03T10:00:10.000Z';
-const rpcResult=(rewards)=>({jsonrpc:'2.0',result:{slot:123,blockTime:1788439200,transaction:{signatures:[SIG],message:{accountKeys:[{pubkey:WALLET}]}},meta:{err:null,rewards}}});
+const rpcResult=(rewards)=>({jsonrpc:'2.0',result:{slot:123,blockTime:1788429599,transaction:{signatures:[SIG],message:{accountKeys:[{pubkey:WALLET}]}},meta:{err:null,rewards}}});
 const collect=(response)=>collectSolanaTransactionRewardEvidence({rpcRequest:async(method,params)=>{assert.equal(method,'getTransaction');assert.equal(params[0],SIG);return response},signature:SIG,traderWallet:WALLET,rpcEndpointLabel:'synthetic-rpc',requestStartedAt:START,observedAt:OBS});
 async function rejects(fn,pattern){await assert.rejects(fn,pattern)}
 
