@@ -62,8 +62,9 @@ async function withTransaction(pool, fn) {
   }
 }
 
-async function setActor(client, actorId) {
-  await client.query(`SELECT set_config('aether.actor',$1,true)`, [actorId]);
+async function setActor(client, actor) {
+  await client.query(`SELECT set_config('aether.actor',$1,true)`, [actor.actor_id]);
+  await client.query(`SELECT set_config('aether.actor_role',$1,true)`, [actor.role]);
 }
 
 export function createFeeControlApprovalRepository(pool) {
@@ -73,7 +74,7 @@ export function createFeeControlApprovalRepository(pool) {
       if (!Number.isSafeInteger(config_id) || config_id <= 0) throw new Error('invalid_fee_config_id');
 
       return withTransaction(pool, async client => {
-        await setActor(client, actor.actor_id);
+        await setActor(client, actor);
         const currentResult = await client.query(
           `SELECT config_id,performance_fee_bps,execution_fee_bps FROM platform_fee_config WHERE config_id=$1 FOR UPDATE`,
           [config_id],
@@ -110,7 +111,7 @@ export function createFeeControlApprovalRepository(pool) {
       const actor = canonicalActor(approver, 'FEE_CONFIG_APPROVER');
 
       return withTransaction(pool, async client => {
-        await setActor(client, actor.actor_id);
+        await setActor(client, actor);
         const selected = await client.query(`SELECT * FROM fee_control_changes WHERE change_id=$1 FOR UPDATE`, [changeId]);
         const row = selected.rows[0];
         const approved = approveFeeConfigChange(changeFromRow(row), actor);
@@ -131,7 +132,7 @@ export function createFeeControlApprovalRepository(pool) {
       const actor = canonicalActor(applier, 'FEE_CONFIG_APPLIER');
 
       return withTransaction(pool, async client => {
-        await setActor(client, actor.actor_id);
+        await setActor(client, actor);
         const selected = await client.query(`SELECT * FROM fee_control_changes WHERE change_id=$1 FOR UPDATE`, [changeId]);
         const row = selected.rows[0];
         const result = applyApprovedFeeConfig(changeFromRow(row), actor);
