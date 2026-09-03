@@ -29,6 +29,7 @@ const SESSION_GET_ROUTES = new Set([
   '/api/account/wallet-portfolio',
   '/api/account/trader',
   '/api/account/copy-mandates',
+  '/api/account/copy-trades',
 ]);
 
 const SESSION_POST_ROUTES = new Set([
