@@ -1,0 +1,23 @@
+name: SHADOW Lifecycle Persistence Guard Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/repositories/execution-requests.mjs'
+      - 'scripts/shadow-lifecycle-persistence-guard-regression.mjs'
+      - '.github/workflows/shadow-lifecycle-persistence-guard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run SHADOW lifecycle persistence guard regression
+        run: node scripts/shadow-lifecycle-persistence-guard-regression.mjs

@@ -17,6 +17,7 @@ const CANONICAL_TRANSITIONS = Object.freeze({
   FAILED: new Set()
 });
 const EXECUTION_MODES = new Set(['SHADOW', 'PAPER', 'LIVE']);
+const SHADOW_FORBIDDEN_PERSISTED_STATES = new Set(['AUTHORIZED', 'DISPATCHED', 'CONFIRMED', 'RECONCILED']);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const assertUUID = (value, field) => {
@@ -27,6 +28,12 @@ const assertUUID = (value, field) => {
 
 const assertCanonicalState = (state) => {
   if (!CANONICAL_EXECUTION_STATE_SET.has(state)) throw new Error('invalid_canonical_execution_state');
+};
+
+const assertShadowStateAllowed = (mode, state) => {
+  if (mode === 'SHADOW' && SHADOW_FORBIDDEN_PERSISTED_STATES.has(state)) {
+    throw new Error('shadow_execution_state_not_authorized');
+  }
 };
 
 export function createExecutionRequestRepository(pool) {
@@ -49,6 +56,7 @@ export function createExecutionRequestRepository(pool) {
 
       const status = request.status ?? 'PENDING';
       if (!EXECUTION_STATUSES.has(status)) throw new Error('invalid_execution_status');
+      assertShadowStateAllowed(mode, status);
 
       const q = `
         INSERT INTO execution_requests
@@ -79,10 +87,23 @@ export function createExecutionRequestRepository(pool) {
     async updateStatus(id, status) {
       assertUUID(id, 'execution_request_id');
       if (!EXECUTION_STATUSES.has(status)) throw new Error('invalid_execution_status');
-      return (await pool.query(
-        'UPDATE execution_requests SET status=$2,updated_at=now() WHERE execution_request_id=$1 RETURNING *',
+      const result = await pool.query(
+        `UPDATE execution_requests
+            SET status=$2,updated_at=now()
+          WHERE execution_request_id=$1
+            AND NOT (mode='SHADOW' AND $2 IN ('AUTHORIZED','DISPATCHED','CONFIRMED','RECONCILED'))
+          RETURNING *`,
         [id, status]
-      )).rows[0] ?? null;
+      );
+      if (result.rows[0]) return result.rows[0];
+
+      const current = await pool.query(
+        'SELECT status,mode FROM execution_requests WHERE execution_request_id=$1',
+        [id]
+      );
+      if (!current.rows[0]) return null;
+      assertShadowStateAllowed(current.rows[0].mode, status);
+      return null;
     },
     async transitionCanonicalState(id, expectedState, nextState) {
       assertUUID(id, 'execution_request_id');
@@ -94,16 +115,18 @@ export function createExecutionRequestRepository(pool) {
         `UPDATE execution_requests
             SET status=$3,updated_at=now()
           WHERE execution_request_id=$1 AND status=$2
+            AND NOT (mode='SHADOW' AND $3 IN ('AUTHORIZED','DISPATCHED','CONFIRMED','RECONCILED'))
           RETURNING *`,
         [id, expectedState, nextState]
       );
       if (result.rows[0]) return result.rows[0];
 
       const current = await pool.query(
-        'SELECT status FROM execution_requests WHERE execution_request_id=$1',
+        'SELECT status,mode FROM execution_requests WHERE execution_request_id=$1',
         [id]
       );
       if (!current.rows[0]) throw new Error('execution_request_not_found');
+      assertShadowStateAllowed(current.rows[0].mode, nextState);
       throw new Error('execution_state_conflict');
     }
   };
