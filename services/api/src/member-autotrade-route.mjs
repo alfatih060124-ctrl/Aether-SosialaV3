@@ -1,5 +1,6 @@
 import { persistAuthenticatedAutoTradeDecisionAtomically } from './autotrade-atomic-persistence.mjs';
 import { createTrustedAutoTradeRuntimeRiskResolver } from './trusted-autotrade-runtime-risk.mjs';
+import { handleMemberPositionsRoute } from './member-positions-route.mjs';
 
 const MEMBER_ROUTE = '/api/account/autotrade/evaluate';
 const LEGACY_ROUTE = '/api/autotrade/evaluate';
@@ -37,6 +38,8 @@ export async function handleMemberAutoTradeRoute({
   persistDecision = persistAuthenticatedAutoTradeDecisionAtomically,
   createRiskResolver = createTrustedAutoTradeRuntimeRiskResolver
 }) {
+  if (await handleMemberPositionsRoute({ req, res, route, pool, walletAuth, sessionFor, send })) return true;
+
   if (route === LEGACY_ROUTE) {
     if (req.method !== 'POST') return false;
     send(res, 410, {
