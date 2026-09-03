@@ -1,0 +1,29 @@
+name: Fee Control DB Applier Role Regression
+
+on:
+  push:
+    branches:
+      - 'security/fee-control-db-applier-role-guard'
+    paths:
+      - 'migrations/020_fee_control_approval_ledger.sql'
+      - 'scripts/fee-control-db-applier-role-regression.mjs'
+      - '.github/workflows/fee-control-db-applier-role-regression.yml'
+  pull_request:
+    paths:
+      - 'migrations/020_fee_control_approval_ledger.sql'
+      - 'scripts/fee-control-db-applier-role-regression.mjs'
+      - '.github/workflows/fee-control-db-applier-role-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require database-side fee applier role guard
+        run: node scripts/fee-control-db-applier-role-regression.mjs
