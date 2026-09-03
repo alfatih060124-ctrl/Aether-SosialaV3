@@ -206,6 +206,10 @@ const selfCopy = await request('/api/account/copy-mandates', {
     max_slippage_bps: 100,
     max_daily_loss_bps: 300,
     stop_drawdown_bps: 1500,
+    policy_type: 'FIXED_USD',
+    policy_value: 10,
+    consent_version: 'aether.copy_mandate.consent.v1',
+    consent_accepted: true,
   }),
 });
 assert(selfCopy.response.status === 403, `self-copy should be 403, got ${selfCopy.response.status}`);
@@ -222,6 +226,10 @@ const mandateCreate = await request('/api/account/copy-mandates', {
     max_slippage_bps: 100,
     max_daily_loss_bps: 300,
     stop_drawdown_bps: 1500,
+    policy_type: 'FIXED_USD',
+    policy_value: 25,
+    consent_version: 'aether.copy_mandate.consent.v1',
+    consent_accepted: true,
   }),
 });
 assert(mandateCreate.response.status === 201, `copy mandate creation failed: ${mandateCreate.response.status}`);
