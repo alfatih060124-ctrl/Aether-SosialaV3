@@ -28,7 +28,7 @@ const walletAuth = pool ? createWalletAuthService(pool) : null;
 const automaticEvidence = pool ? createAutomaticEvidenceService(pool,{rpcUrl:process.env.SOLANA_RPC_URL,endpointLabel:process.env.SOLANA_RPC_ENDPOINT_LABEL||'solana-rpc'}) : null;
 const reconciledPerformance = pool ? createReconciledPerformanceService(pool) : null;
 const walletPortfolio = createWalletPortfolioService({rpcUrl:process.env.SOLANA_RPC_URL});
-const VERSION = '2026.09.03-wallet-portfolio-shadow';
+const VERSION = '2026.09.03-follower-activity-shadow';
 const send=(res,status,body,type='application/json; charset=utf-8')=>{res.writeHead(status,{'content-type':type,'cache-control':'no-store'});res.end(type.startsWith('text/')?body:JSON.stringify(body));};
 const auth=req=>Boolean(process.env.API_TOKEN)&&req.headers.authorization===`Bearer ${process.env.API_TOKEN}`;
 const adminAuth=req=>Boolean(process.env.ADMIN_API_TOKEN)&&req.headers.authorization===`Bearer ${process.env.ADMIN_API_TOKEN}`;
@@ -87,6 +87,16 @@ const server=http.createServer(async(req,res)=>{try{
    if(!repos||!walletAuth)return send(res,503,{error:'database_unconfigured'});
    const session=await sessionFor(req);if(!session)return send(res,401,{error:'session_required'});
    return send(res,200,{items:await repos.copyPolicies.listForFollower(session.user_id),mode:'SHADOW',live_execution_authorized:false});
+ }
+ if(req.method==='GET'&&route==='/api/account/copy-trades'){
+   if(!repos||!walletAuth)return send(res,503,{error:'database_unconfigured'});
+   const session=await sessionFor(req);if(!session)return send(res,401,{error:'session_required'});
+   const items=await repos.executionRequests.listForFollower(session.user_id,requestUrl(req).searchParams.get('limit'));
+   const inFlight=items.filter(item=>['PENDING','QUEUED'].includes(item.status)).length;
+   const simulated=items.filter(item=>item.status==='SIMULATED').length;
+   const completed=items.filter(item=>item.status==='EXECUTED').length;
+   const failed=items.filter(item=>['REJECTED','FAILED'].includes(item.status)).length;
+   return send(res,200,{items,summary:{in_flight:inFlight,simulated,completed,failed},open_positions:[],position_accounting_ready:false,mode:'SHADOW',live_execution_authorized:false});
  }
  if(req.method==='POST'&&route==='/api/account/copy-mandates'){
    if(!repos||!walletAuth)return send(res,503,{error:'database_unconfigured'});
