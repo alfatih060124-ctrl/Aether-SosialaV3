@@ -1,0 +1,19 @@
+name: Auto Trade Runtime Risk Writer Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/autotrade-runtime-risk-writer.mjs'
+      - 'scripts/autotrade-runtime-risk-writer-regression.mjs'
+      - '.github/workflows/autotrade-runtime-risk-writer.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/autotrade-runtime-risk-writer-regression.mjs
