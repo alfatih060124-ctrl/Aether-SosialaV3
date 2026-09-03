@@ -61,4 +61,16 @@ assert.equal(signer.passed, false);
 assert.ok(signer.reason_codes.includes('SIGNER_FORBIDDEN'));
 assert.equal(signer.execution_dispatched, false);
 
-console.log(JSON.stringify({ ok: true, tests: 7, schema: EXECUTION_RISK_RECHECK_CONTRACT.schema, hard_min_expected_net_edge_bps: 10, posture: 'SHADOW_FAIL_CLOSED' }));
+const malformedMandate = evaluateExecutionRiskRecheck({
+  intent: { ...intent, mandate_id: 'not-a-uuid' },
+  risk: baseRisk,
+  now
+});
+assert.equal(malformedMandate.passed, false);
+assert.ok(malformedMandate.reason_codes.includes('MANDATE_ID_INVALID'));
+assert.equal(malformedMandate.execution_dispatched, false);
+assert.equal(malformedMandate.network_submission_authorized, false);
+assert.equal(malformedMandate.live_execution_authorized, false);
+assert.equal(malformedMandate.signer_required, false);
+
+console.log(JSON.stringify({ ok: true, tests: 8, schema: EXECUTION_RISK_RECHECK_CONTRACT.schema, hard_min_expected_net_edge_bps: 10, posture: 'SHADOW_FAIL_CLOSED' }));
