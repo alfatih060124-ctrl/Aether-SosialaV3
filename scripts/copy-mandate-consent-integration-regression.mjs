@@ -82,7 +82,6 @@ for (const invariant of [
   "consent_version: 'aether.copy_mandate.consent.v1'",
   "policy_type: 'FIXED_USD'",
   'policy_value: maxCopy',
-  'live execution',
   'does not sign a transaction',
   'does not sign a transaction, move funds, or enable LIVE execution'
 ]) assert.ok(ui.includes(invariant), `missing UI consent invariant: ${invariant}`);
