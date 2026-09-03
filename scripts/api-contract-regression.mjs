@@ -5,6 +5,7 @@ import { API_CONTRACT } from '../services/api/src/api-contract.mjs';
 const server = await fs.readFile(new URL('../services/api/src/server.mjs', import.meta.url), 'utf8');
 const edge = await fs.readFile(new URL('../api/index.mjs', import.meta.url), 'utf8');
 const walletPortfolio = await fs.readFile(new URL('../services/api/src/wallet-portfolio.mjs', import.meta.url), 'utf8');
+const executionRequests = await fs.readFile(new URL('../services/api/src/repositories/execution-requests.mjs', import.meta.url), 'utf8');
 const reconciledService = await fs.readFile(new URL('../services/api/src/reconciled-performance-service.mjs', import.meta.url), 'utf8');
 const reconciliationRuntime = await fs.readFile(new URL('../services/api/src/reconciliation-runtime-service.mjs', import.meta.url), 'utf8');
 
@@ -17,6 +18,7 @@ for (const required of [
   'GET /api/execution/status',
   'POST /api/auth/verify',
   'GET /api/account/wallet-portfolio',
+  'GET /api/account/copy-trades',
   'POST /api/account/trader/apply',
   'POST /api/autotrade/evaluate',
   'POST /api/executions',
@@ -50,6 +52,9 @@ assert.equal(API_CONTRACT.invariants.market_token_lookup_is_read_only, true);
 assert.equal(API_CONTRACT.invariants.wallet_portfolio_is_session_bound, true);
 assert.equal(API_CONTRACT.invariants.wallet_portfolio_is_read_only, true);
 assert.equal(API_CONTRACT.invariants.wallet_portfolio_never_authorizes_live, true);
+assert.equal(API_CONTRACT.invariants.copy_trade_activity_is_session_bound, true);
+assert.equal(API_CONTRACT.invariants.copy_trade_activity_never_authorizes_live, true);
+assert.equal(API_CONTRACT.invariants.copy_trade_open_positions_not_inferred_from_execution_requests, true);
 assert.equal(API_CONTRACT.invariants.evidence_collection_does_not_verify, true);
 assert.equal(API_CONTRACT.invariants.evidence_recording_does_not_verify, true);
 assert.equal(API_CONTRACT.invariants.reconciled_performance_evidence_does_not_verify, true);
@@ -70,6 +75,7 @@ for (const literal of [
   "route==='/api/account/wallet-portfolio'",
   "route==='/api/account/trader'",
   "route==='/api/account/copy-mandates'",
+  "route==='/api/account/copy-trades'",
   "route==='/api/autotrade/evaluate'",
   "route==='/api/shadow/simulate'",
   "route==='/api/executions'",
@@ -91,6 +97,7 @@ for (const segment of [
 
 assert.ok(edge.includes("path === '/api/market/token'"));
 assert.ok(edge.includes("'/api/account/wallet-portfolio'"));
+assert.ok(edge.includes("'/api/account/copy-trades'"));
 assert.ok(edge.includes("read_only: true"));
 assert.ok(edge.includes("live_execution_authorized: false"));
 assert.ok(edge.includes("error: 'public_gateway_route_blocked'"));
@@ -98,6 +105,8 @@ assert.ok(server.includes("execution_dispatched:false"));
 assert.ok(server.includes("verification_authorized:false"));
 assert.ok(server.includes("publication_authorized:false"));
 assert.ok(server.includes("live_execution_authorized:false"));
+assert.ok(server.includes("open_positions:[]"));
+assert.ok(server.includes("position_accounting_ready:false"));
 assert.ok(
   server.includes("route==='/api/shadow/simulate'){if(!auth(req))return send(res,401,{error:'unauthorized'});"),
   'direct PRIMARY_VM shadow simulation must require API_TOKEN before any simulation work'
@@ -111,6 +120,9 @@ assert.ok(walletPortfolio.includes('transaction_created: false'));
 assert.ok(walletPortfolio.includes('funds_moved: false'));
 assert.ok(walletPortfolio.includes('live_execution_authorized: false'));
 assert.ok(walletPortfolio.includes("available_for_copy_usdc: null"));
+assert.ok(executionRequests.includes('async listForFollower(userId, limit = 100)'));
+assert.ok(executionRequests.includes('WHERE er.follower_user_id=$1'));
+assert.ok(executionRequests.includes('LEFT JOIN trade_events te ON te.event_id=er.event_id'));
 
 assert.ok(reconciledService.includes('createReconciliationRuntimeService'));
 assert.ok(reconciledService.includes('reconciliation_manual_metrics_blocked'));
