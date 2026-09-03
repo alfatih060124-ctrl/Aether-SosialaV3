@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { evaluateMarketplacePublicationGate } from '../marketplace-publication-gate.mjs';
 
 const publicTraderFields = `trader_id,wallet_address,display_name,bio,strategy_summary,reputation_score,drawdown_bps,status,verified,mode,total_return_bps,win_rate_bps,trades_count,followers_count,performance_fee_bps,execution_fee_bps,ownership_verified_at,verification_source,verification_reference,verification_observed_at,verified_at,created_at,updated_at`;
 const accountTraderFields = `trader_id,wallet_address,display_name,bio,strategy_summary,reputation_score,drawdown_bps,status,verified,mode,total_return_bps,win_rate_bps,trades_count,followers_count,performance_fee_bps,execution_fee_bps,owner_user_id,ownership_verified_at,onboarding_status,verification_status,published,applied_at,reviewed_at,review_note,verification_source,verification_reference,verification_observed_at,verification_note,verified_at,created_at,updated_at`;
@@ -19,25 +20,55 @@ function boundedNumber(value, name, min, max) {
   if (!Number.isFinite(n) || n < min || n > max) throw new Error(`invalid_${name}`);
   return n;
 }
+function publicationGateInput(trader, publicationStatus) {
+  return {
+    trader_id: trader.trader_id,
+    mode: trader.mode,
+    live_execution_authorized: false,
+    network_submission_authorized: false,
+    signer_required: false,
+    evidence_recorded: trader.evidence_recorded === true,
+    verification_status: trader.verification_status ?? (trader.verified === true ? 'VERIFIED' : 'PENDING_DATA'),
+    publication_status: publicationStatus ?? (trader.published === true ? 'PUBLISHED' : 'UNPUBLISHED')
+  };
+}
+function stripGateFields(row) {
+  if (!row) return row;
+  const { evidence_recorded, verification_status, published, ...publicRow } = row;
+  return publicRow;
+}
 
 export function createMarketplaceRepository(pool) {
   return {
     async listTraders(limit = 50) {
       const n = Math.min(Math.max(Number(limit) || 50, 1), 200);
-      return (await pool.query(
-        `SELECT ${publicTraderFields} FROM traders
+      const rows = (await pool.query(
+        `SELECT ${publicTraderFields},verification_status,published,
+                EXISTS(SELECT 1 FROM trader_verification_evidence tve WHERE tve.trader_id=traders.trader_id AND tve.evidence_status='VERIFIED') AS evidence_recorded
+         FROM traders
          WHERE status='ACTIVE' AND verified=true AND onboarding_status='APPROVED' AND verification_status='VERIFIED' AND published=true
          ORDER BY reputation_score DESC, created_at DESC LIMIT $1`,
         [n]
       )).rows;
+      const visible = [];
+      for (const row of rows) {
+        const gate = evaluateMarketplacePublicationGate(publicationGateInput(row));
+        if (gate.allowed && gate.marketplace_visible) visible.push(stripGateFields(row));
+      }
+      return visible;
     },
 
     async getTrader(id) {
-      return (await pool.query(
-        `SELECT ${publicTraderFields} FROM traders
+      const row = (await pool.query(
+        `SELECT ${publicTraderFields},verification_status,published,
+                EXISTS(SELECT 1 FROM trader_verification_evidence tve WHERE tve.trader_id=traders.trader_id AND tve.evidence_status='VERIFIED') AS evidence_recorded
+         FROM traders
          WHERE trader_id=$1 AND status='ACTIVE' AND verified=true AND onboarding_status='APPROVED' AND verification_status='VERIFIED' AND published=true`,
         [id]
       )).rows[0] ?? null;
+      if (!row) return null;
+      const gate = evaluateMarketplacePublicationGate(publicationGateInput(row));
+      return gate.allowed && gate.marketplace_visible ? stripGateFields(row) : null;
     },
 
     async getOwnedTrader(userId) {
@@ -180,10 +211,18 @@ export function createMarketplaceRepository(pool) {
       const published = input.published;
       if (typeof published !== 'boolean') throw new Error('invalid_trader_published');
       const note = cleanText(input.review_note || '', { name: 'trader_review_note', max: 500 });
-      const trader = (await pool.query(`SELECT ${accountTraderFields} FROM traders WHERE trader_id=$1 AND owner_user_id IS NOT NULL`, [traderId])).rows[0];
+      const trader = (await pool.query(
+        `SELECT ${accountTraderFields},
+                EXISTS(SELECT 1 FROM trader_verification_evidence tve WHERE tve.trader_id=traders.trader_id AND tve.evidence_status='VERIFIED') AS evidence_recorded
+         FROM traders WHERE trader_id=$1 AND owner_user_id IS NOT NULL`,
+        [traderId]
+      )).rows[0];
       if (!trader) throw new Error('trader_application_not_found');
-      if (published && !(trader.onboarding_status === 'APPROVED' && trader.verification_status === 'VERIFIED' && trader.verified === true && trader.status === 'ACTIVE' && trader.mode === 'SHADOW' && trader.verification_reference)) {
-        throw new Error('trader_publication_gate_failed');
+      if (published) {
+        const gate = evaluateMarketplacePublicationGate(publicationGateInput(trader, 'PUBLISHED'));
+        if (!gate.allowed || !gate.marketplace_visible || trader.onboarding_status !== 'APPROVED' || trader.verified !== true || trader.status !== 'ACTIVE' || !trader.verification_reference) {
+          throw new Error('trader_publication_gate_failed');
+        }
       }
       return (await pool.query(
         `UPDATE traders SET published=$1,review_note=CASE WHEN $2='' THEN review_note ELSE $2 END,updated_at=now() WHERE trader_id=$3 RETURNING ${accountTraderFields}`,
