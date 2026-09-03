@@ -67,12 +67,15 @@ export async function evaluateAuthenticatedAutoTradeRoute({
   if (resolved.assessment_id !== assessmentId) throw new Error('signal_assessment_id_mismatch');
   const assessment = requireObject(resolved.assessment, 'signal_assessment_required');
 
-  const runtimeRisk = await riskResolver({
+  const runtimeRisk = requireObject(await riskResolver({
     authenticated_follower_user_id: authenticated.user_id,
     policy_id: policyId,
     assessment,
     position: Object.freeze({})
-  });
+  }), 'autotrade_runtime_risk_required');
+  const riskMetadata = runtimeRisk.risk_metadata && typeof runtimeRisk.risk_metadata === 'object' && !Array.isArray(runtimeRisk.risk_metadata)
+    ? runtimeRisk.risk_metadata
+    : {};
 
   const result = await evaluatePersistedCopyMandateAutoTrade({
     repository: mandateRepository,
@@ -102,6 +105,10 @@ export async function evaluateAuthenticatedAutoTradeRoute({
       ...result.audit_metadata,
       route_schema: 'aether.autotrade.authenticated_route_boundary.v2',
       authenticated_follower_user_id: authenticated.user_id,
+      runtime_risk_source: riskMetadata.risk_source || null,
+      runtime_risk_base_currency: riskMetadata.base_currency || null,
+      runtime_risk_portfolio_observed_at: riskMetadata.portfolio_observed_at || null,
+      runtime_risk_daily_pnl_accounting_ready: riskMetadata.daily_pnl_accounting_ready === true,
       caller_mandate_authority: false,
       caller_identity_authority: false,
       caller_runtime_risk_authority: false,
