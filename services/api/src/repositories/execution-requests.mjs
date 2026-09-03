@@ -57,6 +57,32 @@ export function createExecutionRequestRepository(pool) {
     async getByIdempotencyKey(key) {
       return (await pool.query('SELECT * FROM execution_requests WHERE idempotency_key=$1', [key])).rows[0] ?? null;
     },
+    async listForFollower(userId, limit = 100) {
+      assertUUID(userId, 'follower_user_id');
+      const safeLimit = Math.max(1, Math.min(200, Number(limit) || 100));
+      const q = `
+        SELECT
+          er.execution_request_id,
+          er.event_id,
+          er.trader_id,
+          er.requested_amount_usd,
+          er.mode,
+          er.status,
+          er.created_at,
+          er.updated_at,
+          te.dex,
+          te.token_in,
+          te.token_out,
+          te.amount_usd AS source_trade_amount_usd,
+          te.tx_hash AS source_tx_hash,
+          te.observed_at AS source_observed_at
+        FROM execution_requests er
+        LEFT JOIN trade_events te ON te.event_id=er.event_id
+        WHERE er.follower_user_id=$1
+        ORDER BY er.created_at DESC
+        LIMIT $2`;
+      return (await pool.query(q, [userId, safeLimit])).rows;
+    },
     async updateStatus(id, status) {
       assertUUID(id, 'execution_request_id');
       if (!EXECUTION_STATUSES.has(status)) throw new Error('invalid_execution_status');
