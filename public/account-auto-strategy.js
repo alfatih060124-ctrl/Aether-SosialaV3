@@ -19,6 +19,21 @@
   `;
   d.head.appendChild(style);
 
+  function setMenuLabel(selector, label) {
+    const link = d.querySelector(selector);
+    if (!link) return;
+    const textNode = [...link.childNodes].find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+    if (textNode) textNode.textContent = label;
+    else if (!link.querySelector('span')) link.textContent = label;
+  }
+
+  setMenuLabel('.navlinks a[href="/marketplace"]', 'Trader Marketplace');
+  setMenuLabel('.navlinks a[href="#become-trader"]', 'Become Trader');
+  setMenuLabel('.bottomnav a[href="/marketplace"]', 'Marketplace');
+  setMenuLabel('.bottomnav a[href="#become-trader"]', 'Become');
+  const traderCenterItem = d.querySelector('.navmap a[href="#become-trader"] b');
+  if (traderCenterItem) traderCenterItem.textContent = 'Become a Trader';
+
   const navLinks = d.querySelector('.navlinks');
   if (navLinks && !navLinks.querySelector('[href="#auto-strategy"]')) {
     const a = d.createElement('a');
