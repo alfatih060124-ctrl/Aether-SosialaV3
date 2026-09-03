@@ -1,0 +1,24 @@
+name: Wallet Portfolio Address Validation Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/wallet-portfolio.mjs'
+      - 'scripts/regression-wallet-portfolio-address-validation.mjs'
+      - '.github/workflows/wallet-portfolio-address-validation-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Enforce canonical 32-byte wallet validation
+        run: node scripts/regression-wallet-portfolio-address-validation.mjs
