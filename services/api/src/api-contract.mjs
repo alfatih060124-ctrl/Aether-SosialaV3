@@ -35,6 +35,7 @@ export const API_CONTRACT = {
     'POST /api/account/trader/challenge',
     'POST /api/account/trader/apply',
     'GET /api/account/copy-mandates',
+    'GET /api/account/copy-trades',
     'POST /api/account/copy-mandates',
     'PATCH /api/account/copy-mandates/:policyId'
   ],
@@ -89,6 +90,9 @@ export const API_CONTRACT = {
     wallet_portfolio_is_session_bound: true,
     wallet_portfolio_is_read_only: true,
     wallet_portfolio_never_authorizes_live: true,
+    copy_trade_activity_is_session_bound: true,
+    copy_trade_activity_never_authorizes_live: true,
+    copy_trade_open_positions_not_inferred_from_execution_requests: true,
     evidence_collection_does_not_verify: true,
     evidence_recording_does_not_verify: true,
     reconciled_performance_evidence_does_not_verify: true,
