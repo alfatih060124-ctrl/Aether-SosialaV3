@@ -79,6 +79,62 @@ export const API_CONTRACT = {
     'GET /api/admin/billing/ledger'
   ],
 
+  authority_boundaries: {
+    trader_evidence_recording: {
+      route: 'POST /api/admin/traders/:traderId/evidence',
+      may_record_evidence: true,
+      may_verify_trader: false,
+      may_publish_trader: false,
+      live_execution_authorized: false
+    },
+    trader_verification: {
+      route: 'PATCH /api/admin/traders/:traderId/verification',
+      requires_recorded_evidence: true,
+      may_record_evidence: false,
+      may_verify_trader: true,
+      may_publish_trader: false,
+      live_execution_authorized: false
+    },
+    trader_publication: {
+      route: 'PATCH /api/admin/traders/:traderId/publication',
+      requires_prior_verification: true,
+      may_record_evidence: false,
+      may_verify_trader: false,
+      may_publish_trader: true,
+      live_execution_authorized: false
+    },
+    copy_mandate: {
+      identity_authority: 'WALLET_SESSION',
+      policy_authority: 'BACKEND_PERSISTED',
+      caller_policy_authority: false,
+      requires_verified_trader: true,
+      requires_published_trader: true,
+      live_execution_authorized: false
+    },
+    auto_trade: {
+      identity_authority: 'AUTHENTICATED_FOLLOWER_SESSION',
+      mandate_authority: 'BACKEND_PERSISTED',
+      runtime_risk_authority: 'BACKEND_PERSISTED',
+      caller_identity_authority: false,
+      caller_mandate_authority: false,
+      caller_runtime_risk_authority: false,
+      output_authority: 'INTENT_ONLY',
+      execution_dispatched: false,
+      live_execution_authorized: false,
+      network_submission_authorized: false,
+      signer_required: false
+    },
+    fee_control: {
+      requester_role: 'FEE_CONFIG_OPERATOR',
+      approver_role: 'FEE_CONFIG_APPROVER',
+      applier_role: 'FEE_CONFIG_APPLIER',
+      requester_must_differ_from_approver: true,
+      requester_must_differ_from_applier: true,
+      approver_must_differ_from_applier: true,
+      live_execution_authorized: false
+    }
+  },
+
   invariants: {
     execution_mode: 'SHADOW',
     live_execution_authorized: false,
@@ -95,6 +151,10 @@ export const API_CONTRACT = {
     publication_requires_prior_verification: true,
     copy_mandate_requires_published_verified_trader: true,
     auto_trade_execution_dispatched: false,
+    auto_trade_is_intent_only: true,
+    caller_cannot_authorize_copy_mandate: true,
+    caller_cannot_authorize_runtime_risk: true,
+    fee_control_requires_three_party_separation: true,
     shadow_simulation_never_authorizes_live: true,
     shadow_simulation_requires_api_token: true
   }
