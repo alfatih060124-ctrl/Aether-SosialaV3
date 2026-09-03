@@ -22,7 +22,7 @@ api.aether.boats {
 
   @wallet_auth_write {
     method POST
-    path /api/auth/challenge /api/auth/verify /api/auth/logout /api/account/trader/challenge /api/account/trader/apply /api/account/copy-mandates
+    path /api/auth/challenge /api/auth/verify /api/auth/logout /api/account/trader/challenge /api/account/trader/apply /api/account/copy-mandates /api/account/autotrade/evaluate
   }
 
   handle @wallet_auth_write {

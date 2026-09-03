@@ -37,13 +37,13 @@ export const API_CONTRACT = {
     'GET /api/account/copy-mandates',
     'GET /api/account/copy-trades',
     'POST /api/account/copy-mandates',
-    'PATCH /api/account/copy-mandates/:policyId'
+    'PATCH /api/account/copy-mandates/:policyId',
+    'POST /api/account/autotrade/evaluate'
   ],
 
   token_authenticated: [
     'POST /api/signals/evaluate',
     'GET /api/signals/recent',
-    'POST /api/autotrade/evaluate',
     'GET /api/autotrade/decisions',
     'GET /api/execution/rental/status',
     'POST /api/execution/rental',
@@ -53,6 +53,10 @@ export const API_CONTRACT = {
     'GET /api/executions',
     'POST /api/internal/traders/:traderId/reconciled-trades',
     'GET /api/internal/traders/:traderId/reconciled-trades'
+  ],
+
+  disabled_legacy: [
+    'POST /api/autotrade/evaluate'
   ],
 
   primary_shadow_only: [
@@ -93,6 +97,13 @@ export const API_CONTRACT = {
     copy_trade_activity_is_session_bound: true,
     copy_trade_activity_never_authorizes_live: true,
     copy_trade_open_positions_not_inferred_from_execution_requests: true,
+    copy_mandate_consent_is_versioned: true,
+    copy_mandate_requires_published_verified_trader: true,
+    member_autotrade_is_session_bound: true,
+    member_autotrade_uses_persisted_mandate: true,
+    member_autotrade_caller_risk_authority: false,
+    member_autotrade_execution_dispatched: false,
+    legacy_caller_mandate_autotrade_disabled: true,
     evidence_collection_does_not_verify: true,
     evidence_recording_does_not_verify: true,
     reconciled_performance_evidence_does_not_verify: true,
@@ -101,7 +112,6 @@ export const API_CONTRACT = {
     incomplete_reconciliation_sources_do_not_write_ledger: true,
     verification_does_not_publish: true,
     publication_requires_prior_verification: true,
-    copy_mandate_requires_published_verified_trader: true,
     auto_trade_execution_dispatched: false,
     shadow_simulation_never_authorizes_live: true,
     shadow_simulation_requires_api_token: true

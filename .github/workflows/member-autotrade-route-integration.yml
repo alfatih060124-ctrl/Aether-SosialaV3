@@ -1,0 +1,53 @@
+name: Member Auto Trade Route Integration Regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/api/src/member-autotrade-route.mjs'
+      - 'services/api/src/server.mjs'
+      - 'services/api/src/autotrade-route-boundary.mjs'
+      - 'services/api/src/autotrade-atomic-persistence.mjs'
+      - 'services/api/src/trusted-autotrade-runtime-risk.mjs'
+      - 'api/index.mjs'
+      - 'deploy/Caddyfile'
+      - 'services/api/src/api-contract.mjs'
+      - 'scripts/member-autotrade-route-integration-regression.mjs'
+      - '.github/workflows/member-autotrade-route-integration.yml'
+  pull_request:
+    paths:
+      - 'services/api/src/member-autotrade-route.mjs'
+      - 'services/api/src/server.mjs'
+      - 'services/api/src/autotrade-route-boundary.mjs'
+      - 'services/api/src/autotrade-atomic-persistence.mjs'
+      - 'services/api/src/trusted-autotrade-runtime-risk.mjs'
+      - 'api/index.mjs'
+      - 'deploy/Caddyfile'
+      - 'services/api/src/api-contract.mjs'
+      - 'scripts/member-autotrade-route-integration-regression.mjs'
+      - '.github/workflows/member-autotrade-route-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check member Auto Trade wiring
+        run: |
+          node --check services/api/src/member-autotrade-route.mjs
+          node --check services/api/src/server.mjs
+          node --check api/index.mjs
+          node --check services/api/src/api-contract.mjs
+          node --check scripts/member-autotrade-route-integration-regression.mjs
+      - name: Validate Caddy ingress
+        run: docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      - name: Run member Auto Trade integration regression
+        run: node scripts/member-autotrade-route-integration-regression.mjs

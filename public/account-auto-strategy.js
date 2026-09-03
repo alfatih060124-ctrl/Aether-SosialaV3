@@ -20,11 +20,90 @@
     .simhistory{display:grid;gap:6px;margin-top:10px}.simhistory div{padding:9px 10px;border:1px solid rgba(255,255,255,.06);border-radius:9px;background:#091523;color:#91a6bf;font-size:11px}.simhistory b{color:#edf4ff}
     .trainingtag{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid rgba(247,211,122,.22);border-radius:999px;color:#ead99e;background:rgba(247,211,122,.05);font-size:9px;font-weight:850;letter-spacing:.08em}
     .copyactivity{border-color:rgba(141,230,207,.24)!important}.activitysummary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.activitymetric{padding:11px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:#091523}.activitymetric span{display:block;color:#8194b0;font-size:9px;text-transform:uppercase;letter-spacing:.1em}.activitymetric b{display:block;margin-top:6px;font-size:17px}.activitylist{display:grid;gap:8px;margin-top:12px}.activityrow{padding:12px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:#091523}.activityrow strong{display:block}.activityrow .meta{margin-top:5px;color:#9fb0c8;font-size:11px;line-height:1.5;overflow-wrap:anywhere}.activitybadge{display:inline-flex;margin-top:7px;padding:4px 7px;border:1px solid rgba(141,230,207,.22);border-radius:999px;color:#bce3d8;font-size:9px;font-weight:850;letter-spacing:.08em}.activitybadge.terminal{border-color:rgba(255,255,255,.12);color:#9fb0c8}.activitybadge.failed{border-color:rgba(247,211,122,.24);color:#ead99e}.activitynote{margin-top:10px;padding:11px 12px;border:1px solid rgba(247,211,122,.22);border-radius:11px;background:rgba(247,211,122,.04);color:#d9c98f;font-size:11px;line-height:1.55}
+    .copyconsent{margin-top:12px;padding:12px 13px;border:1px solid rgba(141,230,207,.22);border-radius:11px;background:rgba(141,230,207,.04);color:#c5d7ea;font-size:12px;line-height:1.55}.copyconsent label{display:flex;gap:9px;align-items:flex-start;color:#edf4ff;font-weight:700}.copyconsent input{width:auto!important;margin:3px 0 0!important;accent-color:#8de6cf}.copyconsent .consentmeta{margin-top:7px;color:#9fb0c8;font-size:11px}
     @media(min-width:901px){.quickgrid{grid-template-columns:repeat(4,1fr)!important}}
     @media(max-width:760px){.simcontrols{grid-template-columns:1fr 1fr}.simresult,.activitysummary{grid-template-columns:1fr 1fr}.simactions .btn{width:100%}}
     @media(max-width:430px){.simcontrols{grid-template-columns:1fr}}
   `;
   d.head.appendChild(style);
+
+  const createMandateButton = d.getElementById('createMandate');
+  const copyStateHost = d.getElementById('copyState');
+  if (createMandateButton && !d.getElementById('copyConsent')) {
+    const consentWrap = d.createElement('div');
+    consentWrap.className = 'copyconsent';
+    consentWrap.innerHTML = `
+      <label><input id="copyConsent" type="checkbox"><span>I understand this creates a SHADOW Copy Mandate only. It stores my follower intent and risk limits; it does not sign a transaction, move funds, or enable LIVE execution.</span></label>
+      <div class="consentmeta">Consent version: aether.copy_mandate.consent.v1 · Policy: FIXED_USD · The Max copy per trade amount is the fixed policy value.</div>
+    `;
+    createMandateButton.parentNode.insertBefore(consentWrap, createMandateButton);
+    const consent = d.getElementById('copyConsent');
+    createMandateButton.disabled = true;
+    consent.addEventListener('change', () => { createMandateButton.disabled = !consent.checked; });
+    createMandateButton.addEventListener('click', async event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!consent.checked) {
+        if (copyStateHost) copyStateHost.textContent = 'Review and accept the SHADOW Copy Mandate consent before creating a mandate.';
+        return;
+      }
+      const traderId = d.getElementById('copyTrader')?.value || '';
+      if (!traderId) {
+        if (copyStateHost) copyStateHost.textContent = 'Select a verified trader first.';
+        return;
+      }
+      const maxCopy = Number(d.getElementById('copyAmount')?.value);
+      const maxPosition = Number(d.getElementById('positionAmount')?.value);
+      const toBps = id => Math.round(Number(d.getElementById(id)?.value) * 100);
+      const payload = {
+        trader_id: traderId,
+        consent_accepted: true,
+        consent_version: 'aether.copy_mandate.consent.v1',
+        policy_type: 'FIXED_USD',
+        policy_value: maxCopy,
+        max_copy_amount_usd: maxCopy,
+        max_position_amount_usd: maxPosition,
+        allocation_bps: toBps('allocationPct'),
+        max_slippage_bps: toBps('slippagePct'),
+        max_daily_loss_bps: toBps('dailyLossPct'),
+        stop_drawdown_bps: toBps('drawdownPct')
+      };
+      createMandateButton.disabled = true;
+      if (copyStateHost) {
+        copyStateHost.className = 'status';
+        copyStateHost.textContent = 'Creating versioned SHADOW Copy Mandate…';
+      }
+      try {
+        const response = await fetch('/api/account/copy-mandates', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({ error: 'invalid_response' }));
+        if (!response.ok) throw Object.assign(new Error(data.error || `HTTP_${response.status}`), { status: response.status });
+        if (copyStateHost) {
+          copyStateHost.className = 'status';
+          copyStateHost.textContent = 'SHADOW Copy Mandate created with explicit versioned consent. LIVE authorized=false.';
+        }
+        setTimeout(() => location.reload(), 450);
+      } catch (error) {
+        const messages = {
+          copy_mandate_exists: 'A mandate for this trader already exists. Use the existing mandate controls.',
+          self_copy_not_allowed: 'You cannot create a copy mandate for your own trader profile.',
+          trader_not_copyable: 'This trader is not currently verified and published for copying.',
+          copy_mandate_consent_required: 'Explicit SHADOW Copy Mandate consent is required.',
+          invalid_consent_version: 'The Copy Mandate consent version is not accepted.',
+          invalid_policy_type: 'The selected Copy Mandate policy is not supported.',
+          invalid_policy_value: 'The fixed copy amount is invalid.'
+        };
+        if (copyStateHost) {
+          copyStateHost.className = 'status warn';
+          copyStateHost.textContent = messages[error.message] || 'Copy Mandate creation did not complete. No execution authority changed.';
+        }
+        createMandateButton.disabled = !consent.checked;
+      }
+    }, true);
+  }
 
   function setMenuLabel(selector, label) {
     const link = d.querySelector(selector);

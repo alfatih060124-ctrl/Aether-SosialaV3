@@ -36,6 +36,7 @@ const SESSION_POST_ROUTES = new Set([
   '/api/account/trader/challenge',
   '/api/account/trader/apply',
   '/api/account/copy-mandates',
+  '/api/account/autotrade/evaluate',
 ]);
 
 const json = (res, status, body) => {
