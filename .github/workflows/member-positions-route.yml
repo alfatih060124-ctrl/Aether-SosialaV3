@@ -1,0 +1,27 @@
+name: Member Positions Route Regression
+
+on:
+  push:
+    branches: [main, integration/member-open-positions-shadow]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check member positions lane
+        run: |
+          node --check services/api/src/member-positions-route.mjs
+          node --check services/api/src/member-autotrade-route.mjs
+          node --check public/account-wallet-portfolio.js
+          node --check api/index.mjs
+          node --check scripts/member-positions-route-regression.mjs
+      - name: Run member positions route regression
+        run: node scripts/member-positions-route-regression.mjs
