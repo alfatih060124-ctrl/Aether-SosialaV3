@@ -4,6 +4,7 @@ import { API_CONTRACT } from '../services/api/src/api-contract.mjs';
 
 const server = await fs.readFile(new URL('../services/api/src/server.mjs', import.meta.url), 'utf8');
 const edge = await fs.readFile(new URL('../api/index.mjs', import.meta.url), 'utf8');
+const walletPortfolio = await fs.readFile(new URL('../services/api/src/wallet-portfolio.mjs', import.meta.url), 'utf8');
 const reconciledService = await fs.readFile(new URL('../services/api/src/reconciled-performance-service.mjs', import.meta.url), 'utf8');
 const reconciliationRuntime = await fs.readFile(new URL('../services/api/src/reconciliation-runtime-service.mjs', import.meta.url), 'utf8');
 
@@ -15,6 +16,7 @@ for (const required of [
   'GET /api/market/token?mint=:mint',
   'GET /api/execution/status',
   'POST /api/auth/verify',
+  'GET /api/account/wallet-portfolio',
   'POST /api/account/trader/apply',
   'POST /api/autotrade/evaluate',
   'POST /api/executions',
@@ -45,6 +47,9 @@ assert.equal(API_CONTRACT.invariants.live_execution_authorized, false);
 assert.equal(API_CONTRACT.invariants.signer_exposed_to_api, false);
 assert.equal(API_CONTRACT.invariants.public_edge_blocks_internal_and_admin_routes, true);
 assert.equal(API_CONTRACT.invariants.market_token_lookup_is_read_only, true);
+assert.equal(API_CONTRACT.invariants.wallet_portfolio_is_session_bound, true);
+assert.equal(API_CONTRACT.invariants.wallet_portfolio_is_read_only, true);
+assert.equal(API_CONTRACT.invariants.wallet_portfolio_never_authorizes_live, true);
 assert.equal(API_CONTRACT.invariants.evidence_collection_does_not_verify, true);
 assert.equal(API_CONTRACT.invariants.evidence_recording_does_not_verify, true);
 assert.equal(API_CONTRACT.invariants.reconciled_performance_evidence_does_not_verify, true);
@@ -62,6 +67,7 @@ for (const literal of [
   "route==='/api/health'",
   "route==='/api/execution/status'",
   "route==='/api/autotrade/status'",
+  "route==='/api/account/wallet-portfolio'",
   "route==='/api/account/trader'",
   "route==='/api/account/copy-mandates'",
   "route==='/api/autotrade/evaluate'",
@@ -84,6 +90,7 @@ for (const segment of [
 }
 
 assert.ok(edge.includes("path === '/api/market/token'"));
+assert.ok(edge.includes("'/api/account/wallet-portfolio'"));
 assert.ok(edge.includes("read_only: true"));
 assert.ok(edge.includes("live_execution_authorized: false"));
 assert.ok(edge.includes("error: 'public_gateway_route_blocked'"));
@@ -95,6 +102,15 @@ assert.ok(
   server.includes("route==='/api/shadow/simulate'){if(!auth(req))return send(res,401,{error:'unauthorized'});"),
   'direct PRIMARY_VM shadow simulation must require API_TOKEN before any simulation work'
 );
+assert.ok(walletPortfolio.includes("base_currency: 'USDC'"));
+assert.ok(walletPortfolio.includes("gas_currency: 'SOL'"));
+assert.ok(walletPortfolio.includes('read_only: true'));
+assert.ok(walletPortfolio.includes('non_custodial: true'));
+assert.ok(walletPortfolio.includes('signer_required: false'));
+assert.ok(walletPortfolio.includes('transaction_created: false'));
+assert.ok(walletPortfolio.includes('funds_moved: false'));
+assert.ok(walletPortfolio.includes('live_execution_authorized: false'));
+assert.ok(walletPortfolio.includes("available_for_copy_usdc: null"));
 
 assert.ok(reconciledService.includes('createReconciliationRuntimeService'));
 assert.ok(reconciledService.includes('reconciliation_manual_metrics_blocked'));
