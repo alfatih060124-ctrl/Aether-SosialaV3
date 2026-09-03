@@ -1,5 +1,11 @@
 (() => {
   const d = document;
+  if (!d.querySelector('script[data-aether-wallet-portfolio]')) {
+    const walletScript = d.createElement('script');
+    walletScript.src = '/account-wallet-portfolio.js';
+    walletScript.dataset.aetherWalletPortfolio = 'true';
+    d.head.appendChild(walletScript);
+  }
   const copySection = d.getElementById('copy-mandates');
   if (!copySection || d.getElementById('auto-strategy')) return;
 
