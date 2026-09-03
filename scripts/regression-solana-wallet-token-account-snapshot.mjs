@@ -4,6 +4,8 @@ import { collectSolanaWalletTokenAccountSnapshot, verifySolanaWalletTokenAccount
 // SYNTHETIC / TEST-ONLY fixtures. Never production evidence.
 const WALLET='11111111111111111111111111111111';
 const MINT='So11111111111111111111111111111111111111112';
+const MINT_UPPER='AxBNesXSgjftp9wGLBufXuubZNDWdvcKgcrezYBnKwcZ';
+const MINT_LOWER='azEpqzg9jjM4UdACjuWZ9NZPx47sYzqT5KDEAhknhfw';
 const TOKEN='TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const TOKEN_2022='TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
 const requestedAt='2026-09-03T20:10:00.000Z';
@@ -17,6 +19,8 @@ assert.equal(evidence.collection_status,'PENDING_DATA');assert.equal(evidence.me
 for(const key of ['trades_count','total_return_bps','win_rate_bps','drawdown_bps','reputation_score']) assert.equal(evidence[key],null);
 assert.equal(evidence.evidence_count,2);assert.equal(evidence.rows[0].source_reference,null);assert.equal(evidence.rows[1].source_reference,null);
 assert.deepEqual(evidence.mint_summaries,[{mint:MINT,decimals:6,token_accounts:2,total_raw_amount:'20'}]);assert.equal(evidence.provenance.context_slot,456);assert.equal(evidence.provenance.source_reference_policy,'NONE_NON_TRANSACTION_SNAPSHOT');assert.equal(verifySolanaWalletTokenAccountSnapshot(evidence),true);
+const deterministicOrder=await collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response([row({pubkey:MINT_LOWER,mint:MINT_LOWER,amount:'1'}),row({pubkey:MINT_UPPER,mint:MINT_UPPER,amount:'1'})]),traderWallet:WALLET,requestedAt,observedAt});
+assert.deepEqual(deterministicOrder.mint_summaries.map(({mint})=>mint),[MINT_UPPER,MINT_LOWER]);assert.equal(verifySolanaWalletTokenAccountSnapshot(deterministicOrder),true);
 const verifyTamper=structuredClone(evidence);verifyTamper.verified=true;assert.equal(verifySolanaWalletTokenAccountSnapshot(verifyTamper),false);
 const refTamper=structuredClone(evidence);refTamper.source_reference=`solana_rpc:${'1'.repeat(64)}@456`;assert.equal(verifySolanaWalletTokenAccountSnapshot(refTamper),false);
 const summaryTamper=structuredClone(evidence);summaryTamper.mint_summaries[0].total_raw_amount='21';assert.equal(verifySolanaWalletTokenAccountSnapshot(summaryTamper),false);
