@@ -1,0 +1,33 @@
+name: Fee Control Approval Ledger Regression
+
+on:
+  push:
+    branches:
+      - 'backend/fee-control-approval-ledger'
+    paths:
+      - 'migrations/020_fee_control_approval_ledger.sql'
+      - 'services/api/src/repositories/fee-control-approval.mjs'
+      - 'services/api/src/fee-control.mjs'
+      - 'scripts/fee-control-approval-ledger-regression.mjs'
+      - '.github/workflows/fee-control-approval-ledger.yml'
+  pull_request:
+    paths:
+      - 'migrations/020_fee_control_approval_ledger.sql'
+      - 'services/api/src/repositories/fee-control-approval.mjs'
+      - 'services/api/src/fee-control.mjs'
+      - 'scripts/fee-control-approval-ledger-regression.mjs'
+      - '.github/workflows/fee-control-approval-ledger.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run fail-closed fee control approval ledger regression
+        run: node scripts/fee-control-approval-ledger-regression.mjs
