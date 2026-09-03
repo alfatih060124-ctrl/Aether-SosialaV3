@@ -1,9 +1,14 @@
 const HARD_MIN_EXPECTED_NET_EDGE_BPS = 10;
+const CANONICAL_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function finiteNumber(value, name) {
   const number = Number(value);
   if (!Number.isFinite(number)) throw new Error(`invalid_${name}`);
   return number;
+}
+
+function isCanonicalUuid(value) {
+  return typeof value === 'string' && CANONICAL_UUID_RE.test(value);
 }
 
 export const EXECUTION_RISK_RECHECK_CONTRACT = Object.freeze({
@@ -28,7 +33,12 @@ export function evaluateExecutionRiskRecheck({ intent, risk = {}, now = Date.now
   if (!Number.isFinite(expiresAtMs) || nowMs > expiresAtMs) reasons.push('EXECUTION_INTENT_EXPIRED');
   if (risk.source !== 'BACKEND_INTERNAL' || risk.authoritative !== true || risk.caller_authority === true) reasons.push('RISK_SOURCE_NOT_AUTHORITATIVE');
   if (risk.allowed !== true) reasons.push('RISK_POLICY_NOT_ALLOWED');
-  if (intent.mandate_id && risk.mandate_active !== true) reasons.push('MANDATE_NOT_ACTIVE');
+
+  if (intent.mandate_id !== null && intent.mandate_id !== undefined) {
+    if (!isCanonicalUuid(intent.mandate_id)) reasons.push('MANDATE_ID_INVALID');
+    else if (risk.mandate_active !== true) reasons.push('MANDATE_NOT_ACTIVE');
+  }
+
   if (risk.trader_verified !== true) reasons.push('TRADER_NOT_VERIFIED');
   if (risk.marketplace_published !== true) reasons.push('TRADER_NOT_PUBLISHED');
   if (risk.market_data_fresh !== true) reasons.push('MARKET_DATA_STALE_OR_UNVERIFIED');
