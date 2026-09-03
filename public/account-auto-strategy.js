@@ -19,8 +19,9 @@
     .simreason{margin-top:10px;padding:11px 12px;border:1px solid rgba(141,230,207,.18);border-radius:11px;background:rgba(141,230,207,.035);color:#b8cbe0;font-size:12px;line-height:1.55}
     .simhistory{display:grid;gap:6px;margin-top:10px}.simhistory div{padding:9px 10px;border:1px solid rgba(255,255,255,.06);border-radius:9px;background:#091523;color:#91a6bf;font-size:11px}.simhistory b{color:#edf4ff}
     .trainingtag{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid rgba(247,211,122,.22);border-radius:999px;color:#ead99e;background:rgba(247,211,122,.05);font-size:9px;font-weight:850;letter-spacing:.08em}
+    .copyactivity{border-color:rgba(141,230,207,.24)!important}.activitysummary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.activitymetric{padding:11px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:#091523}.activitymetric span{display:block;color:#8194b0;font-size:9px;text-transform:uppercase;letter-spacing:.1em}.activitymetric b{display:block;margin-top:6px;font-size:17px}.activitylist{display:grid;gap:8px;margin-top:12px}.activityrow{padding:12px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:#091523}.activityrow strong{display:block}.activityrow .meta{margin-top:5px;color:#9fb0c8;font-size:11px;line-height:1.5;overflow-wrap:anywhere}.activitybadge{display:inline-flex;margin-top:7px;padding:4px 7px;border:1px solid rgba(141,230,207,.22);border-radius:999px;color:#bce3d8;font-size:9px;font-weight:850;letter-spacing:.08em}.activitybadge.terminal{border-color:rgba(255,255,255,.12);color:#9fb0c8}.activitybadge.failed{border-color:rgba(247,211,122,.24);color:#ead99e}.activitynote{margin-top:10px;padding:11px 12px;border:1px solid rgba(247,211,122,.22);border-radius:11px;background:rgba(247,211,122,.04);color:#d9c98f;font-size:11px;line-height:1.55}
     @media(min-width:901px){.quickgrid{grid-template-columns:repeat(4,1fr)!important}}
-    @media(max-width:760px){.simcontrols{grid-template-columns:1fr 1fr}.simresult{grid-template-columns:1fr 1fr}.simactions .btn{width:100%}}
+    @media(max-width:760px){.simcontrols{grid-template-columns:1fr 1fr}.simresult,.activitysummary{grid-template-columns:1fr 1fr}.simactions .btn{width:100%}}
     @media(max-width:430px){.simcontrols{grid-template-columns:1fr}}
   `;
   d.head.appendChild(style);
@@ -96,11 +97,31 @@
   `;
   copySection.parentNode.insertBefore(section, copySection);
 
+  const activitySection = d.createElement('section');
+  activitySection.id = 'copy-activity';
+  activitySection.className = 'card full copyactivity';
+  activitySection.innerHTML = `
+    <div class="eyebrow">Follower Center</div>
+    <h2>Active Trades & Copy Activity</h2>
+    <p class="sectionintro">Follower-specific execution activity generated from your copy workflow. PENDING and QUEUED requests are shown as in-flight. SHADOW simulations never move funds.</p>
+    <div id="copyActivityState" class="status warn" role="status" aria-live="polite">Loading your follower execution activity…</div>
+    <div class="activitysummary">
+      <div class="activitymetric"><span>In flight</span><b id="activityInFlight">—</b></div>
+      <div class="activitymetric"><span>Simulated</span><b id="activitySimulated">—</b></div>
+      <div class="activitymetric"><span>Completed</span><b id="activityCompleted">—</b></div>
+      <div class="activitymetric"><span>Rejected / failed</span><b id="activityFailed">—</b></div>
+    </div>
+    <div id="copyActivityList" class="activitylist"><div class="activityrow"><span class="meta">No activity loaded yet.</span></div></div>
+    <div class="activitynote"><strong>Open-position PnL is not inferred from execution requests.</strong> Position accounting must be independently integrated before AETHER shows entry price, current price, unrealized PnL or a position as OPEN. This prevents simulated or incomplete execution records from being presented as real positions.</div>
+  `;
+  copySection.parentNode.insertBefore(activitySection, copySection.nextSibling);
+
   const $ = id => d.getElementById(id);
   const scenarios = ['qualified_entry', 'healthy_position', 'trailing_stop_exit', 'risk_reject', 'stop_loss_exit'];
   let autoTimer = null;
   let autoIndex = 0;
   let running = false;
+  let activityTimer = null;
   const history = [];
 
   const money = value => {
@@ -111,9 +132,61 @@
     const n = Number(value);
     return Number.isFinite(n) ? (n / 100).toFixed(2).replace(/\.00$/, '') + '%' : '—';
   };
+  const shortHash = value => {
+    const text = String(value || '');
+    return text.length > 16 ? `${text.slice(0, 7)}…${text.slice(-7)}` : (text || '—');
+  };
+  const safeDate = value => {
+    const time = new Date(value || 0);
+    return Number.isNaN(time.getTime()) ? '—' : time.toLocaleString();
+  };
 
   function renderHistory() {
     $('simHistory').innerHTML = history.length ? history.map(row => `<div><b>${row.action}</b> · ${row.scenario} · score ${row.score} · ${row.time}</div>`).join('') : '<div>No simulation steps yet.</div>';
+  }
+
+  function renderCopyActivity(data) {
+    const summary = data?.summary || {};
+    $('activityInFlight').textContent = String(Number(summary.in_flight || 0));
+    $('activitySimulated').textContent = String(Number(summary.simulated || 0));
+    $('activityCompleted').textContent = String(Number(summary.completed || 0));
+    $('activityFailed').textContent = String(Number(summary.failed || 0));
+    const rows = Array.isArray(data?.items) ? data.items : [];
+    $('copyActivityState').className = rows.length ? 'status' : 'status warn';
+    $('copyActivityState').textContent = rows.length
+      ? `${rows.length} follower execution record(s) · SHADOW posture · LIVE authorized=false.`
+      : 'No follower execution activity yet. Your copy mandate can exist before any trade signal creates an execution request.';
+    $('copyActivityList').innerHTML = '';
+    if (!rows.length) {
+      const empty = d.createElement('div');
+      empty.className = 'activityrow';
+      empty.innerHTML = '<span class="meta">No copy execution records yet.</span>';
+      $('copyActivityList').appendChild(empty);
+      return;
+    }
+    for (const item of rows.slice(0, 50)) {
+      const row = d.createElement('div');
+      row.className = 'activityrow';
+      const pair = item.token_in || item.token_out ? `${shortHash(item.token_in)} → ${shortHash(item.token_out)}` : 'Token pair unavailable';
+      const status = String(item.status || 'UNKNOWN').toUpperCase();
+      const badgeClass = ['REJECTED', 'FAILED'].includes(status) ? 'activitybadge failed' : ['SIMULATED', 'EXECUTED'].includes(status) ? 'activitybadge terminal' : 'activitybadge';
+      row.innerHTML = `<strong>${pair} · ${money(item.requested_amount_usd)}</strong><div class="meta">Trader ${shortHash(item.trader_id)} · ${item.dex || 'DEX unavailable'} · ${item.mode || 'SHADOW'} · Updated ${safeDate(item.updated_at || item.created_at)}<br>Source trade reference ${shortHash(item.source_tx_hash)} · follower execution ${shortHash(item.execution_request_id)}</div><span class="${badgeClass}">${status}</span>`;
+      $('copyActivityList').appendChild(row);
+    }
+  }
+
+  async function loadCopyActivity() {
+    try {
+      const response = await fetch('/api/account/copy-trades?limit=50', { cache: 'no-store', headers: { accept: 'application/json' } });
+      const data = await response.json().catch(() => ({ error: 'invalid_response' }));
+      if (!response.ok) throw Object.assign(new Error(data.error || `HTTP_${response.status}`), { status: response.status });
+      renderCopyActivity(data);
+    } catch (error) {
+      $('copyActivityState').className = 'status warn';
+      $('copyActivityState').textContent = error.status === 401
+        ? 'Secure wallet session required. Reconnect from onboarding.'
+        : 'Follower execution activity is temporarily unavailable. No execution authority changed.';
+    }
   }
 
   async function runStep(scenario = $('simScenario').value) {
@@ -178,7 +251,10 @@
     await autoStep();
     autoTimer = setInterval(() => { if (!d.hidden) autoStep(); }, 7000);
   });
-  d.addEventListener('visibilitychange', () => { if (d.hidden && autoTimer) stopAuto(); });
+  d.addEventListener('visibilitychange', () => {
+    if (d.hidden && autoTimer) stopAuto();
+    if (!d.hidden) loadCopyActivity();
+  });
 
   const requestedTrader = new URL(location.href).searchParams.get('trader_id');
   const copyTrader = d.getElementById('copyTrader');
@@ -198,4 +274,8 @@
     new MutationObserver(syncTraderChoice).observe(copyTrader, { childList: true });
     syncTraderChoice();
   }
+
+  loadCopyActivity();
+  activityTimer = setInterval(() => { if (!d.hidden) loadCopyActivity(); }, 15000);
+  window.addEventListener('pagehide', () => { if (activityTimer) clearInterval(activityTimer); }, { once: true });
 })();
