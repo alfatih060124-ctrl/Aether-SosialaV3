@@ -1,0 +1,43 @@
+name: Persisted Copy Auto Trade Integration Regression
+
+on:
+  pull_request:
+    paths:
+      - 'migrations/019_copy_mandate_canonical_runtime.sql'
+      - 'services/api/src/copy-mandate.mjs'
+      - 'services/api/src/copy-mandate-runtime.mjs'
+      - 'services/api/src/copy-mandate-autotrade-adapter.mjs'
+      - 'services/api/src/persisted-autotrade-service.mjs'
+      - 'services/api/src/autotrade-route-boundary.mjs'
+      - 'services/api/src/autotrade-persistence-boundary.mjs'
+      - 'services/api/src/autotrade-atomic-persistence.mjs'
+      - 'services/api/src/trusted-autotrade-runtime-risk.mjs'
+      - 'scripts/persisted-copy-autotrade-integration-regression.mjs'
+      - '.github/workflows/persisted-copy-autotrade-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check integration boundary
+        run: |
+          node --check services/api/src/copy-mandate.mjs
+          node --check services/api/src/copy-mandate-runtime.mjs
+          node --check services/api/src/copy-mandate-autotrade-adapter.mjs
+          node --check services/api/src/persisted-autotrade-service.mjs
+          node --check services/api/src/autotrade-route-boundary.mjs
+          node --check services/api/src/autotrade-persistence-boundary.mjs
+          node --check services/api/src/autotrade-atomic-persistence.mjs
+          node --check services/api/src/trusted-autotrade-runtime-risk.mjs
+          node --check scripts/persisted-copy-autotrade-integration-regression.mjs
+      - name: Run persisted Copy Mandate Auto Trade regression
+        run: node scripts/persisted-copy-autotrade-integration-regression.mjs
