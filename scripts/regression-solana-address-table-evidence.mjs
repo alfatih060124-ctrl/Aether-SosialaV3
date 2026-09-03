@@ -14,7 +14,13 @@ function response(overrides={}){
   const base={result:{slot:123456,blockTime:1788429600,transaction:{signatures:[SIG],message:{accountKeys:[WALLET,TABLE],addressTableLookups:[{accountKey:TABLE,writableIndexes:[1],readonlyIndexes:[2]}]}},meta:{err:null,loadedAddresses:{writable:[LOADED_W],readonly:[LOADED_R]}}}};
   return structuredClone(Object.assign(base,overrides));
 }
-const rpcFrom = value => async (method,params)=>{ assert.equal(method,'getTransaction'); assert.equal(params[0],SIG); return structuredClone(value); };
+const rpcFrom = value => async (method,params)=>{
+  assert.equal(method,'getTransaction');
+  assert.equal(params[0],SIG);
+  assert.equal(params[1]?.encoding,'json');
+  assert.equal(params[1]?.maxSupportedTransactionVersion,0);
+  return structuredClone(value);
+};
 const input = rpc => ({rpc,signature:SIG,traderWallet:WALLET,rpcEndpointLabel:'mainnet-primary',commitment:'confirmed',requestedAt,observedAt});
 
 const valid=await collectSolanaAddressTableEvidence(input(rpcFrom(response())));
@@ -23,6 +29,7 @@ assert.equal(valid.metrics_available,false); assert.equal(valid.verified,false);
 for(const k of ['trades_count','total_return_bps','win_rate_bps','drawdown_bps','reputation_score']) assert.equal(valid[k],null);
 assert.equal(valid.lookup_count,1); assert.equal(valid.loaded_writable_count,1); assert.equal(valid.loaded_readonly_count,1);
 assert.equal(valid.source_reference,`solana_rpc:${SIG}@123456`);
+assert.equal(valid.provenance.rpc_encoding,'json');
 assert.equal(verifySolanaAddressTableEvidence(valid),true);
 
 const noLookupResp=response(); noLookupResp.result.transaction.message.addressTableLookups=[]; noLookupResp.result.meta.loadedAddresses={writable:[],readonly:[]};
@@ -30,13 +37,14 @@ const noLookup=await collectSolanaAddressTableEvidence(input(rpcFrom(noLookupRes
 assert.equal(noLookup.source_reference,null); assert.equal(noLookup.lookup_count,0); assert.equal(verifySolanaAddressTableEvidence(noLookup),true);
 
 const notFound=await collectSolanaAddressTableEvidence(input(rpcFrom({result:null})));
-assert.equal(notFound.source_reference,null); assert.equal(notFound.lookup_count,0); assert.equal(verifySolanaAddressTableEvidence(notFound),true);
+assert.equal(notFound.source_reference,null); assert.equal(notFound.lookup_count,0); assert.equal(notFound.provenance.rpc_encoding,'json'); assert.equal(verifySolanaAddressTableEvidence(notFound),true);
 
 for (const mutate of [
   e=>{e.trades_count=1},
   e=>{e.verified=true},
   e=>{e.published=true},
   e=>{e.source_reference=`solana_rpc:${SIG}@123457`},
+  e=>{e.provenance.rpc_encoding='jsonParsed'},
   e=>{e.provenance.loaded_cardinality.writable_expected=2},
   e=>{e.provenance.address_table_lookups[0].writable_indexes=[9]},
   e=>{e.provenance.loaded_addresses.writable=[LOADED_R]},
