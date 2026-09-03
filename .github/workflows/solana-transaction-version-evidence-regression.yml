@@ -1,0 +1,24 @@
+name: Solana Transaction Version Evidence Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-transaction-version-evidence.mjs'
+      - 'scripts/regression-solana-transaction-version-evidence.mjs'
+      - '.github/workflows/solana-transaction-version-evidence-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run synthetic transaction version evidence regression
+        run: node scripts/regression-solana-transaction-version-evidence.mjs
