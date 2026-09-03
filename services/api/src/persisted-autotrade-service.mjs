@@ -14,6 +14,28 @@ function canonicalFollowerUserId(value) {
   return value;
 }
 
+function hasOpenPosition(position) {
+  const value = Number(position?.position_value_usd);
+  return Number.isFinite(value) && value > 0;
+}
+
+function dailyPnlAccountingReady(runtimeRisk) {
+  return runtimeRisk?.risk_metadata?.daily_pnl_accounting_ready === true;
+}
+
+function buildDailyPnlNotReadyDecision(assessment) {
+  return Object.freeze({
+    source_type: 'ALGORITHMIC_STRATEGY',
+    token_mint: assessment?.token_mint || assessment?.snapshot?.token_mint || null,
+    mode: 'SHADOW',
+    live_execution_authorized: false,
+    quality_first: true,
+    action: 'REJECT',
+    reason_codes: Object.freeze(['DAILY_PNL_ACCOUNTING_NOT_READY']),
+    requested_amount_usd: 0
+  });
+}
+
 export async function evaluatePersistedCopyMandateAutoTrade({
   repository,
   authenticatedFollowerUserId,
@@ -33,12 +55,15 @@ export async function evaluatePersistedCopyMandateAutoTrade({
   if (!persisted) throw new Error('copy_mandate_not_found');
 
   const adapted = buildAutoTradeMandateFromPersisted(persisted, followerUserId, runtimeRisk);
-  const decision = evaluateAutoTrade({
-    assessment,
-    mandate: adapted.engine_mandate,
-    position,
-    runtime: { liveEnabled: false }
-  });
+  const pnlAccountingReady = dailyPnlAccountingReady(runtimeRisk);
+  const decision = !hasOpenPosition(position) && !pnlAccountingReady
+    ? buildDailyPnlNotReadyDecision(assessment)
+    : evaluateAutoTrade({
+        assessment,
+        mandate: adapted.engine_mandate,
+        position,
+        runtime: { liveEnabled: false }
+      });
 
   if (decision?.mode !== 'SHADOW' || decision?.live_execution_authorized !== false) {
     throw new Error('autotrade_shadow_invariant_failed');
@@ -55,6 +80,8 @@ export async function evaluatePersistedCopyMandateAutoTrade({
       ...adapted.audit_metadata,
       service_schema: 'aether.autotrade.persisted_mandate_service.v1',
       authenticated_follower_user_id: followerUserId,
+      daily_pnl_accounting_ready: pnlAccountingReady,
+      entry_authorized: pnlAccountingReady,
       execution_dispatched: false,
       live_execution_authorized: false,
       network_submission_authorized: false,
