@@ -125,11 +125,12 @@ export async function collectSolanaAddressTableEvidence({rpc, signature, traderW
   const obsMs = requireIso(observedAt,'invalid_observed_at');
   if (obsMs < reqMs) fail('invalid_observation_chronology');
 
-  const response = await rpc('getTransaction',[requested_signature,{encoding:'jsonParsed',commitment,maxSupportedTransactionVersion:0}]);
+  // `json` is required here: Solana does not expose meta.loadedAddresses for jsonParsed getTransaction responses.
+  const response = await rpc('getTransaction',[requested_signature,{encoding:'json',commitment,maxSupportedTransactionVersion:0}]);
   if (!isPlainObject(response) || !Object.prototype.hasOwnProperty.call(response,'result')) fail('invalid_rpc_response');
   if (response.result === null){
     const provenance = {
-      rpc_method:'getTransaction',rpc_commitment:commitment,rpc_endpoint_label,requested_signature,requested_wallet,
+      rpc_method:'getTransaction',rpc_encoding:'json',rpc_commitment:commitment,rpc_endpoint_label,requested_signature,requested_wallet,
       requested_at:requestedAt,observed_at:observedAt,found:false,slot:null,block_time:null,transaction_err:null,
       account_keys:[],address_table_lookups:[],loaded_addresses:{writable:[],readonly:[]},loaded_cardinality:{writable_expected:0,readonly_expected:0}
     };
@@ -153,7 +154,7 @@ export async function collectSolanaAddressTableEvidence({rpc, signature, traderW
   const loaded_cardinality = enforceLookupLoadedCardinality(address_table_lookups,loaded_addresses);
 
   const provenance = {
-    rpc_method:'getTransaction',rpc_commitment:commitment,rpc_endpoint_label,requested_signature,requested_wallet,
+    rpc_method:'getTransaction',rpc_encoding:'json',rpc_commitment:commitment,rpc_endpoint_label,requested_signature,requested_wallet,
     requested_at:requestedAt,observed_at:observedAt,found:true,slot,block_time,transaction_err,account_keys,
     address_table_lookups,loaded_addresses,loaded_cardinality
   };
@@ -168,7 +169,7 @@ export function verifySolanaAddressTableEvidence(evidence){
     const p = evidence.provenance;
     if (!isPlainObject(p)) return false;
     requireSolanaId(p.requested_signature,64,'invalid_signature'); requireSolanaId(p.requested_wallet,32,'invalid_trader_wallet'); requireEndpointLabel(p.rpc_endpoint_label);
-    if (p.rpc_method !== 'getTransaction' || !['confirmed','finalized'].includes(p.rpc_commitment)) return false;
+    if (p.rpc_method !== 'getTransaction' || p.rpc_encoding !== 'json' || !['confirmed','finalized'].includes(p.rpc_commitment)) return false;
     const reqMs=requireIso(p.requested_at,'invalid_requested_at'), obsMs=requireIso(p.observed_at,'invalid_observed_at'); if(obsMs<reqMs) return false;
     let expectedRef=null, lookupCount=0;
     if (p.found === false){
