@@ -11,6 +11,8 @@ const strong = {
   volume_24h_usd: 5_000_000,
   spread_bps: 8,
   estimated_price_impact_bps: 12,
+  expected_net_edge_bps: 25,
+  net_edge_costs_included: true,
   top10_holder_pct: 14,
   token_age_hours: 720,
   route_count: 6,
@@ -27,6 +29,7 @@ const strong = {
 const assessment = evaluateSignalQuality(strong, { now });
 assert.equal(assessment.verdict, 'QUALIFIED');
 assert.ok(assessment.quality_score >= 82);
+assert.equal(assessment.minimum_expected_net_edge_bps, 10);
 
 const lowLiquidity = evaluateSignalQuality({ ...strong, liquidity_usd: 10_000 }, { now });
 assert.equal(lowLiquidity.verdict, 'REJECTED');
@@ -37,6 +40,25 @@ assert.ok(stale.hard_rejects.includes('STALE_MARKET_DATA'));
 
 const concentrated = evaluateSignalQuality({ ...strong, top10_holder_pct: 70 }, { now });
 assert.ok(concentrated.hard_rejects.includes('HOLDER_CONCENTRATION_TOO_HIGH'));
+
+const belowNetEdge = evaluateSignalQuality({ ...strong, expected_net_edge_bps: 9 }, { now });
+assert.equal(belowNetEdge.verdict, 'REJECTED');
+assert.ok(belowNetEdge.hard_rejects.includes('EXPECTED_NET_EDGE_BELOW_MINIMUM'));
+
+const exactNetEdgeFloor = evaluateSignalQuality({ ...strong, expected_net_edge_bps: 10 }, { now });
+assert.equal(exactNetEdgeFloor.verdict, 'QUALIFIED');
+assert.ok(!exactNetEdgeFloor.hard_rejects.includes('EXPECTED_NET_EDGE_BELOW_MINIMUM'));
+
+const unverifiedNetCosts = evaluateSignalQuality({ ...strong, net_edge_costs_included: false }, { now });
+assert.equal(unverifiedNetCosts.verdict, 'REJECTED');
+assert.ok(unverifiedNetCosts.hard_rejects.includes('NET_EDGE_COSTS_UNVERIFIED'));
+
+const hardFloorCannotBeLowered = evaluateSignalQuality(
+  { ...strong, expected_net_edge_bps: 9 },
+  { now, env: { SIGNAL_MIN_EXPECTED_NET_EDGE_BPS: '5' } }
+);
+assert.equal(hardFloorCannotBeLowered.minimum_expected_net_edge_bps, 10);
+assert.ok(hardFloorCannotBeLowered.hard_rejects.includes('EXPECTED_NET_EDGE_BELOW_MINIMUM'));
 
 const buy = evaluateAutoTrade({
   assessment,
@@ -70,4 +92,4 @@ const trailing = evaluateAutoTrade({
 assert.equal(trailing.action, 'SELL');
 assert.ok(trailing.reason_codes.includes('TRAILING_STOP'));
 
-console.log(JSON.stringify({ ok: true, tests: 8, qualified_score: assessment.quality_score, philosophy: 'quality_over_quantity' }));
+console.log(JSON.stringify({ ok: true, tests: 12, qualified_score: assessment.quality_score, min_expected_net_edge_bps: assessment.minimum_expected_net_edge_bps, philosophy: 'quality_over_quantity' }));

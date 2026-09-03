@@ -1,3 +1,5 @@
+const HARD_MIN_EXPECTED_NET_EDGE_BPS = 10;
+
 const finite = (value, fallback = null) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -24,7 +26,8 @@ export function getSignalQualityConfig(env = process.env) {
     maxDataAgeMs: finite(env.SIGNAL_MAX_DATA_AGE_MS, 5000),
     minRouteCount: finite(env.SIGNAL_MIN_ROUTE_COUNT, 2),
     minSourceCount: finite(env.SIGNAL_MIN_SOURCE_COUNT, 2),
-    maxVolatility1hBps: finite(env.SIGNAL_MAX_VOLATILITY_1H_BPS, 1500)
+    maxVolatility1hBps: finite(env.SIGNAL_MAX_VOLATILITY_1H_BPS, 1500),
+    minExpectedNetEdgeBps: Math.max(HARD_MIN_EXPECTED_NET_EDGE_BPS, finite(env.SIGNAL_MIN_EXPECTED_NET_EDGE_BPS, HARD_MIN_EXPECTED_NET_EDGE_BPS))
   });
 }
 
@@ -35,6 +38,7 @@ function validateSnapshot(snapshot, config, now) {
     ['volume_24h_usd', snapshot.volume_24h_usd],
     ['spread_bps', snapshot.spread_bps],
     ['estimated_price_impact_bps', snapshot.estimated_price_impact_bps],
+    ['expected_net_edge_bps', snapshot.expected_net_edge_bps],
     ['top10_holder_pct', snapshot.top10_holder_pct],
     ['token_age_hours', snapshot.token_age_hours],
     ['route_count', snapshot.route_count],
@@ -58,6 +62,8 @@ function validateSnapshot(snapshot, config, now) {
   if (finite(snapshot.volume_24h_usd, 0) < config.minVolume24hUsd) rejects.push('INSUFFICIENT_VOLUME');
   if (finite(snapshot.spread_bps, Infinity) > config.maxSpreadBps) rejects.push('SPREAD_TOO_WIDE');
   if (finite(snapshot.estimated_price_impact_bps, Infinity) > config.maxPriceImpactBps) rejects.push('PRICE_IMPACT_TOO_HIGH');
+  if (snapshot.net_edge_costs_included !== true) rejects.push('NET_EDGE_COSTS_UNVERIFIED');
+  if (finite(snapshot.expected_net_edge_bps, -Infinity) < config.minExpectedNetEdgeBps) rejects.push('EXPECTED_NET_EDGE_BELOW_MINIMUM');
   if (finite(snapshot.top10_holder_pct, 100) > config.maxTop10HolderPct) rejects.push('HOLDER_CONCENTRATION_TOO_HIGH');
   if (finite(snapshot.token_age_hours, 0) < config.minTokenAgeHours) rejects.push('TOKEN_TOO_NEW');
   if (finite(snapshot.route_count, 0) < config.minRouteCount) rejects.push('INSUFFICIENT_EXECUTION_ROUTES');
@@ -101,7 +107,15 @@ function scoreSnapshot(snapshot, config) {
 
 export function evaluateSignalQuality(snapshot = {}, options = {}) {
   const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
-  const config = { ...getSignalQualityConfig(options.env), ...(options.config || {}) };
+  const baseConfig = getSignalQualityConfig(options.env);
+  const config = {
+    ...baseConfig,
+    ...(options.config || {}),
+    minExpectedNetEdgeBps: Math.max(
+      HARD_MIN_EXPECTED_NET_EDGE_BPS,
+      finite(options.config?.minExpectedNetEdgeBps, baseConfig.minExpectedNetEdgeBps)
+    )
+  };
   const hardRejects = validateSnapshot(snapshot, config, now);
   const { score, components } = scoreSnapshot(snapshot, config);
   const verdict = hardRejects.length ? 'REJECTED' : score >= config.minScore ? 'QUALIFIED' : 'WATCH';
@@ -113,6 +127,9 @@ export function evaluateSignalQuality(snapshot = {}, options = {}) {
     verdict,
     hard_rejects: hardRejects,
     components,
+    expected_net_edge_bps: finite(snapshot.expected_net_edge_bps, null),
+    minimum_expected_net_edge_bps: config.minExpectedNetEdgeBps,
+    net_edge_costs_included: snapshot.net_edge_costs_included === true,
     observed_at: snapshot.observed_at || null,
     evaluated_at: new Date(now).toISOString(),
     quality_first: true,
