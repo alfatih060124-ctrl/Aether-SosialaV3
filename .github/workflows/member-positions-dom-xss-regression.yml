@@ -1,0 +1,22 @@
+name: Member Positions DOM XSS Regression
+
+on:
+  push:
+    branches: [main, security/member-positions-dom-xss-guard]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check DOM XSS regression
+        run: node --check scripts/member-positions-dom-xss-regression.mjs
+      - name: Run member positions DOM XSS regression
+        run: node scripts/member-positions-dom-xss-regression.mjs
