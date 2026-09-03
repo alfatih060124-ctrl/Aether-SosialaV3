@@ -40,9 +40,9 @@ assert.match(migration, /reconciliation_evidence_row_limit/);
 
 // Admin UX exposes build/review as separate actions and states the minimum sample.
 assert.match(admin, /Build Performance Evidence/);
-assert.match(admin, /Minimum 20 reconciled trades|Minimum 20|minimum 20/i);
+assert.match(admin, /Reputation V1 requires at least 20 reconciled trades\./i);
 assert.match(admin, /evidence\/reconcile/);
-assert.match(admin, /Admin VERIFY tetap aksi terpisah/);
-assert.match(admin, /tidak ada langkah yang otomatis VERIFY, Publish, atau mengaktifkan LIVE/i);
+assert.match(admin, /Admin VERIFY remains a separate action\./i);
+assert.match(admin, /No step automatically verifies, publishes, or enables LIVE\./i);
 
 console.log('reconciled performance contract regression: PASS');
