@@ -1,5 +1,15 @@
 (() => {
   const d = document;
+
+  const corePositioning = 'Social Trading + On-chain Intelligence + Verified Performance + Automated Risk + Non-Custodial Execution.';
+  d.title = 'My AETHER — Trade with proof.';
+  const description = d.querySelector('meta[name="description"]');
+  if (description) description.setAttribute('content', `Trade with proof. ${corePositioning} AETHER member workspace for SHADOW market discovery, verified traders, and non-custodial controls.`);
+  const positioning = d.querySelector('.positioning');
+  if (positioning) positioning.textContent = corePositioning;
+  const lead = d.querySelector('.lead');
+  if (lead) lead.textContent = 'Trade with proof. Discover Solana markets, evaluate verified traders, manage SHADOW copy mandates, apply to become a trader, review your wallet session, or check system status without granting execution authority.';
+
   const copySection = d.getElementById('copy-mandates');
   if (!copySection || d.getElementById('auto-strategy')) return;
 
