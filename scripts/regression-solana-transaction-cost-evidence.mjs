@@ -107,6 +107,15 @@ async function collect({ response = rpcResult(), endpoint = 'synthetic_rpc', tra
 
 await assert.rejects(() => collect({ endpoint: 'https://rpc.example/?api-key=TEST_ONLY' }));
 await assert.rejects(() => collect({ traderWallet: `${'1'.repeat(30)}23` }));
+await assert.rejects(() => collect({
+  response: {
+    ...rpcResult(),
+    result: {
+      ...rpcResult().result,
+      meta: { fee: 5000, computeUnitsConsumed: 12345 },
+    },
+  },
+}), /transaction err|meta\.err/i);
 await assert.rejects(() => collect({ response: rpcResult({ fee: Number.MAX_SAFE_INTEGER + 1 }) }));
 await assert.rejects(() => collect({ response: rpcResult({ computeUnitsConsumed: Number.MAX_SAFE_INTEGER + 1 }) }));
 await assert.rejects(() => collect({ response: rpcResult({ accountKeys: [OTHER] }) }));
