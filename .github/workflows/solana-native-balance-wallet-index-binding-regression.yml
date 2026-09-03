@@ -1,0 +1,25 @@
+name: Solana Native Balance Wallet Index Binding Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-transaction-native-balance-evidence.mjs'
+      - 'scripts/regression-solana-native-balance-wallet-index-binding.mjs'
+      - '.github/workflows/solana-native-balance-wallet-index-binding-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: node --check scripts/regression-solana-native-balance-wallet-index-binding.mjs
+      - name: Run fail-closed wallet/index binding regression
+        run: node scripts/regression-solana-native-balance-wallet-index-binding.mjs
