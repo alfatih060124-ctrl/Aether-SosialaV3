@@ -28,6 +28,7 @@ jobs:
           node --check services/api/src/execution-boundary.mjs
           node --check services/api/src/market-intelligence.mjs
           node --check services/api/src/wallet-auth.mjs
+          node --check services/api/src/wallet-portfolio.mjs
           node --check services/api/src/trader-evidence-collector.mjs
           node --check services/api/src/solana-evidence-source.mjs
           node --check services/api/src/internal-reconciliation-evidence-source.mjs
@@ -43,10 +44,13 @@ jobs:
           node --check services/api/src/repositories/marketplace.mjs
           node --check services/api/src/repositories/trade-events.mjs
           node --check services/api/src/repositories/execution-requests.mjs
+          node --check public/account-auto-strategy.js
+          node --check public/account-wallet-portfolio.js
           node --check scripts/run-signal-quality-tests.mjs
           node --check scripts/run-wallet-auth-tests.mjs
           node --check scripts/run-wallet-auth-http-tests.mjs
           node --check scripts/run-trader-copy-http-tests.mjs
+          node --check scripts/wallet-portfolio-regression.mjs
           node --check scripts/admin-safety-regression.mjs
           node --check scripts/execution-uuid-regression.mjs
           node --check scripts/trader-evidence-collector-regression.mjs
@@ -91,6 +95,8 @@ jobs:
         run: node scripts/admin-safety-regression.mjs
       - name: Execution UUID fail-closed regression
         run: node scripts/execution-uuid-regression.mjs
+      - name: Wallet portfolio fail-closed regression
+        run: node scripts/wallet-portfolio-regression.mjs
       - name: Trader evidence collector regression
         run: node scripts/trader-evidence-collector-regression.mjs
       - name: Solana RPC evidence source regression
