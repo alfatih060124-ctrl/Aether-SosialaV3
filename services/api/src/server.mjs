@@ -13,11 +13,11 @@ import { runMigrations } from './migration-runner.mjs';
 import { runShadowSimulation } from './shadow-simulator.mjs';
 import { checkExecutionEngineRental } from './execution-rental-gate.mjs';
 import { evaluateSignalQuality, getSignalQualityConfig } from './signal-intelligence.mjs';
-import { evaluateAutoTrade } from './auto-trade-engine.mjs';
 import { createWalletAuthService } from './wallet-auth.mjs';
 import { createAutomaticEvidenceService } from './automatic-evidence-service.mjs';
 import { createReconciledPerformanceService } from './reconciled-performance-service.mjs';
 import { createWalletPortfolioService } from './wallet-portfolio.mjs';
+import { handleMemberAutoTradeRoute } from './member-autotrade-route.mjs';
 
 const PORT = Number(process.env.PORT || 8080);
 const executionMode = process.env.EXECUTION_MODE || 'SHADOW';
@@ -28,7 +28,7 @@ const walletAuth = pool ? createWalletAuthService(pool) : null;
 const automaticEvidence = pool ? createAutomaticEvidenceService(pool,{rpcUrl:process.env.SOLANA_RPC_URL,endpointLabel:process.env.SOLANA_RPC_ENDPOINT_LABEL||'solana-rpc'}) : null;
 const reconciledPerformance = pool ? createReconciledPerformanceService(pool) : null;
 const walletPortfolio = createWalletPortfolioService({rpcUrl:process.env.SOLANA_RPC_URL});
-const VERSION = '2026.09.03-follower-activity-shadow';
+const VERSION = '2026.09.04-member-autotrade-shadow';
 const send=(res,status,body,type='application/json; charset=utf-8')=>{res.writeHead(status,{'content-type':type,'cache-control':'no-store'});res.end(type.startsWith('text/')?body:JSON.stringify(body));};
 const auth=req=>Boolean(process.env.API_TOKEN)&&req.headers.authorization===`Bearer ${process.env.API_TOKEN}`;
 const adminAuth=req=>Boolean(process.env.ADMIN_API_TOKEN)&&req.headers.authorization===`Bearer ${process.env.ADMIN_API_TOKEN}`;
@@ -44,6 +44,7 @@ const errorStatus=e=>{const code=String(e?.message||'');if(code==='request_body_
 
 const server=http.createServer(async(req,res)=>{try{
  const route=pathname(req),p=parts(req);
+ if(await handleMemberAutoTradeRoute({req,res,route,pool,repos,walletAuth,sessionFor,jsonBody,send,executionMode,liveEnabled,walletPortfolio,assessmentProjection}))return;
  if(req.method==='GET'&&route==='/api/health')return send(res,200,{status:'ok',service:'aether-api',execution_mode:executionMode,live_enabled:liveEnabled,auth_mode:'WALLET_SIGNATURE',version:VERSION});
  if(req.method==='GET'&&route==='/api/readiness'){if(!pool)return send(res,503,{status:'not_ready',database:'unconfigured',version:VERSION});try{await pool.query('SELECT 1');return send(res,200,{status:'ready',database:'ok',version:VERSION});}catch{return send(res,503,{status:'not_ready',database:'unavailable',version:VERSION});}}
  if(req.method==='GET'&&route==='/api/version')return send(res,200,{version:VERSION,execution_mode:executionMode,live_enabled:liveEnabled});
@@ -102,7 +103,7 @@ const server=http.createServer(async(req,res)=>{try{
    if(!repos||!walletAuth)return send(res,503,{error:'database_unconfigured'});
    const session=await sessionFor(req);if(!session)return send(res,401,{error:'session_required'});
    const mandate=await repos.copyPolicies.createForFollower(session.user_id,await jsonBody(req));
-   await repos.auditEvents.append({event_type:'COPY_MANDATE_CREATED',actor:session.primary_wallet,entity_type:'copy_policy',entity_id:String(mandate.policy_id),payload:{trader_id:mandate.trader_id,mode:'SHADOW',allocation_bps:mandate.allocation_bps,max_copy_amount_usd:mandate.max_copy_amount_usd,max_position_amount_usd:mandate.max_position_amount_usd,max_slippage_bps:mandate.max_slippage_bps,max_daily_loss_bps:mandate.max_daily_loss_bps,stop_drawdown_bps:mandate.stop_drawdown_bps,live_execution_authorized:false}});
+   await repos.auditEvents.append({event_type:'COPY_MANDATE_CREATED',actor:session.primary_wallet,entity_type:'copy_policy',entity_id:String(mandate.policy_id),payload:{trader_id:mandate.trader_id,mode:'SHADOW',allocation_bps:mandate.allocation_bps,max_copy_amount_usd:mandate.max_copy_amount_usd,max_position_amount_usd:mandate.max_position_amount_usd,max_slippage_bps:mandate.max_slippage_bps,max_daily_loss_bps:mandate.max_daily_loss_bps,stop_drawdown_bps:mandate.stop_drawdown_bps,policy_type:mandate.policy_type,policy_value:mandate.policy_value,consent_version:mandate.consent_version,consented_at:mandate.consented_at,live_execution_authorized:false}});
    return send(res,201,{mandate,mode:'SHADOW',live_execution_authorized:false});
  }
  if(req.method==='PATCH'&&p[1]==='account'&&p[2]==='copy-mandates'&&p[3]){
@@ -115,7 +116,6 @@ const server=http.createServer(async(req,res)=>{try{
 
  if(req.method==='POST'&&route==='/api/signals/evaluate'){if(!auth(req))return send(res,401,{error:'unauthorized'});if(!repos)return send(res,503,{error:'database_unconfigured'});const assessment=evaluateSignalQuality(await jsonBody(req));const stored=await repos.signalIntelligence.recordAssessment(assessment);await repos.auditEvents.append({event_type:'MACHINE_SIGNAL_ASSESSED',actor:'signal-intelligence',entity_type:'signal_assessment',entity_id:String(stored.assessment_id),payload:{token_mint:assessment.token_mint,quality_score:assessment.quality_score,verdict:assessment.verdict,hard_rejects:assessment.hard_rejects,live_execution_authorized:false}});return send(res,200,{assessment_id:stored.assessment_id,assessment});}
  if(req.method==='GET'&&route==='/api/signals/recent'){if(!auth(req))return send(res,401,{error:'unauthorized'});if(!repos)return send(res,503,{error:'database_unconfigured'});return send(res,200,{items:await repos.signalIntelligence.recentAssessments(requestUrl(req).searchParams.get('limit'))});}
- if(req.method==='POST'&&route==='/api/autotrade/evaluate'){if(!auth(req))return send(res,401,{error:'unauthorized'});if(!repos)return send(res,503,{error:'database_unconfigured'});if(liveEnabled||executionMode!=='SHADOW')return send(res,423,{error:'autotrade_live_blocked',reason:'shadow_only_foundation'});const body=await jsonBody(req);let assessment,assessmentId=null;if(body.assessment_id){const row=await repos.signalIntelligence.getAssessment(body.assessment_id);if(!row)return send(res,404,{error:'signal_assessment_not_found'});assessment=assessmentProjection(row);assessmentId=row.assessment_id;}else{if(!body.snapshot)return send(res,400,{error:'signal_snapshot_required'});assessment=evaluateSignalQuality(body.snapshot);const row=await repos.signalIntelligence.recordAssessment(assessment);assessmentId=row.assessment_id;}const decision=evaluateAutoTrade({assessment,mandate:body.mandate||{},position:body.position||{},runtime:{liveEnabled}});const storedDecision=await repos.signalIntelligence.recordDecision({assessmentId,decision,mandate:body.mandate||{},position:body.position||{}});await repos.auditEvents.append({event_type:'AUTOTRADE_SHADOW_DECISION',actor:'auto-trade-engine',entity_type:'auto_trade_decision',entity_id:String(storedDecision.decision_id),payload:{assessment_id:assessmentId,token_mint:decision.token_mint,action:decision.action,reason_codes:decision.reason_codes,requested_amount_usd:decision.requested_amount_usd,live_execution_authorized:false}});return send(res,200,{assessment_id:assessmentId,decision_id:storedDecision.decision_id,assessment,decision,execution_dispatched:false});}
  if(req.method==='GET'&&route==='/api/autotrade/decisions'){if(!auth(req))return send(res,401,{error:'unauthorized'});if(!repos)return send(res,503,{error:'database_unconfigured'});return send(res,200,{items:await repos.signalIntelligence.recentDecisions(requestUrl(req).searchParams.get('limit'))});}
  if(req.method==='POST'&&route==='/api/shadow/simulate'){if(!auth(req))return send(res,401,{error:'unauthorized'});if(!repos)return send(res,503,{error:'database_unconfigured'});if(liveEnabled||executionMode!=='SHADOW')return send(res,409,{error:'shadow_simulation_locked',reason:'execution_mode_not_shadow'});const result=await runShadowSimulation({repos,pool,body:await jsonBody(req)});return send(res,result.status,result.body);}
  if(req.method==='GET'&&p[1]==='trades')return send(res,200,{items:await repos.tradeEvents.recent(requestUrl(req).searchParams.get('limit'))});
