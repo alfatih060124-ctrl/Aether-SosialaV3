@@ -1,0 +1,24 @@
+name: Auto Trade Runtime Risk Repository Regression
+
+on:
+  pull_request:
+    paths:
+      - 'database/migrations/002_autotrade_runtime_risk_snapshots.sql'
+      - 'services/api/src/autotrade-runtime-risk-repository.mjs'
+      - 'scripts/autotrade-runtime-risk-repository-regression.mjs'
+      - '.github/workflows/autotrade-runtime-risk-repository.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/autotrade-runtime-risk-repository-regression.mjs
