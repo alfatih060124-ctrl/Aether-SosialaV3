@@ -15,9 +15,9 @@ for(const required of [
   'published=false',
   'LIVE authorized=false',
   'Manual evidence — advanced audited-source fallback',
-  'Jangan masukkan angka dummy, estimasi, atau placeholder',
+  'Do not enter dummy, estimated, or placeholder values.',
   'reconciled_metrics_required',
-  'Minimum 20 reconciled trades',
+  'Reputation V1 requires at least 20 reconciled trades.',
 ]) assert(html.includes(required),`missing automatic evidence UI invariant: ${required}`);
 
 assert(/evidence\/collect'\s*,\s*\{method:'POST',body:JSON\.stringify\(\{limit:100,max_pages:3\}\)\}/.test(html),'collector request must contain only bounded collection controls');
@@ -27,7 +27,7 @@ assert(/const ret=input\('Total return \(bps\)','number',''\)/.test(html),'manua
 assert(/const win=input\('Win rate \(bps\)','number',''\)/.test(html),'manual win rate must not ship with fake default');
 assert(/const dd=input\('Drawdown \(bps\)','number',''\)/.test(html),'manual drawdown must not ship with fake default');
 assert(/const rep=input\('Reputation 0-100','number',''\)/.test(html),'manual reputation must not ship with fake default');
-assert(html.includes("window.confirm('Konfirmasi: semua metrik berasal dari sumber yang dapat diaudit dan bukan data dummy/estimasi?')"),'manual evidence must require explicit audited-source confirmation');
+assert(html.includes("window.confirm('Confirm: all metrics come from an auditable source and are not dummy or estimated data.')"),'manual evidence must require explicit audited-source confirmation');
 assert(!/collectSolanaEvidence[\s\S]{0,1000}reviewEvidence\(/.test(html),'automatic collection must not call VERIFY');
 assert(!/collectSolanaEvidence[\s\S]{0,1000}setPublication\(/.test(html),'automatic collection must not publish');
 assert(!/buildReconciledPerformanceEvidence[\s\S]{0,1000}reviewEvidence\(/.test(html),'performance build must not call VERIFY');
