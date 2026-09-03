@@ -1,0 +1,23 @@
+name: SHADOW Lifecycle Dispatch Guard Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/repositories/execution-requests.mjs'
+      - 'scripts/security-shadow-lifecycle-dispatch-guard-regression.mjs'
+      - '.github/workflows/security-shadow-lifecycle-dispatch-guard-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run SHADOW lifecycle dispatch guard regression
+        run: node scripts/security-shadow-lifecycle-dispatch-guard-regression.mjs
