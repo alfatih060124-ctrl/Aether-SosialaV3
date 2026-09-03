@@ -30,6 +30,7 @@ export const API_CONTRACT = {
   ],
 
   wallet_session: [
+    'GET /api/account/wallet-portfolio',
     'GET /api/account/trader',
     'POST /api/account/trader/challenge',
     'POST /api/account/trader/apply',
@@ -85,6 +86,9 @@ export const API_CONTRACT = {
     signer_exposed_to_api: false,
     public_edge_blocks_internal_and_admin_routes: true,
     market_token_lookup_is_read_only: true,
+    wallet_portfolio_is_session_bound: true,
+    wallet_portfolio_is_read_only: true,
+    wallet_portfolio_never_authorizes_live: true,
     evidence_collection_does_not_verify: true,
     evidence_recording_does_not_verify: true,
     reconciled_performance_evidence_does_not_verify: true,
