@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import { collectSolanaWalletTokenAccountSnapshot, verifySolanaWalletTokenAccountSnapshot } from '../services/api/src/solana-wallet-token-account-snapshot.mjs';
+
+// SYNTHETIC / TEST-ONLY fixtures. Never production evidence.
+const WALLET='11111111111111111111111111111111';
+const MINT='So11111111111111111111111111111111111111112';
+const TOKEN='TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+const TOKEN_2022='TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+const requestedAt='2026-09-03T20:10:00.000Z';
+const observedAt='2026-09-03T20:10:10.000Z';
+const row=({pubkey=TOKEN,owner=WALLET,mint=MINT,amount='12',decimals=6,state='initialized',program=TOKEN}={})=>({pubkey,account:{owner:program,data:{parsed:{type:'account',info:{owner,mint,state,tokenAmount:{amount,decimals}}}}}});
+const response=(value=[row(),row({pubkey:TOKEN_2022,amount:'8'})])=>({result:{context:{slot:456},value}});
+let captured;
+const evidence=await collectSolanaWalletTokenAccountSnapshot({rpc:async req=>(captured=req,response()),traderWallet:WALLET,requestedAt,observedAt});
+assert.deepEqual(captured,{method:'getTokenAccountsByOwner',params:[WALLET,{programId:TOKEN},{encoding:'jsonParsed',commitment:'confirmed'}]});
+assert.equal(evidence.collection_status,'PENDING_DATA');assert.equal(evidence.metrics_available,false);assert.equal(evidence.verified,false);assert.equal(evidence.published,false);assert.equal(evidence.live_execution_authorized,false);assert.equal(evidence.source_reference,null);
+for(const key of ['trades_count','total_return_bps','win_rate_bps','drawdown_bps','reputation_score']) assert.equal(evidence[key],null);
+assert.equal(evidence.evidence_count,2);assert.equal(evidence.rows[0].source_reference,null);assert.equal(evidence.rows[1].source_reference,null);
+assert.deepEqual(evidence.mint_summaries,[{mint:MINT,decimals:6,token_accounts:2,total_raw_amount:'20'}]);assert.equal(evidence.provenance.context_slot,456);assert.equal(evidence.provenance.source_reference_policy,'NONE_NON_TRANSACTION_SNAPSHOT');assert.equal(verifySolanaWalletTokenAccountSnapshot(evidence),true);
+const verifyTamper=structuredClone(evidence);verifyTamper.verified=true;assert.equal(verifySolanaWalletTokenAccountSnapshot(verifyTamper),false);
+const refTamper=structuredClone(evidence);refTamper.source_reference=`solana_rpc:${'1'.repeat(64)}@456`;assert.equal(verifySolanaWalletTokenAccountSnapshot(refTamper),false);
+const summaryTamper=structuredClone(evidence);summaryTamper.mint_summaries[0].total_raw_amount='21';assert.equal(verifySolanaWalletTokenAccountSnapshot(summaryTamper),false);
+const rowTamper=structuredClone(evidence);rowTamper.rows[0].raw_amount='13';assert.equal(verifySolanaWalletTokenAccountSnapshot(rowTamper),false);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response(),traderWallet:'z'.repeat(44),requestedAt,observedAt}),/invalid_trader_wallet/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response([row({owner:MINT})]),traderWallet:WALLET,requestedAt,observedAt}),/wallet_not_token_account_owner/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response([row({amount:'18446744073709551616'})]),traderWallet:WALLET,requestedAt,observedAt}),/invalid_raw_amount/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response([row(),row({pubkey:TOKEN_2022,decimals:9})]),traderWallet:WALLET,requestedAt,observedAt}),/mint_decimals_mismatch/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response([row(),row()]),traderWallet:WALLET,requestedAt,observedAt}),/duplicate_token_account/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response(),traderWallet:WALLET,endpointLabel:'https://rpc.example/?key=secret',requestedAt,observedAt}),/invalid_rpc_endpoint_label/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response(),traderWallet:WALLET,tokenProgramId:MINT,requestedAt,observedAt}),/unsupported_token_program/);
+const empty=await collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response([]),traderWallet:WALLET,requestedAt,observedAt});assert.equal(empty.evidence_count,0);assert.deepEqual(empty.mint_summaries,[]);assert.equal(verifySolanaWalletTokenAccountSnapshot(empty),true);
+console.log('Solana wallet token account snapshot regression: SYNTHETIC / TEST-ONLY PASS');
