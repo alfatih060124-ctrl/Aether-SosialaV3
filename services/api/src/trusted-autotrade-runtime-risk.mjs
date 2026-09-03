@@ -18,6 +18,12 @@ function money(value, error) {
   return Math.round(n * 100) / 100;
 }
 
+function signedMoney(value, error) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) throw new Error(error);
+  return Math.round(n * 100) / 100;
+}
+
 function requireTokenMint(assessment) {
   const mint = String(assessment?.token_mint || '').trim();
   if (!mint) throw new Error('autotrade_token_mint_required');
@@ -35,6 +41,21 @@ function requirePortfolio(portfolio, walletAddress) {
   const usdc = money(portfolio?.balances?.usdc?.amount, 'autotrade_usdc_balance_invalid');
   if (usdc <= 0) throw new Error('autotrade_usdc_balance_required');
   return { portfolio, usdc };
+}
+
+function accountingReadiness(row, observedNow, maxLagMs) {
+  if (!row || row.accounting_ready !== true || row.mode !== 'SHADOW' || row.live_execution_authorized !== false || !row.complete_through) {
+    return Object.freeze({ ready: false, reason: 'ACCOUNTING_NOT_READY', completeThrough: null, sourceVersion: row?.source_version || null });
+  }
+  const completeThrough = new Date(row.complete_through);
+  if (Number.isNaN(completeThrough.getTime())) {
+    return Object.freeze({ ready: false, reason: 'ACCOUNTING_CURSOR_INVALID', completeThrough: null, sourceVersion: row.source_version || null });
+  }
+  const lagMs = observedNow.getTime() - completeThrough.getTime();
+  if (lagMs < -2000 || lagMs > maxLagMs) {
+    return Object.freeze({ ready: false, reason: 'ACCOUNTING_STALE', completeThrough, sourceVersion: row.source_version || null, lagMs });
+  }
+  return Object.freeze({ ready: true, reason: null, completeThrough, sourceVersion: row.source_version || null, lagMs });
 }
 
 export function createTrustedAutoTradeRuntimeRiskResolver({
@@ -58,8 +79,18 @@ export function createTrustedAutoTradeRuntimeRiskResolver({
     const observedNow = now();
     if (!(observedNow instanceof Date) || Number.isNaN(observedNow.getTime())) throw new Error('autotrade_risk_clock_invalid');
     const utcStart = new Date(Date.UTC(observedNow.getUTCFullYear(), observedNow.getUTCMonth(), observedNow.getUTCDate()));
+    const maxAccountingLagMs = boundedInt(env.AUTOTRADE_ACCOUNTING_MAX_LAG_MS, 60000, 1000, 300000);
+    const accountingFeatureEnabled = env.AUTOTRADE_POSITION_ACCOUNTING_ENABLED === 'true';
+    const accountingStatePromise = accountingFeatureEnabled
+      ? pool.query(
+          `SELECT accounting_ready,complete_through,source_version,mode,live_execution_authorized
+             FROM follower_shadow_accounting_state
+            WHERE follower_user_id=$1`,
+          [followerUserId]
+        )
+      : Promise.resolve({ rows: [] });
 
-    const [portfolioResult, reservationResult, historyResult] = await Promise.all([
+    const [portfolioResult, reservationResult, historyResult, accountingStateResult] = await Promise.all([
       portfolioService.getPortfolio(wallet),
       pool.query(
         `SELECT COALESCE(SUM(max_position_amount_usd),0) AS reserved_usd
@@ -78,7 +109,8 @@ export function createTrustedAutoTradeRuntimeRiskResolver({
           WHERE mandate->>'mandate_id'=$1
             AND created_at >= $2`,
         [policyId, utcStart.toISOString()]
-      )
+      ),
+      accountingStatePromise
     ]);
 
     const { portfolio, usdc } = requirePortfolio(portfolioResult, wallet);
@@ -90,10 +122,29 @@ export function createTrustedAutoTradeRuntimeRiskResolver({
       ? Math.min(MAX_SECONDS_SINCE_DECISION, Math.max(0, Math.floor((observedNow.getTime() - lastDecision.getTime()) / 1000)))
       : MAX_SECONDS_SINCE_DECISION;
 
+    const accounting = accountingFeatureEnabled
+      ? accountingReadiness(accountingStateResult?.rows?.[0] || null, observedNow, maxAccountingLagMs)
+      : Object.freeze({ ready: false, reason: 'ACCOUNTING_FEATURE_DISABLED', completeThrough: null, sourceVersion: null });
+    let dailyRealizedPnlUsd = 0;
+    if (accounting.ready) {
+      const pnlResult = await pool.query(
+        `SELECT COALESCE(SUM(realized_pnl_usdc),0) AS daily_realized_pnl_usd
+           FROM follower_shadow_position_events
+          WHERE follower_user_id=$1
+            AND event_type IN ('DECREASE','CLOSE')
+            AND occurred_at >= $2
+            AND occurred_at <= $3
+            AND mode='SHADOW'
+            AND live_execution_authorized=false`,
+        [followerUserId, utcStart.toISOString(), accounting.completeThrough.toISOString()]
+      );
+      dailyRealizedPnlUsd = signedMoney(pnlResult?.rows?.[0]?.daily_realized_pnl_usd ?? 0, 'autotrade_daily_realized_pnl_invalid');
+    }
+
     return Object.freeze({
       capital_limit_usd: usdc,
       available_capital_usd: available,
-      daily_realized_pnl_usd: 0,
+      daily_realized_pnl_usd: dailyRealizedPnlUsd,
       trades_today: decisionsToday,
       max_trades_per_day: boundedInt(env.AUTOTRADE_DEFAULT_MAX_TRADES_PER_DAY, 6, 1, 100),
       cooldown_seconds: boundedInt(env.AUTOTRADE_DEFAULT_COOLDOWN_SECONDS, 1800, 0, 30 * 24 * 60 * 60),
@@ -102,12 +153,17 @@ export function createTrustedAutoTradeRuntimeRiskResolver({
       exit_quality_floor: boundedNumber(env.AUTOTRADE_EXIT_QUALITY_FLOOR, 55, 0, 100),
       allowed_tokens: Object.freeze([tokenMint]),
       risk_metadata: Object.freeze({
-        risk_source: 'SESSION_WALLET_USDC_AND_DECISION_HISTORY',
+        risk_source: 'SESSION_WALLET_USDC_POSITION_ACCOUNTING_AND_DECISION_HISTORY',
         base_currency: 'USDC',
         wallet_binding: 'AUTHENTICATED_SESSION_PRIMARY_WALLET',
         portfolio_observed_at: portfolio.observed_at || null,
         other_active_mandate_reservations_usd: reservedOther,
-        daily_pnl_accounting_ready: false,
+        position_accounting_feature_enabled: accountingFeatureEnabled,
+        daily_pnl_accounting_ready: accounting.ready,
+        daily_pnl_accounting_reason: accounting.reason,
+        accounting_complete_through: accounting.completeThrough?.toISOString() || null,
+        accounting_source_version: accounting.sourceVersion,
+        accounting_max_lag_ms: maxAccountingLagMs,
         read_only: true,
         non_custodial: true,
         execution_dispatched: false,
