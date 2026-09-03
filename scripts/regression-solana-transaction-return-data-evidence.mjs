@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { collectSolanaTransactionReturnDataEvidence, verifySolanaTransactionReturnDataEvidence } from '../services/api/src/solana-transaction-return-data-evidence.mjs';
 
 const SIGNATURE = '1'.repeat(64);
+const OTHER_SIGNATURE = `${'1'.repeat(63)}2`;
 const WALLET = '1'.repeat(32);
-const PROGRAM = '2'.repeat(32);
+const OTHER_WALLET = `${'1'.repeat(31)}2`;
+const PROGRAM = OTHER_WALLET;
 const START = '2026-09-03T06:00:00.000Z';
 const OBSERVED = '2026-09-03T06:00:02.000Z';
 
@@ -59,8 +61,8 @@ const metricInjected = structuredClone(evidence);
 metricInjected.win_rate_bps = 9000;
 assert.throws(() => verifySolanaTransactionReturnDataEvidence(metricInjected), /win_rate_bps must remain null/);
 
-await assert.rejects(() => collect(rpcResult({ transaction: { signatures: ['2'.repeat(64)], message: { accountKeys: [{ pubkey: WALLET }] } } })), /returned primary signature/);
-await assert.rejects(() => collect(rpcResult({ transaction: { signatures: [SIGNATURE], message: { accountKeys: [{ pubkey: '2'.repeat(32) }] } } })), /requested trader wallet must participate/);
+await assert.rejects(() => collect(rpcResult({ transaction: { signatures: [OTHER_SIGNATURE], message: { accountKeys: [{ pubkey: WALLET }] } } })), /returned primary signature/);
+await assert.rejects(() => collect(rpcResult({ transaction: { signatures: [SIGNATURE], message: { accountKeys: [{ pubkey: OTHER_WALLET }] } } })), /requested trader wallet must participate/);
 await assert.rejects(() => collect(rpcResult({ meta: { err: 'bad', returnData: null } })), /transaction err/);
 await assert.rejects(() => collect(rpcResult({ meta: { err: null, returnData: { programId: PROGRAM, data: ['%%%not-base64%%%', 'base64'] } } })), /base64/);
 await assert.rejects(() => collect(rpcResult({ meta: { err: null, returnData: { programId: PROGRAM, data: [Buffer.from('x').toString('base64'), 'utf8'] } } })), /returnData.data/);
