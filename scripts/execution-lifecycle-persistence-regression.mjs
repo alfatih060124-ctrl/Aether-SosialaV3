@@ -19,7 +19,7 @@ const pool = {
     if (sql.includes('UPDATE execution_requests') && sql.includes('status=$3')) {
       return { rows: [{ execution_request_id: values[0], status: values[2] }] };
     }
-    if (sql.includes('SELECT status FROM execution_requests')) return { rows: [{ status: 'CREATED' }] };
+    if (sql.includes('SELECT status,mode FROM execution_requests')) return { rows: [{ status: 'CREATED', mode: 'SHADOW' }] };
     return { rows: [] };
   }
 };
@@ -56,7 +56,7 @@ await assert.rejects(
 const conflictPool = {
   async query(sql) {
     if (sql.includes('UPDATE execution_requests')) return { rows: [] };
-    if (sql.includes('SELECT status FROM execution_requests')) return { rows: [{ status: 'QUOTED' }] };
+    if (sql.includes('SELECT status,mode FROM execution_requests')) return { rows: [{ status: 'QUOTED', mode: 'SHADOW' }] };
     return { rows: [] };
   }
 };
