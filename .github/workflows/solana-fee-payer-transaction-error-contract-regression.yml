@@ -1,0 +1,26 @@
+name: Solana Fee Payer Transaction Error Contract Regression
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-transaction-fee-payer-evidence.mjs'
+      - 'scripts/regression-solana-fee-payer-transaction-error-contract.mjs'
+      - '.github/workflows/solana-fee-payer-transaction-error-contract-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/api/src/solana-transaction-fee-payer-evidence.mjs'
+      - 'scripts/regression-solana-fee-payer-transaction-error-contract.mjs'
+      - '.github/workflows/solana-fee-payer-transaction-error-contract-regression.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check regression
+        run: node --check scripts/regression-solana-fee-payer-transaction-error-contract.mjs
+      - name: Run fail-closed regression
+        run: node scripts/regression-solana-fee-payer-transaction-error-contract.mjs
