@@ -95,7 +95,7 @@ BEFORE INSERT OR UPDATE ON fee_control_changes
 FOR EACH ROW EXECUTE FUNCTION aether_guard_fee_control_change_transition();
 
 -- Strengthen the existing platform fee guard: changing performance/execution fees now
--- requires a matching APPROVED ledger entry and a distinct applier identity supplied in
+-- requires a matching APPROVED ledger entry and a distinct applier identity + role supplied in
 -- transaction-local backend context. Existing inserts remain unaffected.
 CREATE OR REPLACE FUNCTION aether_guard_fee_config()
 RETURNS trigger
@@ -104,6 +104,7 @@ AS $$
 DECLARE
   change_id_text text;
   actor_id text;
+  actor_role text;
   approved_change fee_control_changes%ROWTYPE;
 BEGIN
   IF NEW.performance_fee_bps < 0 OR NEW.performance_fee_bps > 10000 THEN RAISE EXCEPTION 'invalid_performance_fee_bps'; END IF;
@@ -117,8 +118,12 @@ BEGIN
   ) THEN
     change_id_text := NULLIF(current_setting('aether.fee_change_id', true), '');
     actor_id := NULLIF(current_setting('aether.actor', true), '');
-    IF change_id_text IS NULL OR actor_id IS NULL THEN
+    actor_role := NULLIF(current_setting('aether.actor_role', true), '');
+    IF change_id_text IS NULL OR actor_id IS NULL OR actor_role IS NULL THEN
       RAISE EXCEPTION 'fee_change_context_required';
+    END IF;
+    IF actor_role IS DISTINCT FROM 'FEE_CONFIG_APPLIER' THEN
+      RAISE EXCEPTION 'fee_config_applier_role_required';
     END IF;
 
     BEGIN
