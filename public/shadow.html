@@ -7,15 +7,20 @@
 <meta http-equiv="refresh" content="0;url=/dashboard">
 <meta name="theme-color" content="#07111f">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<title>AETHER — Dashboard moved</title>
-<style>body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#07111f;color:#eef2ff;margin:0;min-height:100vh;display:grid;place-items:center}.card{max-width:620px;margin:24px;padding:24px;border:1px solid #203451;border-radius:18px;background:rgba(13,26,45,.9)}.brand{display:inline-flex;align-items:center;gap:10px;font-weight:850;letter-spacing:.14em}.brand img{width:30px;height:30px}.muted{color:#9fb0c8;line-height:1.6}a{color:#8de6cf}h1{letter-spacing:-.03em}</style>
+<title>AETHER — Trade with proof.</title>
+<meta name="description" content="AETHER SHADOW redirect — Social Trading + On-chain Intelligence + Verified Performance + Automated Risk + Non-Custodial Execution. Read-only observability; no LIVE execution or signer authority.">
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eef2ff;background:#07111f}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 75% 10%,rgba(48,103,178,.18),transparent 30%),radial-gradient(circle at 18% 82%,rgba(35,179,145,.08),transparent 28%),#07111f}.card{width:min(720px,calc(100% - 28px));margin:14px;padding:clamp(24px,5vw,42px);border:1px solid #203451;border-radius:22px;background:rgba(13,26,45,.92);box-shadow:0 24px 70px rgba(0,0,0,.24)}.brand{display:inline-flex;align-items:center;gap:10px;font-weight:850;letter-spacing:.14em;color:inherit;text-decoration:none}.brand img{width:32px;height:32px;display:block}.eyebrow{margin-top:28px;font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:#8de6cf;font-weight:800}h1{font-size:clamp(38px,8vw,60px);letter-spacing:-.05em;line-height:1;margin:12px 0 16px}.positioning{margin:0 0 16px;color:#dbe7f7;font-size:clamp(17px,2.5vw,21px);font-weight:760;line-height:1.5}.muted{color:#9fb0c8;line-height:1.65;margin:0}.cta{display:inline-flex;align-items:center;justify-content:center;margin-top:22px;padding:11px 14px;border:1px solid #8de6cf;border-radius:10px;color:#8de6cf;font-weight:800;text-decoration:none}.brand:focus-visible,.cta:focus-visible{outline:3px solid #8de6cf;outline-offset:3px}@media(max-width:520px){.brand img{width:29px;height:29px}.positioning{font-size:17px}.cta{width:100%}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
 </head>
 <body>
-<main class="card">
-  <div class="brand"><img src="/aether-mark.svg" alt="" width="30" height="30">AETHER</div>
-  <h1>Public SHADOW view has one canonical route.</h1>
-  <p class="muted">To prevent duplicated functions and overlapping traffic paths, this page no longer runs API calls or simulations. Use the public read-only dashboard instead.</p>
-  <p><a href="/dashboard">Open /dashboard</a></p>
+<main class="card" aria-labelledby="page-title">
+  <a class="brand" href="/" aria-label="AETHER home"><img src="/aether-mark.svg" alt="" aria-hidden="true" width="32" height="32">AETHER</a>
+  <div class="eyebrow">Canonical SHADOW route</div>
+  <h1 id="page-title">Trade with proof.</h1>
+  <p class="positioning">Social Trading + On-chain Intelligence + Verified Performance + Automated Risk + Non-Custodial Execution.</p>
+  <p class="muted">This legacy route performs no API calls, simulations, orders, wallet signing, or fund movement. Public SHADOW observability is available only through the canonical read-only dashboard.</p>
+  <a class="cta" href="/dashboard">Open SHADOW Dashboard</a>
 </main>
 <script>location.replace('/dashboard');</script>
 </body>
