@@ -83,5 +83,6 @@ createMandate.addEventListener('click',async()=>{const trader_id=copyTrader.valu
 logout.addEventListener('click',async()=>{logout.disabled=true;try{await fetch('/api/auth/logout',{method:'POST'});}catch{}location.replace('/onboarding');});
 load();
 </script>
+<script src="/account-auto-strategy.js"></script>
 </body>
 </html>
