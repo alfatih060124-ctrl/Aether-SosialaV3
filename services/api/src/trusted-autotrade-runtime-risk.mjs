@@ -80,6 +80,15 @@ export function createTrustedAutoTradeRuntimeRiskResolver({
     if (!(observedNow instanceof Date) || Number.isNaN(observedNow.getTime())) throw new Error('autotrade_risk_clock_invalid');
     const utcStart = new Date(Date.UTC(observedNow.getUTCFullYear(), observedNow.getUTCMonth(), observedNow.getUTCDate()));
     const maxAccountingLagMs = boundedInt(env.AUTOTRADE_ACCOUNTING_MAX_LAG_MS, 60000, 1000, 300000);
+    const accountingFeatureEnabled = env.AUTOTRADE_POSITION_ACCOUNTING_ENABLED === 'true';
+    const accountingStatePromise = accountingFeatureEnabled
+      ? pool.query(
+          `SELECT accounting_ready,complete_through,source_version,mode,live_execution_authorized
+             FROM follower_shadow_accounting_state
+            WHERE follower_user_id=$1`,
+          [followerUserId]
+        )
+      : Promise.resolve({ rows: [] });
 
     const [portfolioResult, reservationResult, historyResult, accountingStateResult] = await Promise.all([
       portfolioService.getPortfolio(wallet),
@@ -101,12 +110,7 @@ export function createTrustedAutoTradeRuntimeRiskResolver({
             AND created_at >= $2`,
         [policyId, utcStart.toISOString()]
       ),
-      pool.query(
-        `SELECT accounting_ready,complete_through,source_version,mode,live_execution_authorized
-           FROM follower_shadow_accounting_state
-          WHERE follower_user_id=$1`,
-        [followerUserId]
-      )
+      accountingStatePromise
     ]);
 
     const { portfolio, usdc } = requirePortfolio(portfolioResult, wallet);
@@ -118,7 +122,9 @@ export function createTrustedAutoTradeRuntimeRiskResolver({
       ? Math.min(MAX_SECONDS_SINCE_DECISION, Math.max(0, Math.floor((observedNow.getTime() - lastDecision.getTime()) / 1000)))
       : MAX_SECONDS_SINCE_DECISION;
 
-    const accounting = accountingReadiness(accountingStateResult?.rows?.[0] || null, observedNow, maxAccountingLagMs);
+    const accounting = accountingFeatureEnabled
+      ? accountingReadiness(accountingStateResult?.rows?.[0] || null, observedNow, maxAccountingLagMs)
+      : Object.freeze({ ready: false, reason: 'ACCOUNTING_FEATURE_DISABLED', completeThrough: null, sourceVersion: null });
     let dailyRealizedPnlUsd = 0;
     if (accounting.ready) {
       const pnlResult = await pool.query(
@@ -152,6 +158,7 @@ export function createTrustedAutoTradeRuntimeRiskResolver({
         wallet_binding: 'AUTHENTICATED_SESSION_PRIMARY_WALLET',
         portfolio_observed_at: portfolio.observed_at || null,
         other_active_mandate_reservations_usd: reservedOther,
+        position_accounting_feature_enabled: accountingFeatureEnabled,
         daily_pnl_accounting_ready: accounting.ready,
         daily_pnl_accounting_reason: accounting.reason,
         accounting_complete_through: accounting.completeThrough?.toISOString() || null,
