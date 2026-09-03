@@ -14,7 +14,7 @@ function response(overrides={}){
   const base={result:{slot:123456,blockTime:1788429600,transaction:{signatures:[SIG],message:{accountKeys:[WALLET,TABLE],addressTableLookups:[{accountKey:TABLE,writableIndexes:[1],readonlyIndexes:[2]}]}},meta:{err:null,loadedAddresses:{writable:[LOADED_W],readonly:[LOADED_R]}}}};
   return structuredClone(Object.assign(base,overrides));
 }
-const rpcFrom = value => async (method,params)=>{ assert.equal(method,'getTransaction'); assert.equal(params[0],SIG); return structuredClone(value); };
+const rpcFrom = value => async (method,params)=>{ assert.equal(method,'getTransaction'); assert.equal(params[0],SIG); assert.equal(params[1]?.encoding,'json'); return structuredClone(value); };
 const input = rpc => ({rpc,signature:SIG,traderWallet:WALLET,rpcEndpointLabel:'mainnet-primary',commitment:'confirmed',requestedAt,observedAt});
 
 const valid=await collectSolanaAddressTableEvidence(input(rpcFrom(response())));
