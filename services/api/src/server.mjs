@@ -17,6 +17,7 @@ import { evaluateAutoTrade } from './auto-trade-engine.mjs';
 import { createWalletAuthService } from './wallet-auth.mjs';
 import { createAutomaticEvidenceService } from './automatic-evidence-service.mjs';
 import { createReconciledPerformanceService } from './reconciled-performance-service.mjs';
+import { createWalletPortfolioService } from './wallet-portfolio.mjs';
 
 const PORT = Number(process.env.PORT || 8080);
 const executionMode = process.env.EXECUTION_MODE || 'SHADOW';
@@ -26,7 +27,8 @@ const repos = pool ? { tradeEvents:createTradeEventRepository(pool), executionRe
 const walletAuth = pool ? createWalletAuthService(pool) : null;
 const automaticEvidence = pool ? createAutomaticEvidenceService(pool,{rpcUrl:process.env.SOLANA_RPC_URL,endpointLabel:process.env.SOLANA_RPC_ENDPOINT_LABEL||'solana-rpc'}) : null;
 const reconciledPerformance = pool ? createReconciledPerformanceService(pool) : null;
-const VERSION = '2026.09.01-reconciled-performance-shadow';
+const walletPortfolio = createWalletPortfolioService({rpcUrl:process.env.SOLANA_RPC_URL});
+const VERSION = '2026.09.03-wallet-portfolio-shadow';
 const send=(res,status,body,type='application/json; charset=utf-8')=>{res.writeHead(status,{'content-type':type,'cache-control':'no-store'});res.end(type.startsWith('text/')?body:JSON.stringify(body));};
 const auth=req=>Boolean(process.env.API_TOKEN)&&req.headers.authorization===`Bearer ${process.env.API_TOKEN}`;
 const adminAuth=req=>Boolean(process.env.ADMIN_API_TOKEN)&&req.headers.authorization===`Bearer ${process.env.ADMIN_API_TOKEN}`;
@@ -53,6 +55,11 @@ const server=http.createServer(async(req,res)=>{try{
  if(req.method==='GET'&&route==='/api/auth/session'){if(!walletAuth)return send(res,503,{error:'database_unconfigured'});const token=bearerToken(req);if(!token)return send(res,401,{error:'session_required'});const session=await walletAuth.getSession(token);if(!session)return send(res,401,{error:'session_invalid'});return send(res,200,{authenticated:true,user:{user_id:session.user_id,username:session.username,display_name:session.display_name,status:session.status,primary_wallet:session.primary_wallet},session:{session_id:session.session_id,expires_at:session.expires_at}});}
  if(req.method==='POST'&&route==='/api/auth/logout'){if(!walletAuth)return send(res,503,{error:'database_unconfigured'});const token=bearerToken(req);if(!token)return send(res,401,{error:'session_required'});const revoked=await walletAuth.revokeSession(token);if(!revoked)return send(res,401,{error:'session_invalid'});return send(res,200,{revoked:true});}
 
+ if(req.method==='GET'&&route==='/api/account/wallet-portfolio'){
+   if(!walletAuth)return send(res,503,{error:'database_unconfigured'});
+   const session=await sessionFor(req);if(!session)return send(res,401,{error:'session_required'});
+   return send(res,200,await walletPortfolio.getPortfolio(session.primary_wallet));
+ }
  if(req.method==='GET'&&route==='/api/account/trader'){
    if(!repos||!walletAuth)return send(res,503,{error:'database_unconfigured'});
    const session=await sessionFor(req);if(!session)return send(res,401,{error:'session_required'});
