@@ -93,11 +93,14 @@ const route = await evaluateAuthenticatedAutoTradeRoute({
   liveEnabled: false
 });
 assert.equal(route.schema, 'aether.autotrade.authenticated_route_boundary.v2');
-assert.equal(route.decision.action, 'BUY');
-assert.equal(route.decision.requested_amount_usd, 37.5);
+assert.equal(route.decision.action, 'REJECT');
+assert.deepEqual(route.decision.reason_codes, ['DAILY_PNL_ACCOUNTING_NOT_READY']);
+assert.equal(route.decision.requested_amount_usd, 0);
 assert.equal(route.audit_metadata.runtime_risk_source, 'SESSION_WALLET_USDC_AND_DECISION_HISTORY');
 assert.equal(route.audit_metadata.runtime_risk_base_currency, 'USDC');
 assert.equal(route.audit_metadata.runtime_risk_daily_pnl_accounting_ready, false);
+assert.equal(route.audit_metadata.daily_pnl_accounting_ready, false);
+assert.equal(route.audit_metadata.entry_authorized, false);
 assert.equal(route.audit_metadata.caller_position_authority, false);
 assert.equal(route.audit_metadata.caller_signal_snapshot_authority, false);
 assert.equal(route.execution_dispatched, false);
