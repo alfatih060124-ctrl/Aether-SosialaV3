@@ -1,0 +1,32 @@
+name: Cross Venue Net Edge Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/cross-venue-net-edge.mjs'
+      - 'scripts/cross-venue-net-edge-regression.mjs'
+      - 'scripts/vm-cross-venue-net-edge-probe.mjs'
+      - '.github/workflows/cross-venue-net-edge.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/api/src/cross-venue-net-edge.mjs'
+      - 'scripts/cross-venue-net-edge-regression.mjs'
+      - 'scripts/vm-cross-venue-net-edge-probe.mjs'
+      - '.github/workflows/cross-venue-net-edge.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        run: |
+          node --check services/api/src/cross-venue-net-edge.mjs
+          node --check scripts/cross-venue-net-edge-regression.mjs
+          node --check scripts/vm-cross-venue-net-edge-probe.mjs
+      - name: Run cross-venue net-edge regression
+        run: node scripts/cross-venue-net-edge-regression.mjs
