@@ -1,6 +1,7 @@
 import { createMarketIntelligenceService } from '../services/api/src/market-intelligence.mjs';
 import { createSolanaHolderConcentrationService } from '../services/api/src/solana-holder-concentration.mjs';
 import { createJupiterQuoteEvidenceService } from '../services/api/src/jupiter-quote-evidence.mjs';
+import { createSolanaFeeEvidenceService } from '../services/api/src/solana-fee-evidence.mjs';
 
 const view = String(process.env.AETHER_MARKET_VIEW || 'trending').trim().toLowerCase();
 const limitRaw = Number(process.env.AETHER_MARKET_PROBE_LIMIT || 10);
@@ -15,12 +16,10 @@ const quoteUsdcRaw = String(process.env.AETHER_JUPITER_QUOTE_USDC_RAW || '100000
 
 const BASE_MISSING_FIELDS = Object.freeze([
   'spread_bps',
-  'estimated_price_impact_bps',
   'expected_net_edge_bps',
   'net_edge_costs_included',
   'token_age_hours',
   'route_count',
-  'source_count',
   'volatility_1h_bps',
   'sell_simulation_ok',
   'transferable',
@@ -90,6 +89,15 @@ try {
   quoteServiceError = String(error?.message || error);
 }
 
+let feeEvidence = null;
+let feeEvidenceError = null;
+try {
+  const fees = createSolanaFeeEvidenceService({ timeoutMs: 8000 });
+  feeEvidence = await fees.getRecentFeeEvidence();
+} catch (error) {
+  feeEvidenceError = String(error?.message || error);
+}
+
 try {
   const discovery = await withRateLimitBackoff('discovery', () => market.getDiscovery(view));
   const rows = discovery.items.slice(0, limit);
@@ -138,18 +146,20 @@ try {
 
     const observedPriceImpactBps = finite(quoteEvidence?.max_price_impact_bps);
     const priceImpactGatePassed = observedPriceImpactBps !== null && observedPriceImpactBps <= maxPriceImpactBps;
+    const roundtripQuoteEdgeBps = finite(quoteEvidence?.roundtrip_quote_edge_bps);
+    const observedRoundtripCostBps = roundtripQuoteEdgeBps === null ? null : Math.max(0, -roundtripQuoteEdgeBps);
     const evidenceRejects = [...base.preliminary_rejects];
     if (base.preliminary_market_gate_passed && top10HolderPct !== null && !holderGatePassed) evidenceRejects.push('TOP10_HOLDER_CONCENTRATION_TOO_HIGH');
     if (base.preliminary_market_gate_passed && top10HolderPct === null) evidenceRejects.push('TOP10_HOLDER_CONCENTRATION_UNVERIFIED');
     if (base.preliminary_market_gate_passed && holderGatePassed && quoteEvidence && !priceImpactGatePassed) evidenceRejects.push('PRICE_IMPACT_TOO_HIGH');
     if (base.preliminary_market_gate_passed && holderGatePassed && !quoteEvidence) evidenceRejects.push('JUPITER_QUOTE_UNVERIFIED');
+    if (quoteEvidence && roundtripQuoteEdgeBps !== null && roundtripQuoteEdgeBps < 0) evidenceRejects.push('ROUNDTRIP_QUOTE_COST_OBSERVED');
+    if (!feeEvidence) evidenceRejects.push('SOLANA_FEE_EVIDENCE_UNVERIFIED');
 
     const missingFields = [...BASE_MISSING_FIELDS];
     if (top10HolderPct === null) missingFields.splice(4, 0, 'top10_holder_pct');
-    if (quoteEvidence) {
-      const impactIndex = missingFields.indexOf('estimated_price_impact_bps');
-      if (impactIndex >= 0) missingFields.splice(impactIndex, 1);
-    }
+    if (!quoteEvidence) missingFields.push('estimated_price_impact_bps', 'source_count');
+    if (!feeEvidence) missingFields.push('network_fee_evidence');
 
     candidates.push({
       token_mint: row.primary_mint,
@@ -173,7 +183,10 @@ try {
       sell_path_verified_by_quote: Boolean(quoteEvidence?.sell_path_verified_by_quote),
       estimated_price_impact_bps: observedPriceImpactBps,
       price_impact_gate_passed: priceImpactGatePassed,
-      roundtrip_quote_edge_bps: finite(quoteEvidence?.roundtrip_quote_edge_bps),
+      roundtrip_quote_edge_bps: roundtripQuoteEdgeBps,
+      observed_roundtrip_cost_bps: observedRoundtripCostBps,
+      gross_executable_spread_bps: null,
+      expected_net_edge_bps: null,
       buy_route_hops: finite(quoteEvidence?.buy?.route_hop_count),
       sell_route_hops: finite(quoteEvidence?.sell?.route_hop_count),
       buy_distinct_amm_count: finite(quoteEvidence?.buy?.distinct_amm_count),
@@ -181,11 +194,13 @@ try {
       buy_amm_labels: quoteEvidence?.buy?.amm_labels || [],
       sell_amm_labels: quoteEvidence?.sell?.amm_labels || [],
       source_count_observed: finite(quoteEvidence?.source_count_observed),
+      fee_evidence_available: Boolean(feeEvidence),
+      exact_transaction_fee_ready: Boolean(feeEvidence?.exact_transaction_fee_ready),
       net_edge_costs_included: false,
       sell_simulation_ok: false,
       preliminary_rejects: evidenceRejects,
       full_signal_gate_ready: false,
-      missing_mandatory_signal_fields: missingFields,
+      missing_mandatory_signal_fields: [...new Set(missingFields)],
       detail_error: 'detail_not_requested_provider_quota_preserved',
       holder_error: holderError,
       holder_source: holderEvidence?.source || null,
@@ -218,6 +233,15 @@ try {
     quote_stage_attempted: quoteStage.length,
     quote_stage_succeeded: quoted.length,
     quote_price_impact_gate_passed: quoted.filter(item => item.price_impact_gate_passed).length,
+    fee_evidence: feeEvidence ? {
+      samples: feeEvidence.samples,
+      prioritization_fee_rpc_p50: feeEvidence.prioritization_fee_rpc_p50,
+      prioritization_fee_rpc_p75: feeEvidence.prioritization_fee_rpc_p75,
+      prioritization_fee_rpc_p90: feeEvidence.prioritization_fee_rpc_p90,
+      base_fee_lamports_per_signature_reference: feeEvidence.base_fee_lamports_per_signature_reference,
+      exact_transaction_fee_ready: false
+    } : null,
+    fee_evidence_error: feeEvidenceError,
     quote_stage_results: quoteStage.map(item => ({
       token_mint: item.token_mint,
       symbol: item.symbol,
@@ -228,8 +252,9 @@ try {
       estimated_price_impact_bps: item.estimated_price_impact_bps,
       price_impact_gate_passed: item.price_impact_gate_passed,
       roundtrip_quote_edge_bps: item.roundtrip_quote_edge_bps,
-      buy_amm_labels: item.buy_amm_labels,
-      sell_amm_labels: item.sell_amm_labels,
+      observed_roundtrip_cost_bps: item.observed_roundtrip_cost_bps,
+      gross_executable_spread_bps: null,
+      expected_net_edge_bps: null,
       quote_error: item.quote_error
     })),
     full_signal_gate_ready: 0,
@@ -240,7 +265,7 @@ try {
       jupiter_inter_quote_delay_ms: quotes?.inter_quote_delay_ms || null,
       rate_limit_retries: maxRetries
     },
-    note: 'Real market discovery, holder evidence, and read-only Jupiter buy/sell quotes are active. Quote success proves current route availability and price impact only. Final Auto Trade remains fail-closed until transaction simulation, token controls, independent route reconciliation, and expected net edge after all modeled costs are verified.',
+    note: 'Round-trip Jupiter output is treated as observed route cost, not arbitrage profit. Final expected net edge remains unavailable until an executable gross spread is independently proven and exact transaction fees are obtained from an unsigned transaction message/simulation.',
     mode: 'SHADOW',
     execution_ready: false,
     transaction_built: false,
