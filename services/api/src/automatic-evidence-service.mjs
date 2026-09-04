@@ -30,6 +30,18 @@ function optionalNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function canonicalAutomaticSourceReference(collected) {
+  const signature = collected?.provenance?.newest_signature ?? null;
+  const slot = collected?.provenance?.newest_slot ?? null;
+  if (signature === null) {
+    if (collected?.source_reference !== null) throw new Error('automatic_source_reference_inconsistent');
+    return null;
+  }
+  if (collected?.source_reference !== signature) throw new Error('automatic_source_reference_inconsistent');
+  if (!Number.isSafeInteger(slot) || slot < 0) throw new Error('automatic_source_slot_missing');
+  return `solana_rpc:${signature}@${slot}`;
+}
+
 function projection(row) {
   if (!row) return null;
   return {
@@ -121,15 +133,21 @@ export function createAutomaticEvidenceService(pool, {
         maxPages,
         endpointLabel
       });
+      const sourceReference = canonicalAutomaticSourceReference(collected);
       const collectionId = crypto.randomUUID();
       const observedAt = new Date();
+      const provenance = {
+        ...(collected.provenance || {}),
+        recorded_source_reference: sourceReference,
+        source_reference_policy: 'SOLANA_RPC_SIGNATURE_SLOT'
+      };
       const row = (await pool.query(
         `INSERT INTO trader_evidence_collection_runs(
            collection_id,trader_id,source_type,source_reference,observed_at,collection_status,reason,
            provenance,metrics_available,verified,published,live_execution_authorized
          ) VALUES($1,$2,$3,$4,$5,'PENDING_DATA',$6,$7::jsonb,false,false,false,false)
          RETURNING *`,
-        [collectionId,trader.trader_id,'SOLANA_RPC',collected.source_reference,observedAt,collected.reason,JSON.stringify(collected.provenance || {})]
+        [collectionId,trader.trader_id,'SOLANA_RPC',sourceReference,observedAt,collected.reason,JSON.stringify(provenance)]
       )).rows[0];
       return projection(row);
     },
