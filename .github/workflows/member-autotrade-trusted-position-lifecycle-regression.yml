@@ -18,6 +18,7 @@ permissions:
 
 jobs:
   regression:
+    # Pull-request checkout validates the current merge ref, including the latest main safety contracts.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
