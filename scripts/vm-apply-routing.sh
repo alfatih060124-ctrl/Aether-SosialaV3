@@ -6,12 +6,17 @@ SOURCE="$APP_DIR/deploy/Caddyfile"
 TARGET="/etc/caddy/Caddyfile"
 BACKUP="/etc/caddy/Caddyfile.aether-backup-$(date +%Y%m%d%H%M%S)"
 PUBLIC_API="https://api.aether.boats"
+ADMIN_ORIGIN="https://a.aether.boats"
 
 say(){ printf '[aether-routing] %s\n' "$*"; }
 fail(){ printf '[aether-routing] ERROR: %s\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || fail "run as root"
 [ -s "$SOURCE" ] || fail "$SOURCE is missing"
+[ -s "$APP_DIR/public/operator-autotrade.html" ] || fail "operator auto-trade page is missing"
+[ -s "$APP_DIR/services/api/src/auto-trade-training.mjs" ] || fail "auto-trade training module is missing"
+[ -s "$APP_DIR/services/api/src/signal-intelligence.mjs" ] || fail "signal intelligence module is missing"
+[ -s "$APP_DIR/services/api/src/auto-trade-engine.mjs" ] || fail "auto-trade engine module is missing"
 command -v caddy >/dev/null 2>&1 || fail "caddy is not installed"
 command -v curl >/dev/null 2>&1 || fail "curl is not installed"
 systemctl is-active --quiet caddy || fail "caddy is not active"
@@ -83,7 +88,13 @@ expect_blocked GET /api/admin/wallets
 expect_blocked POST /api/executions
 expect_blocked POST /api/signals/evaluate
 
+say "verifying PRIMARY_VM operator auto-trade training surface"
+curl -fsS --max-time 12 "$ADMIN_ORIGIN/operator-autotrade" | grep -q 'AUTO TRADE OPERATOR SIMULATOR'
+curl -fsS --max-time 12 "$ADMIN_ORIGIN/operator-modules/auto-trade-training.mjs" | grep -q 'runAutoTradeTraining'
+curl -fsS --max-time 12 "$ADMIN_ORIGIN/operator-modules/signal-intelligence.mjs" | grep -q 'HARD_MIN_EXPECTED_NET_EDGE_BPS = 20'
+curl -fsS --max-time 12 "$ADMIN_ORIGIN/operator-modules/auto-trade-engine.mjs" | grep -q 'live_execution_authorized: false'
+
 ROLLBACK_REQUIRED=0
 trap - ERR INT TERM
-say "FINAL: public API exposes read + wallet-auth + session-bound SHADOW account lanes only; PRIMARY_VM remains the only writable runtime"
+say "FINAL: public API remains fenced; PRIMARY_VM operator SHADOW simulator is reachable on the Admin hostname; LIVE remains disabled"
 say "previous Caddyfile backup: $BACKUP"
