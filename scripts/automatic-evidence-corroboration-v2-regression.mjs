@@ -29,6 +29,17 @@ async function rpcEvidence() {
   return {
     ...collected,
     source_reference,
+    collection_status: 'PENDING_DATA',
+    metrics_available: false,
+    trades_count: null,
+    total_return_bps: null,
+    win_rate_bps: null,
+    drawdown_bps: null,
+    reputation_score: null,
+    calculation_hash: null,
+    verified: false,
+    published: false,
+    live_execution_authorized: false,
     provenance: {
       ...collected.provenance,
       recorded_source_reference: source_reference,
