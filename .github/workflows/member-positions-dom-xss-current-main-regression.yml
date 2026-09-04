@@ -1,0 +1,25 @@
+name: Member Positions DOM XSS Current Main Regression
+
+on:
+  pull_request:
+    paths:
+      - 'public/account-wallet-portfolio.js'
+      - 'scripts/member-positions-dom-xss-regression.mjs'
+      - '.github/workflows/member-positions-dom-xss-current-main-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check DOM XSS regression
+        run: node --check scripts/member-positions-dom-xss-regression.mjs
+      - name: Run member positions DOM XSS regression
+        run: node scripts/member-positions-dom-xss-regression.mjs
