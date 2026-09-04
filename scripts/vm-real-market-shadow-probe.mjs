@@ -5,6 +5,10 @@ const limitRaw = Number(process.env.AETHER_MARKET_PROBE_LIMIT || 10);
 const limit = Number.isSafeInteger(limitRaw) ? Math.min(20, Math.max(1, limitRaw)) : 10;
 const minLiquidityUsd = Math.max(0, Number(process.env.SIGNAL_MIN_LIQUIDITY_USD || 500000));
 const minVolume24hUsd = Math.max(0, Number(process.env.SIGNAL_MIN_VOLUME_24H_USD || 250000));
+const detailDelayMsRaw = Number(process.env.AETHER_MARKET_PROBE_DETAIL_DELAY_MS || 1200);
+const detailDelayMs = Number.isFinite(detailDelayMsRaw) ? Math.min(10000, Math.max(250, detailDelayMsRaw)) : 1200;
+const maxRetriesRaw = Number(process.env.AETHER_MARKET_PROBE_MAX_RETRIES || 3);
+const maxRetries = Number.isSafeInteger(maxRetriesRaw) ? Math.min(5, Math.max(0, maxRetriesRaw)) : 3;
 
 const REQUIRED_UNVERIFIED_FIELDS = Object.freeze([
   'spread_bps',
@@ -46,10 +50,31 @@ function preliminary(candidate) {
   };
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function withRateLimitBackoff(label, operation) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const reason = String(error?.message || error);
+      if (reason !== 'market_provider_rate_limited' || attempt >= maxRetries) throw error;
+      const waitMs = Math.min(15000, 1500 * (2 ** attempt));
+      console.error(`[aether-real-market] ${label} rate-limited; retry ${attempt + 1}/${maxRetries} after ${waitMs}ms`);
+      await sleep(waitMs);
+    }
+  }
+  throw lastError;
+}
+
 const market = createMarketIntelligenceService({ timeoutMs: 8000 });
 
 try {
-  const discovery = await market.getDiscovery(view);
+  const discovery = await withRateLimitBackoff('discovery', () => market.getDiscovery(view));
   const rows = discovery.items.slice(0, limit);
   const candidates = [];
 
@@ -57,10 +82,18 @@ try {
     const base = preliminary(row);
     let detail = null;
     let detailError = null;
-    try {
-      detail = await market.getToken(row.primary_mint);
-    } catch (error) {
-      detailError = String(error?.message || error);
+
+    // Preserve provider quota: only enrich candidates that already pass the cheap
+    // discovery liquidity/volume gate. Rejected candidates remain fail-closed.
+    if (base.preliminary_market_gate_passed) {
+      if (candidates.length > 0) await sleep(detailDelayMs);
+      try {
+        detail = await withRateLimitBackoff(`token:${row.primary_mint}`, () => market.getToken(row.primary_mint));
+      } catch (error) {
+        detailError = String(error?.message || error);
+      }
+    } else {
+      detailError = 'detail_skipped_preliminary_gate_rejected';
     }
 
     candidates.push({
@@ -100,6 +133,11 @@ try {
     candidates_scanned: candidates.length,
     preliminary_market_gate_passed: candidates.filter(item => item.preliminary_market_gate_passed).length,
     full_signal_gate_ready: 0,
+    provider_quota_policy: {
+      detail_only_after_preliminary_gate: true,
+      detail_delay_ms: detailDelayMs,
+      rate_limit_retries: maxRetries
+    },
     note: 'Real market data is active. No candidate is allowed to reach Auto Trade until quote/sell simulation, holder/token controls, multi-source reconciliation, and net-edge-after-cost fields are independently verified.',
     mode: 'SHADOW',
     execution_ready: false,
@@ -111,6 +149,7 @@ try {
     status: 'error',
     probe: 'AETHER_REAL_MARKET_SHADOW',
     error: String(error?.message || error),
+    retry_policy_exhausted: String(error?.message || error) === 'market_provider_rate_limited',
     mode: 'SHADOW',
     execution_ready: false,
     live_execution_authorized: false
