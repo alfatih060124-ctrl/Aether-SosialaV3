@@ -1,0 +1,27 @@
+name: Solscan Account DeFi Activity Evidence Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solscan-account-defi-activity-evidence.mjs'
+      - 'scripts/regression-solscan-account-defi-activity-evidence.mjs'
+      - '.github/workflows/solscan-account-defi-activity-evidence-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check collector
+        run: node --check services/api/src/solscan-account-defi-activity-evidence.mjs
+      - name: Syntax check regression
+        run: node --check scripts/regression-solscan-account-defi-activity-evidence.mjs
+      - name: Run fail-closed synthetic regression
+        run: node scripts/regression-solscan-account-defi-activity-evidence.mjs
