@@ -3,6 +3,10 @@ const finite = (value, fallback = null) => {
   return Number.isFinite(n) ? n : fallback;
 };
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const truthy = (value, fallback = false) => {
+  if (value == null) return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+};
 
 export function normalizeAutoTradeMandate(mandate = {}, env = process.env) {
   const capital = Math.max(0, finite(mandate.capital_limit_usd, 0));
@@ -20,6 +24,7 @@ export function normalizeAutoTradeMandate(mandate = {}, env = process.env) {
     trades_today: Math.max(0, Math.floor(finite(mandate.trades_today, 0))),
     cooldown_seconds: Math.max(0, finite(mandate.cooldown_seconds, finite(env.AUTOTRADE_DEFAULT_COOLDOWN_SECONDS, 1800))),
     seconds_since_last_trade: finite(mandate.seconds_since_last_trade, Infinity),
+    shadow_unlimited: truthy(mandate.shadow_unlimited, truthy(env.AUTOTRADE_SHADOW_UNLIMITED, true)),
     max_slippage_bps: Math.max(1, finite(mandate.max_slippage_bps, 100)),
     min_signal_score: clamp(finite(mandate.min_signal_score, finite(env.SIGNAL_MIN_SCORE, 82)), 0, 100),
     stop_loss_bps: Math.max(1, finite(mandate.stop_loss_bps, finite(env.AUTOTRADE_DEFAULT_STOP_LOSS_BPS, 500))),
@@ -53,7 +58,8 @@ export function evaluateAutoTrade({ assessment, mandate: rawMandate = {}, positi
     token_mint: tokenMint,
     mode: 'SHADOW',
     live_execution_authorized: false,
-    quality_first: true
+    quality_first: true,
+    shadow_unlimited: mandate.shadow_unlimited
   };
 
   if (!assessment) return { ...common, action: 'REJECT', reason_codes: ['SIGNAL_ASSESSMENT_REQUIRED'], requested_amount_usd: 0 };
@@ -87,8 +93,8 @@ export function evaluateAutoTrade({ assessment, mandate: rawMandate = {}, positi
   if (assessment.verdict !== 'QUALIFIED') entryRejects.push('SIGNAL_NOT_QUALIFIED');
   if (finite(assessment.quality_score, 0) < mandate.min_signal_score) entryRejects.push('QUALITY_SCORE_BELOW_MANDATE');
   if (mandate.max_daily_loss_usd > 0 && mandate.daily_realized_pnl_usd <= -mandate.max_daily_loss_usd) entryRejects.push('DAILY_LOSS_LIMIT_REACHED');
-  if (mandate.trades_today >= mandate.max_trades_per_day) entryRejects.push('DAILY_TRADE_LIMIT_REACHED');
-  if (mandate.seconds_since_last_trade < mandate.cooldown_seconds) entryRejects.push('COOLDOWN_ACTIVE');
+  if (!mandate.shadow_unlimited && mandate.trades_today >= mandate.max_trades_per_day) entryRejects.push('DAILY_TRADE_LIMIT_REACHED');
+  if (!mandate.shadow_unlimited && mandate.seconds_since_last_trade < mandate.cooldown_seconds) entryRejects.push('COOLDOWN_ACTIVE');
   if (finite(assessment.snapshot?.estimated_price_impact_bps, Infinity) > mandate.max_slippage_bps) entryRejects.push('MANDATE_SLIPPAGE_LIMIT');
   if (assessment.snapshot?.sell_simulation_ok !== true) entryRejects.push('SELL_PATH_NOT_VERIFIED');
   if (entryRejects.length) return { ...common, action: 'REJECT', reason_codes: [...new Set(entryRejects)], requested_amount_usd: 0 };
@@ -100,7 +106,9 @@ export function evaluateAutoTrade({ assessment, mandate: rawMandate = {}, positi
   return {
     ...common,
     action: 'BUY',
-    reason_codes: ['STRICT_SIGNAL_QUALIFIED', 'MANDATE_LIMITS_PASSED'],
+    reason_codes: mandate.shadow_unlimited
+      ? ['STRICT_SIGNAL_QUALIFIED', 'SHADOW_HISTORY_COLLECTION_UNLIMITED']
+      : ['STRICT_SIGNAL_QUALIFIED', 'MANDATE_LIMITS_PASSED'],
     requested_amount_usd: Math.round(requested * 100) / 100
   };
 }
