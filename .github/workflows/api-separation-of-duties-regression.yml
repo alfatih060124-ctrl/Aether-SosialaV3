@@ -1,0 +1,22 @@
+name: API Separation of Duties Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/api-contract.mjs'
+      - 'services/api/src/api-separation-of-duties.regression.mjs'
+      - '.github/workflows/api-separation-of-duties-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  api-separation-of-duties-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node services/api/src/api-separation-of-duties.regression.mjs
