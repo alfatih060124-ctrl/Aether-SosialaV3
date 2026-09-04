@@ -23,6 +23,8 @@ const maxPriceImpactBps = Math.max(0, Number(process.env.SIGNAL_MAX_PRICE_IMPACT
 const quoteUsdcRaw = String(process.env.AETHER_JUPITER_QUOTE_USDC_RAW || '100000000').trim();
 const interRequestDelayMs = Number(process.env.AETHER_JUPITER_INTER_QUOTE_DELAY_MS || (apiKey ? 1100 : 2200));
 const minNetEdgeBps = Math.max(20, Number(process.env.SIGNAL_MIN_EXPECTED_NET_EDGE_BPS || 20));
+const dexPairAttemptsRaw = Number(process.env.AETHER_CROSS_VENUE_DEX_PAIR_ATTEMPTS || 6);
+const maxDexPairAttempts = Number.isSafeInteger(dexPairAttemptsRaw) ? Math.min(12, Math.max(1, dexPairAttemptsRaw)) : 6;
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function finite(value) { const n = Number(value); return Number.isFinite(n) ? n : null; }
@@ -161,37 +163,72 @@ try {
     let owners;
     try { owners = await ownerPrograms(addresses); } catch { continue; }
 
-    let selected = null;
+    const dexPairs = [];
+    const seenDexPairs = new Set();
     for (const pair of provisional) {
       const buyProgram = owners.get(pair.buy_amm_address);
       const sellProgram = owners.get(pair.sell_amm_address);
       const buyDex = buyProgram ? labelsByProgram?.[buyProgram] : null;
       const sellDex = sellProgram ? labelsByProgram?.[sellProgram] : null;
       if (!buyDex || !sellDex || buyDex === sellDex) continue;
-      selected = { ...pair, buy_dex: String(buyDex), sell_dex: String(sellDex) };
-      break;
+      const key = `${buyDex}=>${sellDex}`;
+      if (seenDexPairs.has(key)) continue;
+      seenDexPairs.add(key);
+      dexPairs.push({ ...pair, buy_dex: String(buyDex), sell_dex: String(sellDex) });
+      if (dexPairs.length >= maxDexPairAttempts) break;
     }
 
-    if (!selected) {
+    if (!dexPairs.length) {
       results.push({ symbol: row.base_token?.symbol || null, token_mint: row.primary_mint, status: 'NO_DISTINCT_DEX_PAIR', expected_net_edge_bps: null });
       continue;
     }
 
-    await sleep(interRequestDelayMs);
-    let buyQuote;
-    let sellQuote;
-    try {
-      buyQuote = await jupiterQuote({ inputMint: USDC_MINT, outputMint: row.primary_mint, amount: quoteUsdcRaw, dex: selected.buy_dex, onlyDirectRoutes: true });
+    let selected = null;
+    let buyQuote = null;
+    let sellQuote = null;
+    const quoteAttempts = [];
+
+    for (const candidate of dexPairs) {
       await sleep(interRequestDelayMs);
-      sellQuote = await jupiterQuote({ inputMint: row.primary_mint, outputMint: USDC_MINT, amount: buyQuote.outAmount, dex: selected.sell_dex, onlyDirectRoutes: true });
-    } catch (error) {
+      try {
+        const candidateBuy = await jupiterQuote({
+          inputMint: USDC_MINT,
+          outputMint: row.primary_mint,
+          amount: quoteUsdcRaw,
+          dex: candidate.buy_dex,
+          onlyDirectRoutes: true
+        });
+        await sleep(interRequestDelayMs);
+        const candidateSell = await jupiterQuote({
+          inputMint: row.primary_mint,
+          outputMint: USDC_MINT,
+          amount: candidateBuy.outAmount,
+          dex: candidate.sell_dex,
+          onlyDirectRoutes: true
+        });
+        selected = candidate;
+        buyQuote = candidateBuy;
+        sellQuote = candidateSell;
+        quoteAttempts.push({ buy_dex: candidate.buy_dex, sell_dex: candidate.sell_dex, ok: true });
+        break;
+      } catch (error) {
+        quoteAttempts.push({
+          buy_dex: candidate.buy_dex,
+          sell_dex: candidate.sell_dex,
+          ok: false,
+          error: String(error?.message || error)
+        });
+      }
+    }
+
+    if (!selected || !buyQuote || !sellQuote) {
       results.push({
         symbol: row.base_token?.symbol || null,
         token_mint: row.primary_mint,
         status: 'DEX_RESTRICTED_QUOTE_UNAVAILABLE',
-        buy_dex: selected.buy_dex,
-        sell_dex: selected.sell_dex,
-        quote_error: String(error?.message || error),
+        dex_pairs_considered: dexPairs.length,
+        dex_pair_attempts: quoteAttempts.length,
+        quote_attempts: quoteAttempts,
         expected_net_edge_bps: null
       });
       continue;
@@ -205,6 +242,7 @@ try {
         status: 'PRICE_IMPACT_REJECTED',
         buy_dex: selected.buy_dex,
         sell_dex: selected.sell_dex,
+        dex_pair_attempts: quoteAttempts.length,
         estimated_price_impact_bps: impact,
         expected_net_edge_bps: null
       });
@@ -238,6 +276,7 @@ try {
       status: net.net_edge_costs_included ? 'NET_EDGE_MEASURED' : 'NET_EDGE_INCOMPLETE',
       buy_dex: selected.buy_dex,
       sell_dex: selected.sell_dex,
+      dex_pair_attempts: quoteAttempts.length,
       provisional_cross_venue_spread_bps: selected.provisional_cross_venue_spread_bps,
       gross_executable_spread_bps: net.gross_executable_spread_bps,
       exact_roundtrip_fee_lamports: exactFee,
@@ -269,6 +308,7 @@ try {
     candidates_scanned: rows.length,
     sol_usd_reference: solUsd,
     min_expected_net_edge_bps: minNetEdgeBps,
+    max_dex_pair_attempts: maxDexPairAttempts,
     results,
     mode: 'SHADOW',
     execution_ready: false,
