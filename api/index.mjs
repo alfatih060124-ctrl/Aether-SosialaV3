@@ -1,5 +1,4 @@
 import { createMarketIntelligenceService } from '../services/api/src/market-intelligence.mjs';
-import { runAutoTradeTraining } from '../services/api/src/auto-trade-training.mjs';
 
 const PRIMARY_API_ORIGIN = 'https://api.aether.boats';
 const SESSION_COOKIE = 'aether_session';
@@ -31,6 +30,7 @@ const SESSION_GET_ROUTES = new Set([
   '/api/account/copy-mandates',
   '/api/account/copy-trades',
   '/api/account/positions',
+  '/api/account/auto-strategy/demo',
 ]);
 
 const SESSION_POST_ROUTES = new Set([
@@ -38,6 +38,7 @@ const SESSION_POST_ROUTES = new Set([
   '/api/account/trader/apply',
   '/api/account/copy-mandates',
   '/api/account/autotrade/evaluate',
+  '/api/account/auto-strategy/simulate',
 ]);
 
 const json = (res, status, body) => {
@@ -185,38 +186,6 @@ export default async function handler(req, res) {
 
     if (path === '/api/market/token' || path === '/api/market/discovery') {
       return json(res, 405, { error: 'method_not_allowed', read_only: true, live_execution_authorized: false });
-    }
-
-    if (req.method === 'POST' && path === '/api/account/auto-strategy/simulate') {
-      const token = getSessionToken(req);
-      if (!token) return json(res, 401, { error: 'session_required' });
-      const sessionCheck = await requestPrimary(req, '/api/auth/session', { method: 'GET', sessionToken: token });
-      if (sessionCheck.status === 401) {
-        res.setHeader('Set-Cookie', clearSessionCookie());
-        return json(res, 401, { error: 'session_invalid' });
-      }
-      if (sessionCheck.status < 200 || sessionCheck.status >= 300) return sendUpstream(res, sessionCheck);
-      let body = {};
-      const raw = await readBody(req);
-      if (raw) {
-        try { body = JSON.parse(raw); } catch { return json(res, 400, { error: 'invalid_json' }); }
-      }
-      try {
-        return json(res, 200, {
-          ...runAutoTradeTraining(body),
-          authenticated_session: true,
-          simulator_runtime: 'PUBLIC_EDGE',
-        });
-      } catch (error) {
-        if (error instanceof Error && error.message === 'invalid_training_scenario') {
-          return json(res, 400, { error: 'invalid_training_scenario', mode: 'SHADOW', live_execution_authorized: false });
-        }
-        return json(res, 503, { error: 'auto_strategy_simulator_unavailable', mode: 'SHADOW', live_execution_authorized: false });
-      }
-    }
-
-    if (path === '/api/account/auto-strategy/simulate') {
-      return json(res, 405, { error: 'method_not_allowed', mode: 'SHADOW', live_execution_authorized: false });
     }
 
     if (req.method === 'GET' && isPublicReadRoute(path)) {
