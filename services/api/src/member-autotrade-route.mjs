@@ -2,6 +2,7 @@ import { persistAuthenticatedAutoTradeDecisionAtomically } from './autotrade-ato
 import { createTrustedAutoTradeRuntimeRiskResolver } from './trusted-autotrade-runtime-risk.mjs';
 import { handleMemberPositionsRoute } from './member-positions-route.mjs';
 import { getMemberAutoTradeDemoState, runMemberAutoTradeDemoStep } from './member-autotrade-demo.mjs';
+import { handleTraderControlPlaneRoute } from './trader-control-plane-route.mjs';
 
 const MEMBER_ROUTE = '/api/account/autotrade/evaluate';
 const LEGACY_ROUTE = '/api/autotrade/evaluate';
@@ -28,6 +29,7 @@ export async function handleMemberAutoTradeRoute({
   req,
   res,
   route,
+  parts,
   pool,
   repos,
   walletAuth,
@@ -41,6 +43,7 @@ export async function handleMemberAutoTradeRoute({
   persistDecision = persistAuthenticatedAutoTradeDecisionAtomically,
   createRiskResolver = createTrustedAutoTradeRuntimeRiskResolver
 }) {
+  if (await handleTraderControlPlaneRoute({ req, res, parts, pool, repos, jsonBody, send })) return true;
   if (await handleMemberPositionsRoute({ req, res, route, pool, walletAuth, sessionFor, send })) return true;
 
   if (route === DEMO_STATE_ROUTE || route === DEMO_SIMULATE_ROUTE) {
