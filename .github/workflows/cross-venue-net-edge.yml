@@ -8,6 +8,7 @@ on:
       - 'scripts/vm-cross-venue-net-edge-probe.mjs'
       - 'scripts/vm-cross-venue-expanded-universe-probe.mjs'
       - 'scripts/vm-cross-venue-stage-diagnostic.mjs'
+      - 'scripts/vm-cross-venue-liquidity-first-probe.mjs'
       - '.github/workflows/cross-venue-net-edge.yml'
   push:
     branches: [main]
@@ -17,6 +18,7 @@ on:
       - 'scripts/vm-cross-venue-net-edge-probe.mjs'
       - 'scripts/vm-cross-venue-expanded-universe-probe.mjs'
       - 'scripts/vm-cross-venue-stage-diagnostic.mjs'
+      - 'scripts/vm-cross-venue-liquidity-first-probe.mjs'
       - '.github/workflows/cross-venue-net-edge.yml'
 
 jobs:
@@ -34,5 +36,6 @@ jobs:
           node --check scripts/vm-cross-venue-net-edge-probe.mjs
           node --check scripts/vm-cross-venue-expanded-universe-probe.mjs
           node --check scripts/vm-cross-venue-stage-diagnostic.mjs
+          node --check scripts/vm-cross-venue-liquidity-first-probe.mjs
       - name: Run cross-venue net-edge regression
         run: node scripts/cross-venue-net-edge-regression.mjs
