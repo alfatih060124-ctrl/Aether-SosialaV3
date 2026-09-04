@@ -1,0 +1,24 @@
+name: Trader Control Plane Role Auth Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/trader-control-plane-role-auth.mjs'
+      - 'scripts/trader-control-plane-role-auth-regression.mjs'
+      - '.github/workflows/trader-control-plane-role-auth.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run fail-closed role auth regression
+        run: node scripts/trader-control-plane-role-auth-regression.mjs
