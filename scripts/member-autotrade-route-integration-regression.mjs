@@ -27,13 +27,24 @@ function deps(overrides = {}) {
     executionMode: 'SHADOW', liveEnabled: false, walletPortfolio: {},
     assessmentProjection: row => ({ token_mint: row.token_mint, quality_score: Number(row.quality_score), verdict: row.verdict, hard_rejects: [], components: {}, snapshot: {}, live_execution_authorized: false }),
     createRiskResolver: ({ walletAddress }) => { assert.equal(walletAddress, session.primary_wallet); return async () => ({ trusted: true }); },
+    createPositionResolver: () => async () => ({}),
+    createLifecycleBridge: () => ({
+      async applyDecision() { return { action: 'REJECT', persisted: false, mode: 'SHADOW', live_execution_authorized: false }; }
+    }),
     persistDecision: async input => {
       assert.equal(input.session.user_id, session.user_id);
       assert.deepEqual(input.requestBody, { policy_id: policyId, assessment_id: assessmentId });
       const resolved = await input.resolveAssessment({ assessment_id: assessmentId });
       assert.equal(resolved.assessment_id, assessmentId);
       await input.resolveRuntimeRisk({});
-      return { schema: 'test', decision_id: 'decision', execution_dispatched: false, live_execution_authorized: false, network_submission_authorized: false, signer_required: false };
+      assert.deepEqual(await input.resolvePosition({ authenticated_follower_user_id: session.user_id, policy_id: policyId, assessment: resolved.assessment }), {});
+      return {
+        schema: 'test', decision_id: 'decision', assessment_id: assessmentId, mandate_id: policyId, trader_id: 'trader',
+        assessment: resolved.assessment,
+        decision: { action: 'REJECT', mode: 'SHADOW', live_execution_authorized: false, reason_codes: ['TEST_ONLY'], requested_amount_usd: 0 },
+        position_reference: {},
+        execution_dispatched: false, live_execution_authorized: false, network_submission_authorized: false, signer_required: false
+      };
     },
     capture,
     ...overrides
@@ -50,6 +61,7 @@ function deps(overrides = {}) {
   assert.equal(x.capture.last().body.live_execution_authorized, false);
   assert.equal(x.capture.last().body.network_submission_authorized, false);
   assert.equal(x.capture.last().body.signer_required, false);
+  assert.equal(x.capture.last().body.lifecycle_applied, false);
 }
 
 {
@@ -77,6 +89,7 @@ const routeBoundary = fs.readFileSync(new URL('../services/api/src/autotrade-rou
 for (const field of ['mandate','follower_user_id','trader_id','runtime_risk','position','snapshot','execution_mode','mode','live_execution_authorized','network_submission_authorized','signer_required']) {
   assert.ok(routeBoundary.includes(`'${field}'`), `caller authority field must remain forbidden: ${field}`);
 }
+assert.ok(routeBoundary.includes('resolvePosition'), 'trusted backend position resolver must be wired');
 
 const server = fs.readFileSync(new URL('../services/api/src/server.mjs', import.meta.url), 'utf8');
 assert.ok(server.includes("import { handleMemberAutoTradeRoute } from './member-autotrade-route.mjs';"));
