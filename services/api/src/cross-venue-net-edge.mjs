@@ -34,6 +34,13 @@ function reportEntries(payload) {
   return rows;
 }
 
+function observedRouteAmmAddresses(payload) {
+  const routePlan = Array.isArray(payload?.routePlan) ? payload.routePlan : [];
+  return new Set(routePlan
+    .map(item => String(item?.swapInfo?.ammKey || '').trim())
+    .filter(Boolean));
+}
+
 export function rankCrossVenueReportPairs(quoteEvidence) {
   const buyPayload = quoteEvidence?.buy?.provider_quote_response;
   const sellPayload = quoteEvidence?.sell?.provider_quote_response;
@@ -41,6 +48,8 @@ export function rankCrossVenueReportPairs(quoteEvidence) {
   const sellInput = positiveBigInt(quoteEvidence?.sell?.in_amount, 'sell_input_amount_required');
   const buys = reportEntries(buyPayload);
   const sells = reportEntries(sellPayload);
+  const observedBuyAmms = observedRouteAmmAddresses(buyPayload);
+  const observedSellAmms = observedRouteAmmAddresses(sellPayload);
   const rows = [];
 
   for (const buy of buys) {
@@ -52,15 +61,24 @@ export function rankCrossVenueReportPairs(quoteEvidence) {
       const denominator = initialUsdc * sellInput;
       const provisionalSpreadBps = ratioToBps(numerator, denominator);
       if (provisionalSpreadBps === null) continue;
+      const buyRouteObserved = observedBuyAmms.has(buy.amm_address);
+      const sellRouteObserved = observedSellAmms.has(sell.amm_address);
       rows.push(Object.freeze({
         buy_amm_address: buy.amm_address,
         sell_amm_address: sell.amm_address,
+        buy_route_observed: buyRouteObserved,
+        sell_route_observed: sellRouteObserved,
+        routability_score: Number(buyRouteObserved) + Number(sellRouteObserved),
         provisional_cross_venue_spread_bps: provisionalSpreadBps
       }));
     }
   }
 
-  rows.sort((a, b) => b.provisional_cross_venue_spread_bps - a.provisional_cross_venue_spread_bps);
+  rows.sort((a, b) => {
+    const routabilityDelta = b.routability_score - a.routability_score;
+    if (routabilityDelta !== 0) return routabilityDelta;
+    return b.provisional_cross_venue_spread_bps - a.provisional_cross_venue_spread_bps;
+  });
   return Object.freeze(rows);
 }
 
