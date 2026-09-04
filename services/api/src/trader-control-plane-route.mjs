@@ -8,8 +8,15 @@ function safeStatus(code) {
   return 400;
 }
 
+function routeParts(req, parts) {
+  if (Array.isArray(parts) && parts.length) return parts;
+  const path = new URL(String(req?.url || '/'), 'http://localhost').pathname;
+  return path.replace(/\/+$/, '').split('/').filter(Boolean);
+}
+
 export async function handleTraderControlPlaneRoute({ req, res, parts, pool, repos, jsonBody, send, env = process.env } = {}) {
-  if (!isTraderControlPlaneMutation({ method: req?.method, parts })) return false;
+  const resolvedParts = routeParts(req, parts);
+  if (!isTraderControlPlaneMutation({ method: req?.method, parts: resolvedParts })) return false;
   if (!pool || !repos?.marketplace || !repos?.auditEvents) {
     send(res, 503, { error: 'database_unconfigured', live_execution_authorized: false });
     return true;
@@ -23,9 +30,9 @@ export async function handleTraderControlPlaneRoute({ req, res, parts, pool, rep
     return true;
   }
 
-  const traderId = parts[3];
+  const traderId = resolvedParts[3];
   try {
-    if (req.method === 'POST' && parts[4] === 'evidence' && !parts[5]) {
+    if (req.method === 'POST' && resolvedParts[4] === 'evidence' && !resolvedParts[5]) {
       const authz = await sod.authorizeEvidence(req);
       const evidence = await repos.marketplace.recordTraderVerificationEvidence(traderId, await jsonBody(req));
       await repos.auditEvents.append({
@@ -55,7 +62,7 @@ export async function handleTraderControlPlaneRoute({ req, res, parts, pool, rep
       return true;
     }
 
-    if (req.method === 'PATCH' && parts[4] === 'verification' && !parts[5]) {
+    if (req.method === 'PATCH' && resolvedParts[4] === 'verification' && !resolvedParts[5]) {
       const body = await jsonBody(req);
       const authz = await sod.authorizeVerification(req, { traderId, evidenceId: body.evidence_id });
       const trader = await repos.marketplace.reviewTraderVerification(traderId, body);
@@ -84,7 +91,7 @@ export async function handleTraderControlPlaneRoute({ req, res, parts, pool, rep
       return true;
     }
 
-    if (req.method === 'PATCH' && parts[4] === 'publication' && !parts[5]) {
+    if (req.method === 'PATCH' && resolvedParts[4] === 'publication' && !resolvedParts[5]) {
       const authz = await sod.authorizePublication(req, { traderId });
       const body = await jsonBody(req);
       const trader = await repos.marketplace.setTraderPublished(traderId, body);
