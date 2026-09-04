@@ -13,6 +13,7 @@ export async function persistAuthenticatedAutoTradeDecision({
   auditRepository,
   resolveAssessment,
   resolveRuntimeRisk,
+  resolvePosition,
   liveEnabled = false
 }) {
   const recordDecision = requireMethod(signalRepository, 'recordDecision', 'autotrade_decision_repository_required');
@@ -24,6 +25,7 @@ export async function persistAuthenticatedAutoTradeDecision({
     mandateRepository,
     resolveAssessment,
     resolveRuntimeRisk,
+    resolvePosition,
     liveEnabled
   });
 
@@ -41,12 +43,13 @@ export async function persistAuthenticatedAutoTradeDecision({
     caller_authority: false,
     live_execution_authorized: false
   });
+  const positionReference = result.position_reference || Object.freeze({});
 
   const stored = await recordDecision({
     assessmentId: result.assessment_id,
     decision: result.decision,
     mandate: mandateReference,
-    position: Object.freeze({})
+    position: positionReference
   });
   if (!stored?.decision_id) throw new Error('autotrade_decision_persistence_failed');
 
@@ -59,6 +62,7 @@ export async function persistAuthenticatedAutoTradeDecision({
       assessment_id: result.assessment_id,
       mandate_id: result.mandate_id,
       trader_id: result.trader_id,
+      position_id: positionReference.position_id || null,
       token_mint: result.decision?.token_mint ?? null,
       action: result.decision?.action ?? null,
       reason_codes: result.decision?.reason_codes ?? [],
@@ -79,6 +83,7 @@ export async function persistAuthenticatedAutoTradeDecision({
     trader_id: result.trader_id,
     assessment: result.assessment,
     decision: result.decision,
+    position_reference: positionReference,
     execution_dispatched: false,
     live_execution_authorized: false,
     network_submission_authorized: false,
