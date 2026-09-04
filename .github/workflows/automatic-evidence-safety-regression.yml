@@ -1,0 +1,27 @@
+name: Automatic Evidence Safety Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/automatic-evidence-service.mjs'
+      - 'scripts/automatic-evidence-service-regression.mjs'
+      - '.github/workflows/automatic-evidence-safety-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  automatic-evidence-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check automatic evidence service
+        run: node --check services/api/src/automatic-evidence-service.mjs
+      - name: Syntax check automatic evidence regression
+        run: node --check scripts/automatic-evidence-service-regression.mjs
+      - name: Run fail-closed automatic evidence regression
+        run: node scripts/automatic-evidence-service-regression.mjs
