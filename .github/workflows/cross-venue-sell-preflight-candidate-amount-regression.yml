@@ -1,0 +1,27 @@
+name: Cross-Venue Sell Preflight Candidate Amount Regression
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/vm-cross-venue-net-edge-probe.mjs'
+      - 'scripts/cross-venue-sell-preflight-candidate-amount-regression.mjs'
+      - '.github/workflows/cross-venue-sell-preflight-candidate-amount-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check probe
+        run: node --check scripts/vm-cross-venue-net-edge-probe.mjs
+      - name: Syntax check regression
+        run: node --check scripts/cross-venue-sell-preflight-candidate-amount-regression.mjs
+      - name: Run fail-closed regression
+        run: node scripts/cross-venue-sell-preflight-candidate-amount-regression.mjs
