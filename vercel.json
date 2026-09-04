@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "ignoreCommand": "bash scripts/vercel-ignore-build.sh",
   "builds": [
     { "src": "api/index.mjs", "use": "@vercel/node" },
     { "src": "api/chart.mjs", "use": "@vercel/node" },
