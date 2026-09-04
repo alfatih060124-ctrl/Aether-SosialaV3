@@ -163,6 +163,13 @@ export function createJupiterUnsignedSimulationService({
     const lamports = Number(feeResult?.value);
     const exactFeeLamports = Number.isSafeInteger(lamports) && lamports >= 0 ? lamports : null;
     const sim = simulationResult(simulation);
+    if (!sim.ok) {
+      console.error('[aether-shadow-sim] simulation rejected', JSON.stringify({
+        error: sim.error,
+        units_consumed: sim.units_consumed,
+        logs_observed: sim.logs_observed
+      }));
+    }
     return Object.freeze({
       transaction_built: true,
       exact_fee_lamports: exactFeeLamports,
