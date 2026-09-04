@@ -110,7 +110,9 @@ export function createJupiterUnsignedSimulationService({
 } = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('fetch_unavailable');
   const rpcEndpoint = httpsUrl(endpoint, 'solana_rpc_url_required');
-  const userPublicKey = normalizeSolanaMint(simulationPublicKey);
+  const rawPublicKey = String(simulationPublicKey || '').trim();
+  if (!rawPublicKey) throw new Error('shadow_simulation_public_key_required');
+  const userPublicKey = normalizeSolanaMint(rawPublicKey);
   const safeApiKey = String(apiKey || '').trim();
 
   async function buildAndObserve(quoteEvidence) {
