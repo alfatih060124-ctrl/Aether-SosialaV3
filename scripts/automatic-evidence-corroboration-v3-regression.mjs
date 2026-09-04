@@ -70,7 +70,10 @@ async function solscanEvidence() {
   });
 }
 
-async function rejects(code, { rpc = await rpcEvidence(), solscan = await solscanEvidence(), observedAt = CORROBORATED_AT } = {}) {
+async function rejects(code, options = {}) {
+  const rpc = options.rpc ?? await rpcEvidence();
+  const solscan = options.solscan ?? await solscanEvidence();
+  const observedAt = options.observedAt ?? CORROBORATED_AT;
   assert.throws(
     () => corroborateAutomaticEvidenceV3({ rpcEvidence: rpc, solscanEvidence: solscan, observedAt }),
     error => error?.code === code
