@@ -105,6 +105,29 @@ function simulationResult(result) {
   };
 }
 
+function classifySimulationState(sim) {
+  if (sim?.ok) {
+    return Object.freeze({
+      state_status: 'SIMULATION_STATE_READY',
+      account_state_available: true,
+      route_execution_rejected: false
+    });
+  }
+  const error = typeof sim?.error === 'string' ? sim.error : JSON.stringify(sim?.error ?? null);
+  if (error === 'AccountNotFound') {
+    return Object.freeze({
+      state_status: 'SIMULATION_ACCOUNT_STATE_UNAVAILABLE',
+      account_state_available: false,
+      route_execution_rejected: false
+    });
+  }
+  return Object.freeze({
+    state_status: 'SIMULATION_EXECUTION_REJECTED',
+    account_state_available: true,
+    route_execution_rejected: true
+  });
+}
+
 export function createJupiterUnsignedSimulationService({
   fetchImpl = globalThis.fetch,
   apiKey = process.env.JUPITER_API_KEY || '',
@@ -163,9 +186,13 @@ export function createJupiterUnsignedSimulationService({
     const lamports = Number(feeResult?.value);
     const exactFeeLamports = Number.isSafeInteger(lamports) && lamports >= 0 ? lamports : null;
     const sim = simulationResult(simulation);
+    const state = classifySimulationState(sim);
     if (!sim.ok) {
       console.error('[aether-shadow-sim] simulation rejected', JSON.stringify({
         error: sim.error,
+        state_status: state.state_status,
+        account_state_available: state.account_state_available,
+        route_execution_rejected: state.route_execution_rejected,
         units_consumed: sim.units_consumed,
         logs_observed: sim.logs_observed
       }));
@@ -177,6 +204,9 @@ export function createJupiterUnsignedSimulationService({
       simulation_attempted: true,
       simulation_ok: sim.ok,
       simulation_error: sim.error,
+      simulation_state_status: state.state_status,
+      simulation_account_state_available: state.account_state_available,
+      simulation_route_execution_rejected: state.route_execution_rejected,
       units_consumed: sim.units_consumed,
       logs_observed: sim.logs_observed,
       user_public_key_present: true,
@@ -195,14 +225,13 @@ export function createJupiterUnsignedSimulationService({
     inter_swap_delay_ms: safeDelayMs,
     swap_max_retries: safeMaxRetries,
     async observeRoundTrip(quoteEvidence) {
-      // Quote collection ends immediately before this stage. Delay before the first
-      // swap-build request so Free-tier Jupiter pacing is respected.
       await sleep(safeDelayMs);
       const buy = await buildAndObserve(quoteEvidence?.buy);
       await sleep(safeDelayMs);
       const sell = await buildAndObserve(quoteEvidence?.sell);
       const buyFee = buy.exact_fee_lamports;
       const sellFee = sell.exact_fee_lamports;
+      const accountStateAvailable = Boolean(buy.simulation_account_state_available && sell.simulation_account_state_available);
       return Object.freeze({
         buy,
         sell,
@@ -211,6 +240,8 @@ export function createJupiterUnsignedSimulationService({
         buy_simulation_ok: Boolean(buy.simulation_ok),
         sell_simulation_ok: Boolean(sell.simulation_ok),
         roundtrip_simulation_ok: Boolean(buy.simulation_ok && sell.simulation_ok),
+        simulation_account_state_available: accountStateAvailable,
+        simulation_state_limited: !accountStateAvailable,
         source: 'JUPITER_SWAP_BUILD+SOLANA_RPC',
         read_only: true,
         mode: 'SHADOW',
