@@ -102,6 +102,33 @@ assert.equal(listed[0].source_reference, canonicalReference);
 assert.equal(listed[0].verified, false);
 assert.equal(listed[0].published, false);
 
+const validReconciliationRow = {
+  collection_id: '22222222-2222-4222-8222-222222222222',
+  trader_id: trader.trader_id,
+  source_type: 'INTERNAL_RECONCILIATION',
+  source_reference: null,
+  observed_at: new Date('2026-09-01T00:00:01.000Z'),
+  collection_status: 'RECORDED',
+  reason: 'reconciled_performance_evidence',
+  provenance: { source: 'SYNTHETIC_TEST_ONLY' },
+  metrics_available: true,
+  trades_count: 5,
+  total_return_bps: 120,
+  win_rate_bps: 6000,
+  drawdown_bps: 40,
+  reputation_score: 80,
+  calculation_hash: 'a'.repeat(64),
+  verified: false,
+  published: false,
+  live_execution_authorized: false,
+  created_at: new Date('2026-09-01T00:00:01.000Z')
+};
+inserted.push(validReconciliationRow);
+const mixedSourceListing = await service.listCollections(trader.trader_id, 20);
+assert.equal(mixedSourceListing.length, 1, 'automatic evidence listing must ignore valid non-automatic reconciliation rows instead of failing');
+assert.equal(mixedSourceListing[0].collection_id, collection.collection_id);
+inserted.pop();
+
 const pristine = structuredClone(inserted[0]);
 const unsafeCases = [
   ['metrics_available', true, /automatic_evidence_safety_invariant_violation/],
