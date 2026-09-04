@@ -91,7 +91,7 @@ async function jupiterQuote({ inputMint, outputMint, amount, dex = null, onlyDir
   return getJson(url);
 }
 
-function maxPriceImpactBps(buy, sell) {
+function observedMaxPriceImpactBps(buy, sell) {
   const buyPct = finite(buy?.priceImpactPct);
   const sellPct = finite(sell?.priceImpactPct);
   if (buyPct === null || sellPct === null) return null;
@@ -197,7 +197,7 @@ try {
       continue;
     }
 
-    const impact = maxPriceImpactBps(buyQuote, sellQuote);
+    const impact = observedMaxPriceImpactBps(buyQuote, sellQuote);
     if (impact === null || impact > maxPriceImpactBps) {
       results.push({
         symbol: row.base_token?.symbol || null,
