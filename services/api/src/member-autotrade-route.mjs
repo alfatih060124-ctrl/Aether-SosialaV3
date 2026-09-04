@@ -1,9 +1,12 @@
 import { persistAuthenticatedAutoTradeDecisionAtomically } from './autotrade-atomic-persistence.mjs';
 import { createTrustedAutoTradeRuntimeRiskResolver } from './trusted-autotrade-runtime-risk.mjs';
 import { handleMemberPositionsRoute } from './member-positions-route.mjs';
+import { getMemberAutoTradeDemoState, runMemberAutoTradeDemoStep } from './member-autotrade-demo.mjs';
 
 const MEMBER_ROUTE = '/api/account/autotrade/evaluate';
 const LEGACY_ROUTE = '/api/autotrade/evaluate';
+const DEMO_STATE_ROUTE = '/api/account/auto-strategy/demo';
+const DEMO_SIMULATE_ROUTE = '/api/account/auto-strategy/simulate';
 
 function statusFor(error) {
   const code = String(error?.message || '');
@@ -39,6 +42,46 @@ export async function handleMemberAutoTradeRoute({
   createRiskResolver = createTrustedAutoTradeRuntimeRiskResolver
 }) {
   if (await handleMemberPositionsRoute({ req, res, route, pool, walletAuth, sessionFor, send })) return true;
+
+  if (route === DEMO_STATE_ROUTE || route === DEMO_SIMULATE_ROUTE) {
+    const expectedMethod = route === DEMO_STATE_ROUTE ? 'GET' : 'POST';
+    if (req.method !== expectedMethod) {
+      send(res, 405, { error: 'method_not_allowed', mode: 'SHADOW', live_execution_authorized: false });
+      return true;
+    }
+    if (!pool || !walletAuth) {
+      send(res, 503, { error: 'database_unconfigured', mode: 'SHADOW', live_execution_authorized: false });
+      return true;
+    }
+    if (liveEnabled || executionMode !== 'SHADOW') {
+      send(res, 423, { error: 'autotrade_live_blocked', reason: 'persistent_demo_shadow_only', live_execution_authorized: false });
+      return true;
+    }
+    try {
+      const session = await sessionFor(req);
+      if (!session) {
+        send(res, 401, { error: 'session_required', mode: 'SHADOW', live_execution_authorized: false });
+        return true;
+      }
+      if (route === DEMO_STATE_ROUTE) {
+        const state = await getMemberAutoTradeDemoState(pool, session.user_id, { limit: 20 });
+        send(res, 200, { demo_wallet: state, simulator_runtime: 'PRIMARY_VM_PERSISTENT_DEMO', mode: 'SHADOW', funds_moved: false, live_execution_authorized: false });
+        return true;
+      }
+      const result = await runMemberAutoTradeDemoStep(pool, session, await jsonBody(req));
+      send(res, 200, result);
+      return true;
+    } catch (error) {
+      send(res, statusFor(error), {
+        error: String(error?.message || 'persistent_demo_failed'),
+        mode: 'SHADOW',
+        execution_dispatched: false,
+        funds_moved: false,
+        live_execution_authorized: false
+      });
+      return true;
+    }
+  }
 
   if (route === LEGACY_ROUTE) {
     if (req.method !== 'POST') return false;
@@ -126,3 +169,5 @@ export async function handleMemberAutoTradeRoute({
 }
 
 export const MEMBER_AUTOTRADE_ROUTE = MEMBER_ROUTE;
+export const MEMBER_AUTOTRADE_DEMO_STATE_ROUTE = DEMO_STATE_ROUTE;
+export const MEMBER_AUTOTRADE_DEMO_SIMULATE_ROUTE = DEMO_SIMULATE_ROUTE;
