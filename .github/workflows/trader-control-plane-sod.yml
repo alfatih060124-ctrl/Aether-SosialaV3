@@ -1,0 +1,23 @@
+name: Trader Control Plane SoD Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/trader-control-plane-sod.mjs'
+      - 'scripts/trader-control-plane-sod-regression.mjs'
+      - '.github/workflows/trader-control-plane-sod.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trader-control-plane-sod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run trader control-plane separation regression
+        run: node scripts/trader-control-plane-sod-regression.mjs
