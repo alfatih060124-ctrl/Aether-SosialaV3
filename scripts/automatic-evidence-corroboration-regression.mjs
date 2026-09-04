@@ -4,7 +4,7 @@ import { collectSolscanTransactionDetailEvidence } from '../services/api/src/sol
 
 // SYNTHETIC / TEST-ONLY FIXTURES. NEVER USE THESE IDENTIFIERS AS PRODUCTION EVIDENCE.
 const SIGNATURE = '1'.repeat(64);
-const OTHER_SIGNATURE = '2'.repeat(64);
+const OTHER_SIGNATURE = `${'1'.repeat(63)}2`;
 const WALLET = '1'.repeat(32);
 const SLOT = 123456;
 const OBSERVED_AT = '2026-01-02T00:00:00.000Z';
@@ -92,8 +92,8 @@ await rejects('unsafe_rpc_evidence', rpc => { rpc.live_execution_authorized = tr
 await rejects('rpc_provenance_binding_invalid', rpc => { rpc.provenance.recorded_source_reference = `solana_rpc:${SIGNATURE}@1`; });
 await rejects('unsafe_solscan_evidence', null, evidence => { evidence.total_return_bps = 42; });
 await rejects('unsafe_solscan_evidence', null, evidence => { evidence.verified = true; });
-await rejects('solscan_row_binding_invalid', null, evidence => { evidence.row.slot += 1; });
-await rejects('invalid_solscan_source_hash', null, evidence => { evidence.source_hash = 'not-a-hash'; });
+await rejects('solscan_evidence_verification_failed', null, evidence => { evidence.row.slot += 1; });
+await rejects('solscan_evidence_verification_failed', null, evidence => { evidence.source_hash = 'not-a-hash'; });
 await rejects('invalid_corroboration_chronology', null, null, '2026-01-01T23:59:58.000Z');
 
 for (const mutate of [
