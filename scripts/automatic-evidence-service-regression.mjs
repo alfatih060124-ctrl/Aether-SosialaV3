@@ -16,7 +16,7 @@ function base58(bytes) {
   return '1'.repeat(zeroes) + (out || '1');
 }
 
-// SYNTHETIC / TEST-ONLY identifiers. Never production signatures, wallets, trades, metrics, or source references.
+// SYNTHETIC / TEST-ONLY identifiers and rows. Never production signatures, wallets, trades, metrics, or source references.
 const wallet = base58(new Uint8Array(32).fill(7));
 const signature = base58(new Uint8Array(64).fill(9));
 const canonicalReference = `solana_rpc:${signature}@123`;
@@ -40,7 +40,7 @@ const pool = {
         collection_id: params[0], trader_id: params[1], source_type: params[2], source_reference: params[3],
         observed_at: params[4], collection_status: 'PENDING_DATA', reason: params[5], provenance: JSON.parse(params[6]),
         metrics_available: false, trades_count: null, total_return_bps: null, win_rate_bps: null,
-        drawdown_bps: null, reputation_score: null, verified: false, published: false,
+        drawdown_bps: null, reputation_score: null, calculation_hash: null, verified: false, published: false,
         live_execution_authorized: false, created_at: new Date('2026-09-01T00:00:00.000Z')
       };
       inserted.push(row);
@@ -83,6 +83,7 @@ assert.equal(collection.total_return_bps, null);
 assert.equal(collection.win_rate_bps, null);
 assert.equal(collection.drawdown_bps, null);
 assert.equal(collection.reputation_score, null);
+assert.equal(collection.calculation_hash, null);
 assert.equal(collection.verified, false);
 assert.equal(collection.published, false);
 assert.equal(collection.live_execution_authorized, false);
@@ -100,6 +101,27 @@ assert.equal(listed[0].collection_id, collection.collection_id);
 assert.equal(listed[0].source_reference, canonicalReference);
 assert.equal(listed[0].verified, false);
 assert.equal(listed[0].published, false);
+
+const pristine = structuredClone(inserted[0]);
+const unsafeCases = [
+  ['metrics_available', true, /automatic_evidence_safety_invariant_violation/],
+  ['trades_count', 7, /automatic_evidence_safety_invariant_violation/],
+  ['total_return_bps', 123, /automatic_evidence_safety_invariant_violation/],
+  ['win_rate_bps', 5000, /automatic_evidence_safety_invariant_violation/],
+  ['drawdown_bps', 250, /automatic_evidence_safety_invariant_violation/],
+  ['reputation_score', 99, /automatic_evidence_safety_invariant_violation/],
+  ['calculation_hash', '0'.repeat(64), /automatic_evidence_safety_invariant_violation/],
+  ['verified', true, /automatic_evidence_safety_invariant_violation/],
+  ['published', true, /automatic_evidence_safety_invariant_violation/],
+  ['live_execution_authorized', true, /automatic_evidence_safety_invariant_violation/],
+  ['collection_status', 'VERIFIED', /automatic_evidence_status_invalid/],
+  ['source_type', 'INTERNAL_RECONCILIATION', /automatic_evidence_source_type_invalid/]
+];
+for (const [field, value, expected] of unsafeCases) {
+  inserted[0] = { ...pristine, [field]: value };
+  await assert.rejects(() => service.listCollections(trader.trader_id, 20), expected, `must fail closed for ${field}`);
+}
+inserted[0] = pristine;
 
 assert.throws(() => createSolanaJsonRpcCaller({ rpcUrl: '' }), /solana_rpc_unconfigured/);
 assert.throws(() => createSolanaJsonRpcCaller({ rpcUrl: 'file:///tmp/rpc' }), /invalid_solana_rpc_url/);
