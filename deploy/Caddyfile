@@ -72,6 +72,32 @@ a.aether.boats {
     reverse_proxy 127.0.0.1:8080
   }
 
+  # PRIMARY_VM-only operator training surface. These are repository modules used
+  # by the browser-side SHADOW training page. They do not expose credentials,
+  # database state, signer material, transaction submission, or LIVE authority.
+  handle /operator-modules/auto-trade-training.mjs {
+    rewrite * /auto-trade-training.mjs
+    root * /opt/aether-v3/services/api/src
+    file_server
+  }
+  handle /operator-modules/signal-intelligence.mjs {
+    rewrite * /signal-intelligence.mjs
+    root * /opt/aether-v3/services/api/src
+    file_server
+  }
+  handle /operator-modules/auto-trade-engine.mjs {
+    rewrite * /auto-trade-engine.mjs
+    root * /opt/aether-v3/services/api/src
+    file_server
+  }
+
+  @operator_autotrade_ui path /operator-autotrade /operator-autotrade.html
+  handle @operator_autotrade_ui {
+    root * /opt/aether-v3/public
+    rewrite * /operator-autotrade.html
+    file_server
+  }
+
   @other_api path /api/*
   handle @other_api {
     respond "admin API route not available" 404
