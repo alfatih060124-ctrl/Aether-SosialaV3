@@ -1,5 +1,6 @@
 import { createMarketIntelligenceService } from '../services/api/src/market-intelligence.mjs';
 import { createSolanaHolderConcentrationService } from '../services/api/src/solana-holder-concentration.mjs';
+import { createJupiterQuoteEvidenceService } from '../services/api/src/jupiter-quote-evidence.mjs';
 
 const view = String(process.env.AETHER_MARKET_VIEW || 'trending').trim().toLowerCase();
 const limitRaw = Number(process.env.AETHER_MARKET_PROBE_LIMIT || 10);
@@ -7,8 +8,10 @@ const limit = Number.isSafeInteger(limitRaw) ? Math.min(20, Math.max(1, limitRaw
 const minLiquidityUsd = Math.max(0, Number(process.env.SIGNAL_MIN_LIQUIDITY_USD || 500000));
 const minVolume24hUsd = Math.max(0, Number(process.env.SIGNAL_MIN_VOLUME_24H_USD || 250000));
 const maxTop10HolderPct = Math.max(0, Number(process.env.SIGNAL_MAX_TOP10_HOLDER_PCT || 35));
+const maxPriceImpactBps = Math.max(0, Number(process.env.SIGNAL_MAX_PRICE_IMPACT_BPS || 100));
 const maxRetriesRaw = Number(process.env.AETHER_MARKET_PROBE_MAX_RETRIES || 3);
 const maxRetries = Number.isSafeInteger(maxRetriesRaw) ? Math.min(5, Math.max(0, maxRetriesRaw)) : 3;
+const quoteUsdcRaw = String(process.env.AETHER_JUPITER_QUOTE_USDC_RAW || '100000000').trim();
 
 const BASE_MISSING_FIELDS = Object.freeze([
   'spread_bps',
@@ -79,18 +82,26 @@ try {
   holderServiceError = String(error?.message || error);
 }
 
+let quotes = null;
+let quoteServiceError = null;
 try {
-  // One GeckoTerminal discovery request supplies the cheap market gate. Token-detail
-  // enrichment is intentionally deferred until a later stage because it fans out into
-  // multiple provider calls per mint and does not verify any execution-critical field.
+  quotes = createJupiterQuoteEvidenceService({ timeoutMs: 10_000 });
+} catch (error) {
+  quoteServiceError = String(error?.message || error);
+}
+
+try {
   const discovery = await withRateLimitBackoff('discovery', () => market.getDiscovery(view));
   const rows = discovery.items.slice(0, limit);
   const candidates = [];
+  let quoteAttempts = 0;
 
   for (const row of rows) {
     const base = preliminary(row);
     let holderEvidence = null;
     let holderError = null;
+    let quoteEvidence = null;
+    let quoteError = null;
 
     if (base.preliminary_market_gate_passed) {
       if (holders) {
@@ -108,11 +119,37 @@ try {
 
     const top10HolderPct = finite(holderEvidence?.top10_holder_pct);
     const holderGatePassed = top10HolderPct !== null && top10HolderPct <= maxTop10HolderPct;
+
+    if (base.preliminary_market_gate_passed && holderGatePassed) {
+      if (quotes) {
+        if (quoteAttempts > 0) await sleep(quotes.inter_quote_delay_ms);
+        quoteAttempts += 1;
+        try {
+          quoteEvidence = await quotes.getUsdcRoundTripEvidence(row.primary_mint, { usdcAmountRaw: quoteUsdcRaw });
+        } catch (error) {
+          quoteError = String(error?.message || error);
+        }
+      } else {
+        quoteError = quoteServiceError || 'jupiter_quote_service_unavailable';
+      }
+    } else {
+      quoteError = 'quote_skipped_prequote_gate_rejected';
+    }
+
+    const observedPriceImpactBps = finite(quoteEvidence?.max_price_impact_bps);
+    const priceImpactGatePassed = observedPriceImpactBps !== null && observedPriceImpactBps <= maxPriceImpactBps;
     const evidenceRejects = [...base.preliminary_rejects];
     if (base.preliminary_market_gate_passed && top10HolderPct !== null && !holderGatePassed) evidenceRejects.push('TOP10_HOLDER_CONCENTRATION_TOO_HIGH');
     if (base.preliminary_market_gate_passed && top10HolderPct === null) evidenceRejects.push('TOP10_HOLDER_CONCENTRATION_UNVERIFIED');
+    if (base.preliminary_market_gate_passed && holderGatePassed && quoteEvidence && !priceImpactGatePassed) evidenceRejects.push('PRICE_IMPACT_TOO_HIGH');
+    if (base.preliminary_market_gate_passed && holderGatePassed && !quoteEvidence) evidenceRejects.push('JUPITER_QUOTE_UNVERIFIED');
+
     const missingFields = [...BASE_MISSING_FIELDS];
     if (top10HolderPct === null) missingFields.splice(4, 0, 'top10_holder_pct');
+    if (quoteEvidence) {
+      const impactIndex = missingFields.indexOf('estimated_price_impact_bps');
+      if (impactIndex >= 0) missingFields.splice(impactIndex, 1);
+    }
 
     candidates.push({
       token_mint: row.primary_mint,
@@ -127,24 +164,47 @@ try {
       price_change_percentage: row.price_change_percentage || null,
       pool_age_hours_observation_only: poolAgeHours(row.pool_created_at),
       top10_holder_pct: top10HolderPct,
+      token_decimals: Number.isSafeInteger(Number(holderEvidence?.token_decimals)) ? Number(holderEvidence.token_decimals) : null,
       holder_gate_passed: holderGatePassed,
       preliminary_market_gate_passed: base.preliminary_market_gate_passed,
+      quote_stage_attempted: base.preliminary_market_gate_passed && holderGatePassed,
+      buy_quote_ok: Boolean(quoteEvidence?.buy_quote_ok),
+      sell_quote_ok: Boolean(quoteEvidence?.sell_quote_ok),
+      sell_path_verified_by_quote: Boolean(quoteEvidence?.sell_path_verified_by_quote),
+      estimated_price_impact_bps: observedPriceImpactBps,
+      price_impact_gate_passed: priceImpactGatePassed,
+      roundtrip_quote_edge_bps: finite(quoteEvidence?.roundtrip_quote_edge_bps),
+      buy_route_hops: finite(quoteEvidence?.buy?.route_hop_count),
+      sell_route_hops: finite(quoteEvidence?.sell?.route_hop_count),
+      buy_distinct_amm_count: finite(quoteEvidence?.buy?.distinct_amm_count),
+      sell_distinct_amm_count: finite(quoteEvidence?.sell?.distinct_amm_count),
+      buy_amm_labels: quoteEvidence?.buy?.amm_labels || [],
+      sell_amm_labels: quoteEvidence?.sell?.amm_labels || [],
+      source_count_observed: finite(quoteEvidence?.source_count_observed),
+      net_edge_costs_included: false,
+      sell_simulation_ok: false,
       preliminary_rejects: evidenceRejects,
       full_signal_gate_ready: false,
       missing_mandatory_signal_fields: missingFields,
       detail_error: 'detail_not_requested_provider_quota_preserved',
       holder_error: holderError,
       holder_source: holderEvidence?.source || null,
+      quote_error: quoteError,
+      quote_source: quoteEvidence ? 'JUPITER_QUOTE_API' : null,
       source: 'GECKOTERMINAL_PUBLIC',
       real_market: true,
       mode: 'SHADOW',
       execution_ready: false,
       execution_dispatched: false,
+      transaction_built: false,
       network_submission_authorized: false,
       signer_requested: false,
       live_execution_authorized: false
     });
   }
+
+  const quoteStage = candidates.filter(item => item.preliminary_market_gate_passed && item.holder_gate_passed);
+  const quoted = quoteStage.filter(item => item.buy_quote_ok && item.sell_quote_ok);
 
   console.log(JSON.stringify({
     status: 'ok',
@@ -154,25 +214,38 @@ try {
     market_source_stale: Boolean(discovery.freshness?.stale),
     candidates_scanned: candidates.length,
     preliminary_market_gate_passed: candidates.filter(item => item.preliminary_market_gate_passed).length,
-    holder_gate_passed: candidates.filter(item => item.preliminary_market_gate_passed && item.holder_gate_passed).length,
-    quote_stage_candidates: candidates.filter(item => item.preliminary_market_gate_passed && item.holder_gate_passed).map(item => ({
+    holder_gate_passed: quoteStage.length,
+    quote_stage_attempted: quoteStage.length,
+    quote_stage_succeeded: quoted.length,
+    quote_price_impact_gate_passed: quoted.filter(item => item.price_impact_gate_passed).length,
+    quote_stage_results: quoteStage.map(item => ({
       token_mint: item.token_mint,
       symbol: item.symbol,
-      dex_id: item.dex_id,
-      pool_address: item.pool_address,
-      liquidity_usd: item.liquidity_usd,
-      volume_24h_usd: item.volume_24h_usd,
-      top10_holder_pct: item.top10_holder_pct
+      top10_holder_pct: item.top10_holder_pct,
+      buy_quote_ok: item.buy_quote_ok,
+      sell_quote_ok: item.sell_quote_ok,
+      sell_path_verified_by_quote: item.sell_path_verified_by_quote,
+      estimated_price_impact_bps: item.estimated_price_impact_bps,
+      price_impact_gate_passed: item.price_impact_gate_passed,
+      roundtrip_quote_edge_bps: item.roundtrip_quote_edge_bps,
+      buy_amm_labels: item.buy_amm_labels,
+      sell_amm_labels: item.sell_amm_labels,
+      quote_error: item.quote_error
     })),
     full_signal_gate_ready: 0,
     provider_quota_policy: {
       geckoterminal_requests: 'discovery_only',
       token_detail_deferred: true,
+      jupiter_key_present: Boolean(String(process.env.JUPITER_API_KEY || '').trim()),
+      jupiter_inter_quote_delay_ms: quotes?.inter_quote_delay_ms || null,
       rate_limit_retries: maxRetries
     },
-    note: 'Real market discovery and on-chain holder evidence are active. Quote-stage candidates remain fail-closed until quote/sell simulation, token controls, multi-source reconciliation, and net-edge-after-cost fields are independently verified.',
+    note: 'Real market discovery, holder evidence, and read-only Jupiter buy/sell quotes are active. Quote success proves current route availability and price impact only. Final Auto Trade remains fail-closed until transaction simulation, token controls, independent route reconciliation, and expected net edge after all modeled costs are verified.',
     mode: 'SHADOW',
     execution_ready: false,
+    transaction_built: false,
+    network_submission_authorized: false,
+    signer_requested: false,
     live_execution_authorized: false,
     candidates
   }, null, 2));
@@ -184,6 +257,9 @@ try {
     retry_policy_exhausted: String(error?.message || error) === 'market_provider_rate_limited',
     mode: 'SHADOW',
     execution_ready: false,
+    transaction_built: false,
+    network_submission_authorized: false,
+    signer_requested: false,
     live_execution_authorized: false
   }, null, 2));
   process.exitCode = 1;
