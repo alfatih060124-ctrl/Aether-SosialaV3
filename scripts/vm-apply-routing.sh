@@ -7,6 +7,7 @@ TARGET="/etc/caddy/Caddyfile"
 BACKUP="/etc/caddy/Caddyfile.aether-backup-$(date +%Y%m%d%H%M%S)"
 PUBLIC_API="https://api.aether.boats"
 ADMIN_ORIGIN="https://a.aether.boats"
+ADMIN_HOST="a.aether.boats"
 
 say(){ printf '[aether-routing] %s\n' "$*"; }
 fail(){ printf '[aether-routing] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -88,13 +89,24 @@ expect_blocked GET /api/admin/wallets
 expect_blocked POST /api/executions
 expect_blocked POST /api/signals/evaluate
 
-say "verifying PRIMARY_VM operator auto-trade training surface"
-curl -fsS --max-time 12 "$ADMIN_ORIGIN/operator-autotrade" | grep -q 'AUTO TRADE OPERATOR SIMULATOR'
-curl -fsS --max-time 12 "$ADMIN_ORIGIN/operator-modules/auto-trade-training.mjs" | grep -q 'runAutoTradeTraining'
-curl -fsS --max-time 12 "$ADMIN_ORIGIN/operator-modules/signal-intelligence.mjs" | grep -q 'HARD_MIN_EXPECTED_NET_EDGE_BPS = 20'
-curl -fsS --max-time 12 "$ADMIN_ORIGIN/operator-modules/auto-trade-engine.mjs" | grep -q 'live_execution_authorized: false'
+admin_local(){
+  curl -fsS --max-time 12 --resolve "$ADMIN_HOST:443:127.0.0.1" "$ADMIN_ORIGIN$1"
+}
+
+say "verifying PRIMARY_VM operator auto-trade training surface locally"
+admin_local /operator-autotrade | grep -q 'AUTO TRADE OPERATOR SIMULATOR'
+admin_local /operator-modules/auto-trade-training.mjs | grep -q 'runAutoTradeTraining'
+admin_local /operator-modules/signal-intelligence.mjs | grep -q 'HARD_MIN_EXPECTED_NET_EDGE_BPS = 20'
+admin_local /operator-modules/auto-trade-engine.mjs | grep -q 'live_execution_authorized: false'
+
+say "checking external Admin reachability (non-fatal)"
+external_code="$(curl -sS --max-time 12 -o /dev/null -w '%{http_code}' "$ADMIN_ORIGIN/operator-autotrade" || true)"
+case "$external_code" in
+  200) say "external operator page reachable" ;;
+  *) say "external operator page not yet reachable (HTTP ${external_code:-000}); local Caddy verification passed" ;;
+esac
 
 ROLLBACK_REQUIRED=0
 trap - ERR INT TERM
-say "FINAL: public API remains fenced; PRIMARY_VM operator SHADOW simulator is reachable on the Admin hostname; LIVE remains disabled"
+say "FINAL: public API remains fenced; PRIMARY_VM operator SHADOW simulator is locally verified on the Admin hostname; LIVE remains disabled"
 say "previous Caddyfile backup: $BACKUP"
