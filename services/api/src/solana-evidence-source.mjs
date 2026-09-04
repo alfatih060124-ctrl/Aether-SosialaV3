@@ -142,6 +142,16 @@ function canonicalSignatures(rows = []) {
   });
 }
 
+function sourceHashPayload({ wallet, endpointLabel, commitment, signatures, collection }) {
+  return {
+    v: 8,
+    wallet,
+    source: { type: 'SOLANA_RPC', endpoint_label: endpointLabel, commitment },
+    signatures,
+    collection
+  };
+}
+
 export function buildSolanaRpcProvenance({
   walletAddress,
   signatures,
@@ -157,17 +167,13 @@ export function buildSolanaRpcProvenance({
   const normalizedEndpointLabel = normalizeEndpointLabel(endpointLabel);
   const collection = normalizeCollectionMetadata({ pagesFetched, pageSize, maxPages, collectionComplete });
   const normalizedCommitment = normalizeCommitment(commitment);
-  const sourceHash = crypto.createHash('sha256').update(JSON.stringify({
-    v: 8,
+  const sourceHash = crypto.createHash('sha256').update(JSON.stringify(sourceHashPayload({
     wallet,
-    source: {
-      type: 'SOLANA_RPC',
-      endpoint_label: normalizedEndpointLabel,
-      commitment: normalizedCommitment
-    },
+    endpointLabel: normalizedEndpointLabel,
+    commitment: normalizedCommitment,
     signatures: canonical,
     collection
-  })).digest('hex');
+  }))).digest('hex');
   return {
     schema_version: 8,
     source_type: 'SOLANA_RPC',
@@ -184,8 +190,38 @@ export function buildSolanaRpcProvenance({
     newest_signature: canonical[0]?.signature || null,
     newest_slot: canonical[0]?.slot ?? null,
     oldest_signature: canonical.at(-1)?.signature || null,
+    signature_rows: canonical,
     source_hash: sourceHash
   };
+}
+
+export function verifySolanaRpcProvenance(provenance) {
+  try {
+    if (!provenance || typeof provenance !== 'object' || Array.isArray(provenance)) return false;
+    if (provenance.schema_version !== 8 || provenance.source_type !== 'SOLANA_RPC') return false;
+    const rebuilt = buildSolanaRpcProvenance({
+      walletAddress: provenance.wallet_address,
+      signatures: provenance.signature_rows,
+      endpointLabel: provenance.rpc_endpoint_label,
+      pagesFetched: provenance.pages_fetched,
+      pageSize: provenance.page_size,
+      maxPages: provenance.max_pages,
+      collectionComplete: provenance.collection_complete,
+      commitment: provenance.rpc_commitment
+    });
+    return (
+      rebuilt.source_hash === provenance.source_hash &&
+      rebuilt.signatures_observed === provenance.signatures_observed &&
+      rebuilt.successful_signatures_observed === provenance.successful_signatures_observed &&
+      rebuilt.failed_signatures_observed === provenance.failed_signatures_observed &&
+      rebuilt.newest_signature === provenance.newest_signature &&
+      rebuilt.newest_slot === provenance.newest_slot &&
+      rebuilt.oldest_signature === provenance.oldest_signature &&
+      JSON.stringify(rebuilt.signature_rows) === JSON.stringify(provenance.signature_rows)
+    );
+  } catch {
+    return false;
+  }
 }
 
 export async function collectSolanaRpcEvidence({
@@ -222,9 +258,6 @@ export async function collectSolanaRpcEvidence({
       break;
     }
 
-    // Solana's `before` cursor is positional: it must be the signature from the
-    // final row returned by the provider, not a signature chosen after canonical sorting.
-    // Canonical ordering is only for deterministic provenance hashing after collection.
     const nextBefore = assertSignature(pageResult.at(-1)?.signature);
     if (nextBefore === before) throw new Error('rpc_pagination_stalled');
     before = nextBefore;
@@ -242,8 +275,6 @@ export async function collectSolanaRpcEvidence({
     commitment: normalizedCommitment
   });
 
-  // Signatures prove observable chain activity, not realized trading performance.
-  // Never derive return/win-rate/drawdown from transaction count or token balance deltas.
   return {
     ...pendingData(signatures.length ? 'reconciled_trade_performance_required' : 'no_verifiable_chain_activity'),
     source_type: 'SOLANA_RPC',
