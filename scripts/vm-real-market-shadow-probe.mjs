@@ -2,6 +2,7 @@ import { createMarketIntelligenceService } from '../services/api/src/market-inte
 import { createSolanaHolderConcentrationService } from '../services/api/src/solana-holder-concentration.mjs';
 import { createJupiterQuoteEvidenceService } from '../services/api/src/jupiter-quote-evidence.mjs';
 import { createSolanaFeeEvidenceService } from '../services/api/src/solana-fee-evidence.mjs';
+import { createJupiterUnsignedSimulationService } from '../services/api/src/jupiter-unsigned-simulation.mjs';
 
 const view = String(process.env.AETHER_MARKET_VIEW || 'trending').trim().toLowerCase();
 const limitRaw = Number(process.env.AETHER_MARKET_PROBE_LIMIT || 10);
@@ -13,6 +14,8 @@ const maxPriceImpactBps = Math.max(0, Number(process.env.SIGNAL_MAX_PRICE_IMPACT
 const maxRetriesRaw = Number(process.env.AETHER_MARKET_PROBE_MAX_RETRIES || 3);
 const maxRetries = Number.isSafeInteger(maxRetriesRaw) ? Math.min(5, Math.max(0, maxRetriesRaw)) : 3;
 const quoteUsdcRaw = String(process.env.AETHER_JUPITER_QUOTE_USDC_RAW || '100000000').trim();
+const simulationLimitRaw = Number(process.env.AETHER_SHADOW_SIMULATION_PROBE_LIMIT || 1);
+const simulationLimit = Number.isSafeInteger(simulationLimitRaw) ? Math.min(3, Math.max(0, simulationLimitRaw)) : 1;
 
 const BASE_MISSING_FIELDS = Object.freeze([
   'spread_bps',
@@ -98,11 +101,20 @@ try {
   feeEvidenceError = String(error?.message || error);
 }
 
+let unsignedSimulation = null;
+let unsignedSimulationServiceError = null;
+try {
+  unsignedSimulation = createJupiterUnsignedSimulationService({ timeoutMs: 12_000 });
+} catch (error) {
+  unsignedSimulationServiceError = String(error?.message || error);
+}
+
 try {
   const discovery = await withRateLimitBackoff('discovery', () => market.getDiscovery(view));
   const rows = discovery.items.slice(0, limit);
   const candidates = [];
   let quoteAttempts = 0;
+  let simulationAttempts = 0;
 
   for (const row of rows) {
     const base = preliminary(row);
@@ -110,6 +122,8 @@ try {
     let holderError = null;
     let quoteEvidence = null;
     let quoteError = null;
+    let simulationEvidence = null;
+    let simulationError = null;
 
     if (base.preliminary_market_gate_passed) {
       if (holders) {
@@ -148,6 +162,24 @@ try {
     const priceImpactGatePassed = observedPriceImpactBps !== null && observedPriceImpactBps <= maxPriceImpactBps;
     const roundtripQuoteEdgeBps = finite(quoteEvidence?.roundtrip_quote_edge_bps);
     const observedRoundtripCostBps = roundtripQuoteEdgeBps === null ? null : Math.max(0, -roundtripQuoteEdgeBps);
+
+    if (quoteEvidence && priceImpactGatePassed && simulationAttempts < simulationLimit) {
+      if (unsignedSimulation) {
+        simulationAttempts += 1;
+        try {
+          simulationEvidence = await unsignedSimulation.observeRoundTrip(quoteEvidence);
+        } catch (error) {
+          simulationError = String(error?.message || error);
+        }
+      } else {
+        simulationError = unsignedSimulationServiceError || 'unsigned_simulation_service_unavailable';
+      }
+    } else if (!quoteEvidence || !priceImpactGatePassed) {
+      simulationError = 'simulation_skipped_preconditions_not_met';
+    } else {
+      simulationError = 'simulation_skipped_probe_limit';
+    }
+
     const evidenceRejects = [...base.preliminary_rejects];
     if (base.preliminary_market_gate_passed && top10HolderPct !== null && !holderGatePassed) evidenceRejects.push('TOP10_HOLDER_CONCENTRATION_TOO_HIGH');
     if (base.preliminary_market_gate_passed && top10HolderPct === null) evidenceRejects.push('TOP10_HOLDER_CONCENTRATION_UNVERIFIED');
@@ -155,6 +187,8 @@ try {
     if (base.preliminary_market_gate_passed && holderGatePassed && !quoteEvidence) evidenceRejects.push('JUPITER_QUOTE_UNVERIFIED');
     if (quoteEvidence && roundtripQuoteEdgeBps !== null && roundtripQuoteEdgeBps < 0) evidenceRejects.push('ROUNDTRIP_QUOTE_COST_OBSERVED');
     if (!feeEvidence) evidenceRejects.push('SOLANA_FEE_EVIDENCE_UNVERIFIED');
+    if (quoteEvidence && priceImpactGatePassed && !simulationEvidence) evidenceRejects.push('UNSIGNED_TRANSACTION_SIMULATION_UNVERIFIED');
+    if (simulationEvidence && !simulationEvidence.roundtrip_simulation_ok) evidenceRejects.push('ROUNDTRIP_TRANSACTION_SIMULATION_FAILED');
 
     const missingFields = [...BASE_MISSING_FIELDS];
     if (top10HolderPct === null) missingFields.splice(4, 0, 'top10_holder_pct');
@@ -195,9 +229,19 @@ try {
       sell_amm_labels: quoteEvidence?.sell?.amm_labels || [],
       source_count_observed: finite(quoteEvidence?.source_count_observed),
       fee_evidence_available: Boolean(feeEvidence),
-      exact_transaction_fee_ready: Boolean(feeEvidence?.exact_transaction_fee_ready),
+      transaction_build_attempted: Boolean(quoteEvidence && priceImpactGatePassed && simulationAttempts <= simulationLimit),
+      transaction_built: Boolean(simulationEvidence?.buy?.transaction_built || simulationEvidence?.sell?.transaction_built),
+      exact_buy_fee_lamports: finite(simulationEvidence?.buy?.exact_fee_lamports),
+      exact_sell_fee_lamports: finite(simulationEvidence?.sell?.exact_fee_lamports),
+      exact_roundtrip_fee_lamports: finite(simulationEvidence?.exact_roundtrip_fee_lamports),
+      exact_transaction_fee_ready: Boolean(simulationEvidence?.exact_transaction_fee_ready),
+      buy_simulation_ok: Boolean(simulationEvidence?.buy_simulation_ok),
+      sell_simulation_ok: Boolean(simulationEvidence?.sell_simulation_ok),
+      roundtrip_simulation_ok: Boolean(simulationEvidence?.roundtrip_simulation_ok),
+      buy_simulation_units_consumed: finite(simulationEvidence?.buy?.units_consumed),
+      sell_simulation_units_consumed: finite(simulationEvidence?.sell?.units_consumed),
+      simulation_error: simulationError,
       net_edge_costs_included: false,
-      sell_simulation_ok: false,
       preliminary_rejects: evidenceRejects,
       full_signal_gate_ready: false,
       missing_mandatory_signal_fields: [...new Set(missingFields)],
@@ -211,7 +255,7 @@ try {
       mode: 'SHADOW',
       execution_ready: false,
       execution_dispatched: false,
-      transaction_built: false,
+      transaction_signed: false,
       network_submission_authorized: false,
       signer_requested: false,
       live_execution_authorized: false
@@ -233,6 +277,12 @@ try {
     quote_stage_attempted: quoteStage.length,
     quote_stage_succeeded: quoted.length,
     quote_price_impact_gate_passed: quoted.filter(item => item.price_impact_gate_passed).length,
+    unsigned_simulation_configured: Boolean(unsignedSimulation),
+    unsigned_simulation_service_error: unsignedSimulationServiceError,
+    unsigned_simulation_probe_limit: simulationLimit,
+    unsigned_simulation_attempted: candidates.filter(item => item.transaction_build_attempted && item.simulation_error !== 'simulation_skipped_probe_limit').length,
+    exact_transaction_fee_ready: candidates.filter(item => item.exact_transaction_fee_ready).length,
+    roundtrip_simulation_ok: candidates.filter(item => item.roundtrip_simulation_ok).length,
     fee_evidence: feeEvidence ? {
       samples: feeEvidence.samples,
       prioritization_fee_rpc_p50: feeEvidence.prioritization_fee_rpc_p50,
@@ -253,6 +303,12 @@ try {
       price_impact_gate_passed: item.price_impact_gate_passed,
       roundtrip_quote_edge_bps: item.roundtrip_quote_edge_bps,
       observed_roundtrip_cost_bps: item.observed_roundtrip_cost_bps,
+      exact_roundtrip_fee_lamports: item.exact_roundtrip_fee_lamports,
+      exact_transaction_fee_ready: item.exact_transaction_fee_ready,
+      buy_simulation_ok: item.buy_simulation_ok,
+      sell_simulation_ok: item.sell_simulation_ok,
+      roundtrip_simulation_ok: item.roundtrip_simulation_ok,
+      simulation_error: item.simulation_error,
       gross_executable_spread_bps: null,
       expected_net_edge_bps: null,
       quote_error: item.quote_error
@@ -263,12 +319,13 @@ try {
       token_detail_deferred: true,
       jupiter_key_present: Boolean(String(process.env.JUPITER_API_KEY || '').trim()),
       jupiter_inter_quote_delay_ms: quotes?.inter_quote_delay_ms || null,
+      unsigned_simulation_max_per_probe: simulationLimit,
       rate_limit_retries: maxRetries
     },
-    note: 'Round-trip Jupiter output is treated as observed route cost, not arbitrage profit. Final expected net edge remains unavailable until an executable gross spread is independently proven and exact transaction fees are obtained from an unsigned transaction message/simulation.',
+    note: 'Unsigned Jupiter transactions may be built only with an explicit public simulation wallet. Solana simulateTransaction is called with sigVerify=false and replaceRecentBlockhash=true; no signer is requested and no sendTransaction call exists. Final expected net edge remains unavailable until executable gross spread and all cost evidence are independently proven.',
     mode: 'SHADOW',
     execution_ready: false,
-    transaction_built: false,
+    transaction_signed: false,
     network_submission_authorized: false,
     signer_requested: false,
     live_execution_authorized: false,
@@ -282,7 +339,7 @@ try {
     retry_policy_exhausted: String(error?.message || error) === 'market_provider_rate_limited',
     mode: 'SHADOW',
     execution_ready: false,
-    transaction_built: false,
+    transaction_signed: false,
     network_submission_authorized: false,
     signer_requested: false,
     live_execution_authorized: false
