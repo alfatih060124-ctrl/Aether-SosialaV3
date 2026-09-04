@@ -1,0 +1,24 @@
+name: Solscan Enhanced Transaction Evidence Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solscan-enhanced-transaction-evidence.mjs'
+      - 'scripts/regression-solscan-enhanced-transaction-evidence.mjs'
+      - '.github/workflows/solscan-enhanced-transaction-evidence-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check services/api/src/solscan-enhanced-transaction-evidence.mjs
+      - run: node --check scripts/regression-solscan-enhanced-transaction-evidence.mjs
+      - run: node scripts/regression-solscan-enhanced-transaction-evidence.mjs
