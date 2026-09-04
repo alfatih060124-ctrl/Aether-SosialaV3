@@ -129,20 +129,46 @@
       return;
     }
 
+    const appendMetric = (grid, labelText, valueText) => {
+      const metric = d.createElement('div');
+      metric.className = 'positionmetric';
+      const label = d.createElement('span');
+      label.textContent = labelText;
+      const value = d.createElement('b');
+      value.textContent = valueText;
+      metric.append(label, value);
+      grid.appendChild(metric);
+    };
+
     for (const item of rows.slice(0, 50)) {
       const row = d.createElement('div');
       row.className = 'positionrow';
       const markStatus = String(item.mark_status || 'UNAVAILABLE').toUpperCase();
       const markText = markStatus === 'FRESH' ? money(item.mark_price_usdc) : markStatus;
-      row.innerHTML = `
-        <div class="positionhead"><strong>${shortMint(item.token_mint)} / USDC</strong><span class="positionbadge">${String(item.status || 'OPEN').toUpperCase()} · SIMULATED</span></div>
-        <div class="positiongrid">
-          <div class="positionmetric"><span>Quantity</span><b>${number(item.token_quantity, 8)}</b></div>
-          <div class="positionmetric"><span>Cost basis</span><b>${money(item.cost_basis_usdc)}</b></div>
-          <div class="positionmetric"><span>Mark</span><b>${markText}</b></div>
-          <div class="positionmetric"><span>Unrealized PnL</span><b>${money(item.unrealized_pnl_usdc)}</b></div>
-        </div>
-        <div class="positionmeta">Trader ${shortId(item.trader_id)} · Copy mandate ${shortId(item.policy_id)} · Mark status ${markStatus} · Opened ${item.opened_at ? new Date(item.opened_at).toLocaleString() : '—'}</div>`;
+
+      const head = d.createElement('div');
+      head.className = 'positionhead';
+      const pair = d.createElement('strong');
+      pair.textContent = `${shortMint(item.token_mint)} / USDC`;
+      const badge = d.createElement('span');
+      badge.className = 'positionbadge';
+      badge.textContent = `${String(item.status || 'OPEN').toUpperCase()} · SIMULATED`;
+      head.append(pair, badge);
+
+      const grid = d.createElement('div');
+      grid.className = 'positiongrid';
+      appendMetric(grid, 'Quantity', number(item.token_quantity, 8));
+      appendMetric(grid, 'Cost basis', money(item.cost_basis_usdc));
+      appendMetric(grid, 'Mark', markText);
+      appendMetric(grid, 'Unrealized PnL', money(item.unrealized_pnl_usdc));
+
+      const meta = d.createElement('div');
+      meta.className = 'positionmeta';
+      const opened = item.opened_at ? new Date(item.opened_at) : null;
+      const openedText = opened && !Number.isNaN(opened.getTime()) ? opened.toLocaleString() : '—';
+      meta.textContent = `Trader ${shortId(item.trader_id)} · Copy mandate ${shortId(item.policy_id)} · Mark status ${markStatus} · Opened ${openedText}`;
+
+      row.append(head, grid, meta);
       host.appendChild(row);
     }
   }
