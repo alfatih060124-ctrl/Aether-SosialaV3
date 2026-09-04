@@ -1,0 +1,27 @@
+name: Automatic Corroboration RPC Integrity Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/automatic-evidence-corroboration.mjs'
+      - 'scripts/automatic-corroboration-rpc-integrity-regression.mjs'
+      - '.github/workflows/automatic-corroboration-rpc-integrity-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check corroboration boundary
+        run: node --check services/api/src/automatic-evidence-corroboration.mjs
+      - name: Syntax check RPC integrity regression
+        run: node --check scripts/automatic-corroboration-rpc-integrity-regression.mjs
+      - name: Run fail-closed RPC integrity regression
+        run: node scripts/automatic-corroboration-rpc-integrity-regression.mjs
