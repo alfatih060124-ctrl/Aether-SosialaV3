@@ -194,7 +194,7 @@ try {
     let owners;
     try { owners = await ownerPrograms(addresses); } catch { continue; }
 
-    const dexPairs = [];
+    const rawDexPairs = [];
     const seenDexPairs = new Set();
     for (const pair of provisional) {
       const buyProgram = owners.get(pair.buy_amm_address);
@@ -205,12 +205,70 @@ try {
       const key = `${buyDex}=>${sellDex}`;
       if (seenDexPairs.has(key)) continue;
       seenDexPairs.add(key);
-      dexPairs.push({ ...pair, buy_dex: String(buyDex), sell_dex: String(sellDex) });
-      if (dexPairs.length >= maxDexPairAttempts) break;
+      rawDexPairs.push({ ...pair, buy_dex: String(buyDex), sell_dex: String(sellDex) });
+      if (rawDexPairs.length >= maxDexPairAttempts) break;
     }
 
-    if (!dexPairs.length) {
+    if (!rawDexPairs.length) {
       results.push({ symbol: row.base_token?.symbol || null, token_mint: row.primary_mint, status: 'NO_DISTINCT_DEX_PAIR', expected_net_edge_bps: null });
+      continue;
+    }
+
+    const buyDexes = [...new Set(rawDexPairs.map(item => item.buy_dex))];
+    const sellDexes = [...new Set(rawDexPairs.map(item => item.sell_dex))];
+    const buyPreflight = new Map();
+    const sellPreflight = new Map();
+    const preflightAttempts = [];
+
+    for (const dex of buyDexes) {
+      await sleep(interRequestDelayMs);
+      try {
+        const quote = await jupiterQuote({
+          inputMint: USDC_MINT,
+          outputMint: row.primary_mint,
+          amount: quoteUsdcRaw,
+          dex,
+          onlyDirectRoutes: true
+        });
+        buyPreflight.set(dex, quote);
+        preflightAttempts.push({ side: 'BUY', dex, ok: true });
+      } catch (error) {
+        preflightAttempts.push({ side: 'BUY', dex, ok: false, error: String(error?.message || error) });
+      }
+    }
+
+    const sellReferenceAmount = String(broad?.sell?.in_amount || broad?.buy?.out_amount || '').trim();
+    if (sellReferenceAmount) {
+      for (const dex of sellDexes) {
+        await sleep(interRequestDelayMs);
+        try {
+          const quote = await jupiterQuote({
+            inputMint: row.primary_mint,
+            outputMint: USDC_MINT,
+            amount: sellReferenceAmount,
+            dex,
+            onlyDirectRoutes: true
+          });
+          sellPreflight.set(dex, quote);
+          preflightAttempts.push({ side: 'SELL', dex, ok: true });
+        } catch (error) {
+          preflightAttempts.push({ side: 'SELL', dex, ok: false, error: String(error?.message || error) });
+        }
+      }
+    }
+
+    const dexPairs = rawDexPairs.filter(candidate => buyPreflight.has(candidate.buy_dex) && sellPreflight.has(candidate.sell_dex));
+    if (!dexPairs.length) {
+      results.push({
+        symbol: row.base_token?.symbol || null,
+        token_mint: row.primary_mint,
+        status: 'NO_ROUTABLE_DISTINCT_DEX_PAIR',
+        dex_pairs_considered: rawDexPairs.length,
+        buy_dexes_preflight_ok: buyPreflight.size,
+        sell_dexes_preflight_ok: sellPreflight.size,
+        preflight_attempts: preflightAttempts,
+        expected_net_edge_bps: null
+      });
       continue;
     }
 
@@ -220,9 +278,8 @@ try {
     const quoteAttempts = [];
 
     for (const candidate of dexPairs) {
-      await sleep(interRequestDelayMs);
       try {
-        const candidateBuy = await jupiterQuote({
+        const candidateBuy = buyPreflight.get(candidate.buy_dex) || await jupiterQuote({
           inputMint: USDC_MINT,
           outputMint: row.primary_mint,
           amount: quoteUsdcRaw,
@@ -259,6 +316,9 @@ try {
         status: 'DEX_RESTRICTED_QUOTE_UNAVAILABLE',
         dex_pairs_considered: dexPairs.length,
         dex_pair_attempts: quoteAttempts.length,
+        buy_dexes_preflight_ok: buyPreflight.size,
+        sell_dexes_preflight_ok: sellPreflight.size,
+        preflight_attempts: preflightAttempts,
         quote_attempts: quoteAttempts,
         expected_net_edge_bps: null
       });
@@ -308,6 +368,8 @@ try {
       buy_dex: selected.buy_dex,
       sell_dex: selected.sell_dex,
       dex_pair_attempts: quoteAttempts.length,
+      buy_dexes_preflight_ok: buyPreflight.size,
+      sell_dexes_preflight_ok: sellPreflight.size,
       provisional_cross_venue_spread_bps: selected.provisional_cross_venue_spread_bps,
       gross_executable_spread_bps: net.gross_executable_spread_bps,
       exact_roundtrip_fee_lamports: exactFee,
