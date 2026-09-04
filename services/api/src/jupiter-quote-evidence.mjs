@@ -3,6 +3,10 @@ import { normalizeSolanaMint } from './market-intelligence.mjs';
 const JUPITER_ORIGIN = 'https://api.jup.ag';
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 function positiveIntegerString(value, label) {
   const raw = String(value || '').trim();
   if (!/^\d+$/.test(raw)) throw new Error(label);
@@ -61,10 +65,12 @@ export function createJupiterQuoteEvidenceService({
   fetchImpl = globalThis.fetch,
   apiKey = process.env.JUPITER_API_KEY || '',
   timeoutMs = 10_000,
-  slippageBps = Number(process.env.SIGNAL_MAX_SLIPPAGE_BPS || 100)
+  slippageBps = Number(process.env.SIGNAL_MAX_SLIPPAGE_BPS || 100),
+  interQuoteDelayMs = Number(process.env.AETHER_JUPITER_INTER_QUOTE_DELAY_MS || (process.env.JUPITER_API_KEY ? 1100 : 2200))
 } = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('fetch_unavailable');
   const safeSlippageBps = Number.isFinite(Number(slippageBps)) ? Math.min(500, Math.max(1, Math.trunc(Number(slippageBps)))) : 100;
+  const safeDelayMs = Number.isFinite(Number(interQuoteDelayMs)) ? Math.min(10_000, Math.max(500, Math.trunc(Number(interQuoteDelayMs)))) : 2200;
 
   async function quote(inputMint, outputMint, amount) {
     const input = normalizeSolanaMint(inputMint);
@@ -101,10 +107,12 @@ export function createJupiterQuoteEvidenceService({
   }
 
   return Object.freeze({
+    inter_quote_delay_ms: safeDelayMs,
     async getUsdcRoundTripEvidence(tokenMint, { usdcAmountRaw = '100000000' } = {}) {
       const mint = normalizeSolanaMint(tokenMint);
       const initialUsdc = positiveIntegerString(usdcAmountRaw, 'jupiter_quote_usdc_amount_required');
       const buy = await quote(USDC_MINT, mint, initialUsdc);
+      await sleep(safeDelayMs);
       const sell = await quote(mint, USDC_MINT, buy.out_amount);
       const initial = BigInt(initialUsdc);
       const returned = BigInt(sell.out_amount);
