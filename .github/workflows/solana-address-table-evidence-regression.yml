@@ -1,0 +1,23 @@
+name: Solana Address Table Evidence Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-address-table-evidence.mjs'
+      - 'scripts/regression-solana-address-table-evidence.mjs'
+      - '.github/workflows/solana-address-table-evidence-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run SYNTHETIC TEST-ONLY address table evidence regression
+        run: node scripts/regression-solana-address-table-evidence.mjs
