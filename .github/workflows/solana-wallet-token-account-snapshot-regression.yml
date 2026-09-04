@@ -1,0 +1,24 @@
+name: Solana Wallet Token Account Snapshot Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-wallet-token-account-snapshot.mjs'
+      - 'scripts/regression-solana-wallet-token-account-snapshot.mjs'
+      - '.github/workflows/solana-wallet-token-account-snapshot-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check services/api/src/solana-wallet-token-account-snapshot.mjs
+      - run: node --check scripts/regression-solana-wallet-token-account-snapshot.mjs
+      - run: node scripts/regression-solana-wallet-token-account-snapshot.mjs
