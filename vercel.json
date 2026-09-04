@@ -14,6 +14,7 @@
     { "src": "/dashboard/?", "dest": "/public/dashboard.html" },
     { "src": "/onboarding/?", "dest": "/public/onboarding.html" },
     { "src": "/account/?", "dest": "/public/account.html" },
+    { "src": "/autotrade-demo/?", "dest": "/public/autotrade-demo.html" },
     { "src": "/marketplace/?", "dest": "/public/marketplace.html" },
     { "src": "/market/?", "dest": "/public/market.html" },
     { "src": "/", "dest": "/public/index.html" },
