@@ -182,6 +182,7 @@ export function buildSolanaRpcProvenance({
     successful_signatures_observed: canonical.filter(row => row.err === null).length,
     failed_signatures_observed: canonical.filter(row => row.err !== null).length,
     newest_signature: canonical[0]?.signature || null,
+    newest_slot: canonical[0]?.slot ?? null,
     oldest_signature: canonical.at(-1)?.signature || null,
     source_hash: sourceHash
   };
