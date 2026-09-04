@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { verifySolscanTransactionDetailEvidence } from './solscan-transaction-detail-evidence.mjs';
 
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const B58_SET = new Set(B58);
@@ -52,11 +53,13 @@ function normalizeRpc(evidence) {
   const ref = parseReference(evidence.source_reference, 'solana_rpc:', 'invalid_rpc_source_reference');
   const p = evidence.provenance;
   if (!plain(p) || p.recorded_source_reference !== evidence.source_reference || p.source_reference_policy !== 'SOLANA_RPC_SIGNATURE_SLOT' || p.newest_signature !== ref.signature || p.newest_slot !== ref.slot) fail('rpc_provenance_binding_invalid');
-  return { source_reference: evidence.source_reference, signature: ref.signature, slot: ref.slot, upstream_source_hash: typeof p.source_hash === 'string' ? p.source_hash : null };
+  if (p.source_hash != null && (typeof p.source_hash !== 'string' || !/^[0-9a-f]{64}$/.test(p.source_hash))) fail('invalid_rpc_source_hash');
+  return { source_reference: evidence.source_reference, signature: ref.signature, slot: ref.slot, upstream_source_hash: p.source_hash ?? null };
 }
 function normalizeSolscan(evidence) {
   assertPending(evidence, 'unsafe_solscan_evidence');
   if (evidence.schema !== 'aether.solscan.transaction_detail_evidence.v1' || evidence.reconciliation_required !== true) fail('invalid_solscan_evidence_schema');
+  if (!verifySolscanTransactionDetailEvidence(evidence)) fail('solscan_evidence_verification_failed');
   const ref = parseReference(evidence.source_reference, 'solscan:transaction:', 'invalid_solscan_source_reference');
   if (!plain(evidence.row) || evidence.row.found !== true || evidence.row.signature !== ref.signature || evidence.row.slot !== ref.slot || evidence.row.source_reference !== evidence.source_reference) fail('solscan_row_binding_invalid');
   if (!plain(evidence.provenance) || evidence.provenance.row?.source_reference !== evidence.source_reference || evidence.provenance.requested_signature !== ref.signature) fail('solscan_provenance_binding_invalid');
