@@ -72,23 +72,12 @@ function normalizeEndpointLabel(value) {
 }
 
 function normalizeCollectionMetadata({ pagesFetched, pageSize, maxPages, collectionComplete }) {
-  if (!Number.isSafeInteger(pagesFetched) || pagesFetched < 0 || pagesFetched > 20) {
-    throw new Error('invalid_rpc_pages_fetched');
-  }
-  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 1000) {
-    throw new Error('invalid_rpc_page_size');
-  }
-  if (!Number.isSafeInteger(maxPages) || maxPages < 1 || maxPages > 20) {
-    throw new Error('invalid_rpc_max_pages');
-  }
+  if (!Number.isSafeInteger(pagesFetched) || pagesFetched < 0 || pagesFetched > 20) throw new Error('invalid_rpc_pages_fetched');
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 1000) throw new Error('invalid_rpc_page_size');
+  if (!Number.isSafeInteger(maxPages) || maxPages < 1 || maxPages > 20) throw new Error('invalid_rpc_max_pages');
   if (pagesFetched > maxPages) throw new Error('invalid_rpc_pages_fetched');
   if (typeof collectionComplete !== 'boolean') throw new Error('invalid_rpc_collection_complete');
-  return {
-    pages_fetched: pagesFetched,
-    page_size: pageSize,
-    max_pages: maxPages,
-    complete: collectionComplete
-  };
+  return { pages_fetched: pagesFetched, page_size: pageSize, max_pages: maxPages, complete: collectionComplete };
 }
 
 function canonicalJsonValue(value) {
@@ -130,8 +119,7 @@ function canonicalSignatures(rows = []) {
       deduped.set(signature, normalized);
       continue;
     }
-    const conflict = JSON.stringify(existing) !== JSON.stringify(normalized);
-    if (conflict) throw new Error('conflicting_duplicate_signature');
+    if (JSON.stringify(existing) !== JSON.stringify(normalized)) throw new Error('conflicting_duplicate_signature');
   }
   return [...deduped.values()].sort((a, b) => {
     if (a.slot !== b.slot) return b.slot - a.slot;
@@ -140,6 +128,11 @@ function canonicalSignatures(rows = []) {
     if (timeA !== timeB) return timeB - timeA;
     return a.signature.localeCompare(b.signature);
   });
+}
+
+function canonicalSourceReference(row) {
+  if (!row) return null;
+  return `solana_rpc:${assertSignature(row.signature)}@${normalizeSlot(row.slot)}`;
 }
 
 export function buildSolanaRpcProvenance({
@@ -157,19 +150,17 @@ export function buildSolanaRpcProvenance({
   const normalizedEndpointLabel = normalizeEndpointLabel(endpointLabel);
   const collection = normalizeCollectionMetadata({ pagesFetched, pageSize, maxPages, collectionComplete });
   const normalizedCommitment = normalizeCommitment(commitment);
+  const sourceReference = canonicalSourceReference(canonical[0] || null);
   const sourceHash = crypto.createHash('sha256').update(JSON.stringify({
-    v: 8,
+    v: 9,
     wallet,
-    source: {
-      type: 'SOLANA_RPC',
-      endpoint_label: normalizedEndpointLabel,
-      commitment: normalizedCommitment
-    },
+    source: { type: 'SOLANA_RPC', endpoint_label: normalizedEndpointLabel, commitment: normalizedCommitment },
     signatures: canonical,
-    collection
+    collection,
+    source_reference: sourceReference
   })).digest('hex');
   return {
-    schema_version: 8,
+    schema_version: 9,
     source_type: 'SOLANA_RPC',
     wallet_address: wallet,
     rpc_endpoint_label: normalizedEndpointLabel,
@@ -182,19 +173,14 @@ export function buildSolanaRpcProvenance({
     successful_signatures_observed: canonical.filter(row => row.err === null).length,
     failed_signatures_observed: canonical.filter(row => row.err !== null).length,
     newest_signature: canonical[0]?.signature || null,
+    newest_slot: canonical[0]?.slot ?? null,
     oldest_signature: canonical.at(-1)?.signature || null,
+    source_reference: sourceReference,
     source_hash: sourceHash
   };
 }
 
-export async function collectSolanaRpcEvidence({
-  walletAddress,
-  rpcCall,
-  limit = 100,
-  maxPages = 3,
-  endpointLabel,
-  commitment = 'finalized'
-} = {}) {
+export async function collectSolanaRpcEvidence({ walletAddress, rpcCall, limit = 100, maxPages = 3, endpointLabel, commitment = 'finalized' } = {}) {
   const wallet = assertWallet(walletAddress);
   if (typeof rpcCall !== 'function') throw new Error('solana_rpc_call_required');
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new Error('invalid_rpc_page_size');
@@ -215,15 +201,10 @@ export async function collectSolanaRpcEvidence({
     if (pageResult.length > safeLimit) throw new Error('rpc_page_exceeds_requested_limit');
     pagesFetched += 1;
     rows.push(...pageResult);
-
     if (pageResult.length < safeLimit) {
       collectionComplete = true;
       break;
     }
-
-    // Solana's `before` cursor is positional: it must be the signature from the
-    // final row returned by the provider, not a signature chosen after canonical sorting.
-    // Canonical ordering is only for deterministic provenance hashing after collection.
     const nextBefore = assertSignature(pageResult.at(-1)?.signature);
     if (nextBefore === before) throw new Error('rpc_pagination_stalled');
     before = nextBefore;
@@ -241,12 +222,10 @@ export async function collectSolanaRpcEvidence({
     commitment: normalizedCommitment
   });
 
-  // Signatures prove observable chain activity, not realized trading performance.
-  // Never derive return/win-rate/drawdown from transaction count or token balance deltas.
   return {
     ...pendingData(signatures.length ? 'reconciled_trade_performance_required' : 'no_verifiable_chain_activity'),
     source_type: 'SOLANA_RPC',
-    source_reference: signatures[0]?.signature || null,
+    source_reference: provenance.source_reference,
     provenance
   };
 }
