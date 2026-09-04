@@ -1,0 +1,27 @@
+name: Cross Venue Stage Quote Throttle Regression
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/vm-cross-venue-stage-diagnostic.mjs'
+      - 'scripts/cross-venue-stage-quote-throttle-regression.mjs'
+      - '.github/workflows/cross-venue-stage-quote-throttle-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/vm-cross-venue-stage-diagnostic.mjs'
+      - 'scripts/cross-venue-stage-quote-throttle-regression.mjs'
+      - '.github/workflows/cross-venue-stage-quote-throttle-regression.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: node --check scripts/cross-venue-stage-quote-throttle-regression.mjs
+      - name: Run regression
+        run: node scripts/cross-venue-stage-quote-throttle-regression.mjs
