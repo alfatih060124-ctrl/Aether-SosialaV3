@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>AETHER Operator — Auto Trade SHADOW</title>
+<style>
+:root{color-scheme:dark;--bg:#07111f;--panel:#0d1a2d;--line:#203451;--text:#f5f8ff;--muted:#9fb0c8;--accent:#8de6cf;--warn:#f7d37a}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}.wrap{max-width:1080px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;gap:14px;align-items:center}.brand{font-weight:900;letter-spacing:.16em}.badge{padding:7px 10px;border:1px solid rgba(141,230,207,.3);border-radius:999px;color:var(--accent);font-size:11px;font-weight:850}.card{margin-top:16px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}h1{margin:.3em 0;font-size:clamp(30px,5vw,48px)}.muted{color:var(--muted);line-height:1.55}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.metric{padding:14px;border:1px solid var(--line);border-radius:12px}.metric span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase}.metric b{display:block;margin-top:7px;font-size:19px}.controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.controls label{font-size:11px;color:var(--muted)}input,select,button{font:inherit}.controls input,.controls select{width:100%;margin-top:6px;padding:10px;border:1px solid var(--line);border-radius:9px;background:#091523;color:var(--text)}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}button{border:0;border-radius:10px;padding:11px 14px;font-weight:850;cursor:pointer;background:var(--accent);color:#07111f}button.secondary{background:#203451;color:#fff}.status{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:10px;color:var(--muted)}.history{display:grid;gap:7px;margin-top:10px}.history div{padding:10px;border:1px solid var(--line);border-radius:10px;background:#091523;font-size:12px}.ok{color:var(--accent)}.warn{color:var(--warn)}@media(max-width:760px){.grid,.controls{grid-template-columns:1fr 1fr}}@media(max-width:460px){.grid,.controls{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="top"><div class="brand">AETHER</div><div class="badge">PRIMARY_VM · SHADOW · TRAINING</div></div>
+  <section class="card"><div class="ok">AUTO TRADE OPERATOR SIMULATOR</div><h1>Test the AETHER decision engine.</h1><p class="muted">Runs the repository's existing SHADOW training module directly in this browser from PRIMARY_VM. No transaction is created, no signer is requested, no network submission is authorized, and LIVE remains disabled.</p></section>
+  <section class="card">
+    <div class="controls">
+      <label>Capital USD<input id="capital" type="number" min="10" max="100000" step="10" value="1000"></label>
+      <label>Max trade USD<input id="maxTrade" type="number" min="1" max="100000" step="1" value="100"></label>
+      <label>Max allocation %<input id="allocation" type="number" min="1" max="100" step="1" value="10"></label>
+      <label>Scenario<select id="scenario"><option value="qualified_entry">Qualified entry · BUY</option><option value="healthy_position">Healthy position · HOLD</option><option value="trailing_stop_exit">Trailing stop · SELL</option><option value="stop_loss_exit">Stop loss · SELL</option><option value="risk_reject">Unsafe market · REJECT</option></select></label>
+    </div>
+    <div class="actions"><button id="run">Run Engine Step</button><button id="auto" class="secondary">Start Auto Demo</button></div>
+    <div id="state" class="status">Loading SHADOW engine modules…</div>
+  </section>
+  <section class="card grid">
+    <div class="metric"><span>Action</span><b id="action">—</b></div>
+    <div class="metric"><span>Signal score</span><b id="score">—</b></div>
+    <div class="metric"><span>Expected net edge</span><b id="edge">—</b></div>
+    <div class="metric"><span>Notional</span><b id="notional">—</b></div>
+  </section>
+  <section class="card"><strong>Decision reasons</strong><div id="reasons" class="status">—</div><strong>Recent steps</strong><div id="history" class="history"><div>No steps yet.</div></div></section>
+</main>
+<script type="module">
+globalThis.process={env:{SIGNAL_MIN_EXPECTED_NET_EDGE_BPS:'20',AUTOTRADE_SHADOW_UNLIMITED:'true'}};
+const $=id=>document.getElementById(id);
+const scenarios=['qualified_entry','healthy_position','trailing_stop_exit','stop_loss_exit','risk_reject'];
+let runAutoTradeTraining=null, timer=null, index=0, history=[];
+const money=v=>Number.isFinite(Number(v))?'$'+Number(v).toFixed(2):'—';
+const bps=v=>Number.isFinite(Number(v))?(Number(v)/100).toFixed(2)+'%':'—';
+function renderHistory(){const host=$('history');host.replaceChildren();for(const row of history){const el=document.createElement('div');el.textContent=`${row.time} · ${row.scenario} · ${row.action} · score ${row.score} · edge ${row.edge}`;host.appendChild(el)}}
+async function step(scenario=$('scenario').value){if(!runAutoTradeTraining)return;try{const data=runAutoTradeTraining({scenario,capital_usd:Number($('capital').value),max_trade_usd:Number($('maxTrade').value),max_allocation_bps:Math.round(Number($('allocation').value)*100)});const decision=data.decision||{}, assessment=data.assessment||{};$('action').textContent=decision.action||'—';$('score').textContent=Number.isFinite(Number(assessment.quality_score))?Number(assessment.quality_score).toFixed(1)+' / 100':'—';$('edge').textContent=bps(assessment.expected_net_edge_bps);$('notional').textContent=money(decision.requested_amount_usd);$('reasons').textContent=(decision.reason_codes||[]).join(' · ')||'No reason codes';$('state').className='status ok';$('state').textContent='SHADOW step complete · transaction_created=false · signer_requested=false · network_submission_authorized=false · LIVE=false';history.unshift({time:new Date().toLocaleTimeString(),scenario:data.scenario_label||scenario,action:decision.action||'—',score:Number(assessment.quality_score||0).toFixed(1),edge:bps(assessment.expected_net_edge_bps)});history=history.slice(0,12);renderHistory()}catch(error){$('state').className='status warn';$('state').textContent='Simulator error: '+String(error?.message||error)}}
+function stop(){if(timer)clearInterval(timer);timer=null;$('auto').textContent='Start Auto Demo'}
+$('run').addEventListener('click',()=>step());$('auto').addEventListener('click',async()=>{if(timer){stop();return}$('auto').textContent='Stop Auto Demo';await step(scenarios[index++%scenarios.length]);timer=setInterval(()=>{if(!document.hidden){const scenario=scenarios[index++%scenarios.length];$('scenario').value=scenario;step(scenario)}},5000)});document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});
+try{({runAutoTradeTraining}=await import('/operator-modules/auto-trade-training.mjs'));$('state').className='status ok';$('state').textContent='Engine modules loaded from PRIMARY_VM. Ready to test SHADOW.';}catch(error){$('state').className='status warn';$('state').textContent='Engine module load failed: '+String(error?.message||error)}
+</script>
+</body>
+</html>
