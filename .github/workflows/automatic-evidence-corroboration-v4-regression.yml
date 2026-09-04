@@ -1,0 +1,30 @@
+name: Automatic Evidence Cross-Source Corroboration V4 Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-evidence-source.mjs'
+      - 'services/api/src/automatic-evidence-corroboration-v4.mjs'
+      - 'scripts/automatic-evidence-corroboration-v4-regression.mjs'
+      - '.github/workflows/automatic-evidence-corroboration-v4-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check Solana evidence source
+        run: node --check services/api/src/solana-evidence-source.mjs
+      - name: Syntax check corroboration boundary
+        run: node --check services/api/src/automatic-evidence-corroboration-v4.mjs
+      - name: Syntax check regression
+        run: node --check scripts/automatic-evidence-corroboration-v4-regression.mjs
+      - name: Run synthetic fail-closed regression
+        run: node scripts/automatic-evidence-corroboration-v4-regression.mjs
