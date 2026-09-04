@@ -14,8 +14,8 @@ const maxPriceImpactBps = Math.max(0, Number(process.env.SIGNAL_MAX_PRICE_IMPACT
 const maxRetriesRaw = Number(process.env.AETHER_MARKET_PROBE_MAX_RETRIES || 3);
 const maxRetries = Number.isSafeInteger(maxRetriesRaw) ? Math.min(5, Math.max(0, maxRetriesRaw)) : 3;
 const quoteUsdcRaw = String(process.env.AETHER_JUPITER_QUOTE_USDC_RAW || '100000000').trim();
-const simulationLimitRaw = Number(process.env.AETHER_SHADOW_SIMULATION_PROBE_LIMIT || 1);
-const simulationLimit = Number.isSafeInteger(simulationLimitRaw) ? Math.min(3, Math.max(0, simulationLimitRaw)) : 1;
+const simulationLimitRaw = Number(process.env.AETHER_SHADOW_SIMULATION_PROBE_LIMIT || 0);
+const simulationLimit = Number.isSafeInteger(simulationLimitRaw) && simulationLimitRaw > 0 ? simulationLimitRaw : null;
 
 const BASE_MISSING_FIELDS = Object.freeze([
   'spread_bps',
@@ -162,8 +162,9 @@ try {
     const priceImpactGatePassed = observedPriceImpactBps !== null && observedPriceImpactBps <= maxPriceImpactBps;
     const roundtripQuoteEdgeBps = finite(quoteEvidence?.roundtrip_quote_edge_bps);
     const observedRoundtripCostBps = roundtripQuoteEdgeBps === null ? null : Math.max(0, -roundtripQuoteEdgeBps);
+    const simulationSlotAvailable = simulationLimit === null || simulationAttempts < simulationLimit;
 
-    if (quoteEvidence && priceImpactGatePassed && simulationAttempts < simulationLimit) {
+    if (quoteEvidence && priceImpactGatePassed && simulationSlotAvailable) {
       if (unsignedSimulation) {
         simulationAttempts += 1;
         try {
@@ -229,7 +230,7 @@ try {
       sell_amm_labels: quoteEvidence?.sell?.amm_labels || [],
       source_count_observed: finite(quoteEvidence?.source_count_observed),
       fee_evidence_available: Boolean(feeEvidence),
-      transaction_build_attempted: Boolean(quoteEvidence && priceImpactGatePassed && simulationAttempts <= simulationLimit),
+      transaction_build_attempted: Boolean(quoteEvidence && priceImpactGatePassed && simulationError !== 'simulation_skipped_probe_limit'),
       transaction_built: Boolean(simulationEvidence?.buy?.transaction_built || simulationEvidence?.sell?.transaction_built),
       exact_buy_fee_lamports: finite(simulationEvidence?.buy?.exact_fee_lamports),
       exact_sell_fee_lamports: finite(simulationEvidence?.sell?.exact_fee_lamports),
@@ -279,7 +280,7 @@ try {
     quote_price_impact_gate_passed: quoted.filter(item => item.price_impact_gate_passed).length,
     unsigned_simulation_configured: Boolean(unsignedSimulation),
     unsigned_simulation_service_error: unsignedSimulationServiceError,
-    unsigned_simulation_probe_limit: simulationLimit,
+    unsigned_simulation_probe_limit: simulationLimit === null ? 'UNLIMITED' : simulationLimit,
     unsigned_simulation_attempted: candidates.filter(item => item.transaction_build_attempted && item.simulation_error !== 'simulation_skipped_probe_limit').length,
     exact_transaction_fee_ready: candidates.filter(item => item.exact_transaction_fee_ready).length,
     roundtrip_simulation_ok: candidates.filter(item => item.roundtrip_simulation_ok).length,
@@ -319,10 +320,10 @@ try {
       token_detail_deferred: true,
       jupiter_key_present: Boolean(String(process.env.JUPITER_API_KEY || '').trim()),
       jupiter_inter_quote_delay_ms: quotes?.inter_quote_delay_ms || null,
-      unsigned_simulation_max_per_probe: simulationLimit,
+      unsigned_simulation_max_per_probe: simulationLimit === null ? 'UNLIMITED' : simulationLimit,
       rate_limit_retries: maxRetries
     },
-    note: 'Unsigned Jupiter transactions may be built only with an explicit public simulation wallet. Solana simulateTransaction is called with sigVerify=false and replaceRecentBlockhash=true; no signer is requested and no sendTransaction call exists. Final expected net edge remains unavailable until executable gross spread and all cost evidence are independently proven.',
+    note: 'Unsigned Jupiter transactions may be built only with an explicit public simulation wallet. SHADOW evidence collection does not impose a candidate-count cap by default; provider pacing/backoff remains active. Solana simulateTransaction is called with sigVerify=false and replaceRecentBlockhash=true; no signer is requested and no sendTransaction call exists. Final expected net edge remains unavailable until executable gross spread and all cost evidence are independently proven.',
     mode: 'SHADOW',
     execution_ready: false,
     transaction_signed: false,
