@@ -171,7 +171,8 @@ export function createAutomaticEvidenceService(pool, {
       const n = boundedInt(limit, 20, 1, 100);
       const rows = (await pool.query(
         `SELECT * FROM trader_evidence_collection_runs
-         WHERE trader_id=$1 ORDER BY created_at DESC LIMIT $2`,
+         WHERE trader_id=$1 AND source_type='SOLANA_RPC'
+         ORDER BY created_at DESC LIMIT $2`,
         [traderId,n]
       )).rows;
       return rows.map(projection);
