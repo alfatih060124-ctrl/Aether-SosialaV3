@@ -2,6 +2,10 @@ import { normalizeSolanaMint } from './market-intelligence.mjs';
 
 const JUPITER_ORIGIN = 'https://api.jup.ag';
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 function httpsUrl(value, label) {
   const raw = String(value || '').trim();
   if (!raw) throw new Error(label);
@@ -106,7 +110,9 @@ export function createJupiterUnsignedSimulationService({
   apiKey = process.env.JUPITER_API_KEY || '',
   endpoint = process.env.SOLANA_RPC_URL,
   simulationPublicKey = process.env.AETHER_SHADOW_SIMULATION_PUBLIC_KEY || '',
-  timeoutMs = 12_000
+  timeoutMs = 12_000,
+  interSwapDelayMs = Number(process.env.AETHER_JUPITER_INTER_SWAP_DELAY_MS || (process.env.JUPITER_API_KEY ? 1300 : 2600)),
+  maxSwapRetries = Number(process.env.AETHER_JUPITER_SWAP_MAX_RETRIES || 3)
 } = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('fetch_unavailable');
   const rpcEndpoint = httpsUrl(endpoint, 'solana_rpc_url_required');
@@ -114,17 +120,33 @@ export function createJupiterUnsignedSimulationService({
   if (!rawPublicKey) throw new Error('shadow_simulation_public_key_required');
   const userPublicKey = normalizeSolanaMint(rawPublicKey);
   const safeApiKey = String(apiKey || '').trim();
+  const safeDelayMs = Number.isFinite(Number(interSwapDelayMs)) ? Math.min(15_000, Math.max(1000, Math.trunc(Number(interSwapDelayMs)))) : 1300;
+  const safeMaxRetries = Number.isSafeInteger(Number(maxSwapRetries)) ? Math.min(5, Math.max(0, Number(maxSwapRetries))) : 3;
+
+  async function buildSwapWithBackoff(quoteResponse) {
+    const url = new URL('/swap/v1/swap', JUPITER_ORIGIN);
+    let lastError = null;
+    for (let attempt = 0; attempt <= safeMaxRetries; attempt += 1) {
+      try {
+        return await postJson(fetchImpl, url, {
+          quoteResponse,
+          userPublicKey,
+          dynamicComputeUnitLimit: true,
+          wrapAndUnwrapSol: true
+        }, { apiKey: safeApiKey, timeoutMs });
+      } catch (error) {
+        lastError = error;
+        if (String(error?.message || error) !== 'jupiter_swap_rate_limited' || attempt >= safeMaxRetries) throw error;
+        await sleep(Math.min(15_000, safeDelayMs * (2 ** attempt)));
+      }
+    }
+    throw lastError;
+  }
 
   async function buildAndObserve(quoteEvidence) {
     const quoteResponse = quoteEvidence?.provider_quote_response;
     if (!quoteResponse || typeof quoteResponse !== 'object') throw new Error('jupiter_provider_quote_required');
-    const url = new URL('/swap/v1/swap', JUPITER_ORIGIN);
-    const built = await postJson(fetchImpl, url, {
-      quoteResponse,
-      userPublicKey,
-      dynamicComputeUnitLimit: true,
-      wrapAndUnwrapSol: true
-    }, { apiKey: safeApiKey, timeoutMs });
+    const built = await buildSwapWithBackoff(quoteResponse);
 
     const transactionBase64 = String(built.swapTransaction);
     const messageBase64 = messageBase64FromTransaction(transactionBase64);
@@ -163,8 +185,14 @@ export function createJupiterUnsignedSimulationService({
 
   return Object.freeze({
     user_public_key: userPublicKey,
+    inter_swap_delay_ms: safeDelayMs,
+    swap_max_retries: safeMaxRetries,
     async observeRoundTrip(quoteEvidence) {
+      // Quote collection ends immediately before this stage. Delay before the first
+      // swap-build request so Free-tier Jupiter pacing is respected.
+      await sleep(safeDelayMs);
       const buy = await buildAndObserve(quoteEvidence?.buy);
+      await sleep(safeDelayMs);
       const sell = await buildAndObserve(quoteEvidence?.sell);
       const buyFee = buy.exact_fee_lamports;
       const sellFee = sell.exact_fee_lamports;
