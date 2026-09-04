@@ -7,8 +7,6 @@ const limit = Number.isSafeInteger(limitRaw) ? Math.min(20, Math.max(1, limitRaw
 const minLiquidityUsd = Math.max(0, Number(process.env.SIGNAL_MIN_LIQUIDITY_USD || 500000));
 const minVolume24hUsd = Math.max(0, Number(process.env.SIGNAL_MIN_VOLUME_24H_USD || 250000));
 const maxTop10HolderPct = Math.max(0, Number(process.env.SIGNAL_MAX_TOP10_HOLDER_PCT || 35));
-const detailDelayMsRaw = Number(process.env.AETHER_MARKET_PROBE_DETAIL_DELAY_MS || 1200);
-const detailDelayMs = Number.isFinite(detailDelayMsRaw) ? Math.min(10000, Math.max(250, detailDelayMsRaw)) : 1200;
 const maxRetriesRaw = Number(process.env.AETHER_MARKET_PROBE_MAX_RETRIES || 3);
 const maxRetries = Number.isSafeInteger(maxRetriesRaw) ? Math.min(5, Math.max(0, maxRetriesRaw)) : 3;
 
@@ -82,24 +80,19 @@ try {
 }
 
 try {
+  // One GeckoTerminal discovery request supplies the cheap market gate. Token-detail
+  // enrichment is intentionally deferred until a later stage because it fans out into
+  // multiple provider calls per mint and does not verify any execution-critical field.
   const discovery = await withRateLimitBackoff('discovery', () => market.getDiscovery(view));
   const rows = discovery.items.slice(0, limit);
   const candidates = [];
 
   for (const row of rows) {
     const base = preliminary(row);
-    let detail = null;
-    let detailError = null;
     let holderEvidence = null;
     let holderError = null;
 
     if (base.preliminary_market_gate_passed) {
-      if (candidates.length > 0) await sleep(detailDelayMs);
-      try {
-        detail = await withRateLimitBackoff(`token:${row.primary_mint}`, () => market.getToken(row.primary_mint));
-      } catch (error) {
-        detailError = String(error?.message || error);
-      }
       if (holders) {
         try {
           holderEvidence = await holders.getTop10HolderPct(row.primary_mint);
@@ -110,7 +103,6 @@ try {
         holderError = holderServiceError || 'solana_holder_service_unavailable';
       }
     } else {
-      detailError = 'detail_skipped_preliminary_gate_rejected';
       holderError = 'holder_check_skipped_preliminary_gate_rejected';
     }
 
@@ -126,21 +118,21 @@ try {
       token_mint: row.primary_mint,
       symbol: row.base_token?.symbol || null,
       name: row.base_token?.name || null,
-      dex_id: row.dex_id || detail?.market?.dex_id || null,
-      pool_address: row.pool_address || detail?.market?.pool_address || null,
-      price_usd: finite(row.price_usd ?? detail?.market?.price_usd),
+      dex_id: row.dex_id || null,
+      pool_address: row.pool_address || null,
+      price_usd: finite(row.price_usd),
       liquidity_usd: base.liquidity_usd,
       volume_24h_usd: base.volume_24h_usd,
       transactions_24h: finite(row.transactions_24h),
       price_change_percentage: row.price_change_percentage || null,
-      pool_age_hours_observation_only: poolAgeHours(row.pool_created_at || detail?.market?.pool_created_at),
+      pool_age_hours_observation_only: poolAgeHours(row.pool_created_at),
       top10_holder_pct: top10HolderPct,
       holder_gate_passed: holderGatePassed,
       preliminary_market_gate_passed: base.preliminary_market_gate_passed,
       preliminary_rejects: evidenceRejects,
       full_signal_gate_ready: false,
       missing_mandatory_signal_fields: missingFields,
-      detail_error: detailError,
+      detail_error: 'detail_not_requested_provider_quota_preserved',
       holder_error: holderError,
       holder_source: holderEvidence?.source || null,
       source: 'GECKOTERMINAL_PUBLIC',
@@ -163,13 +155,22 @@ try {
     candidates_scanned: candidates.length,
     preliminary_market_gate_passed: candidates.filter(item => item.preliminary_market_gate_passed).length,
     holder_gate_passed: candidates.filter(item => item.preliminary_market_gate_passed && item.holder_gate_passed).length,
+    quote_stage_candidates: candidates.filter(item => item.preliminary_market_gate_passed && item.holder_gate_passed).map(item => ({
+      token_mint: item.token_mint,
+      symbol: item.symbol,
+      dex_id: item.dex_id,
+      pool_address: item.pool_address,
+      liquidity_usd: item.liquidity_usd,
+      volume_24h_usd: item.volume_24h_usd,
+      top10_holder_pct: item.top10_holder_pct
+    })),
     full_signal_gate_ready: 0,
     provider_quota_policy: {
-      detail_only_after_preliminary_gate: true,
-      detail_delay_ms: detailDelayMs,
+      geckoterminal_requests: 'discovery_only',
+      token_detail_deferred: true,
       rate_limit_retries: maxRetries
     },
-    note: 'Real market data and on-chain holder evidence are fail-closed. No candidate reaches Auto Trade until quote/sell simulation, token controls, multi-source reconciliation, and net-edge-after-cost fields are independently verified.',
+    note: 'Real market discovery and on-chain holder evidence are active. Quote-stage candidates remain fail-closed until quote/sell simulation, token controls, multi-source reconciliation, and net-edge-after-cost fields are independently verified.',
     mode: 'SHADOW',
     execution_ready: false,
     live_execution_authorized: false,
