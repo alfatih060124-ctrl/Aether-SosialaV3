@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import { collectSolanaWalletTokenAccountSnapshot, verifySolanaWalletTokenAccountSnapshot } from '../services/api/src/solana-wallet-token-account-snapshot.mjs';
+
+// SYNTHETIC / TEST-ONLY fixtures. Never production evidence.
+const WALLET='11111111111111111111111111111111';
+const MINT='So11111111111111111111111111111111111111112';
+const MINT_UPPER='AxBNesXSgjftp9wGLBufXuubZNDWdvcKgcrezYBnKwcZ';
+const MINT_LOWER='azEpqzg9jjM4UdACjuWZ9NZPx47sYzqT5KDEAhknhfw';
+const TOKEN='TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+const TOKEN_2022='TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+const requestedAt='2026-09-04T23:20:00.000Z';
+const observedAt='2026-09-04T23:20:10.000Z';
+const row=({pubkey=TOKEN,owner=WALLET,mint=MINT,amount='12',decimals=6,state='initialized',program=TOKEN}={})=>({pubkey,account:{owner:program,data:{parsed:{type:'account',info:{owner,mint,state,tokenAmount:{amount,decimals}}}}}});
+const response=(value=[row(),row({pubkey:TOKEN_2022,amount:'8'})],slot=456)=>({result:{context:{slot},value}});
+let captured;
+const evidence=await collectSolanaWalletTokenAccountSnapshot({rpc:async req=>(captured=req,response()),traderWallet:WALLET,minContextSlot:400,requestedAt,observedAt});
+assert.deepEqual(captured,{method:'getTokenAccountsByOwner',params:[WALLET,{programId:TOKEN},{encoding:'jsonParsed',commitment:'confirmed',minContextSlot:400}]});
+assert.equal(evidence.schema,'aether.solana.wallet_token_account_snapshot.v2');
+assert.equal(evidence.collection_status,'PENDING_DATA');assert.equal(evidence.metrics_available,false);assert.equal(evidence.verified,false);assert.equal(evidence.published,false);assert.equal(evidence.live_execution_authorized,false);assert.equal(evidence.source_reference,null);assert.equal(evidence.calculation_hash,null);
+for(const key of ['trades_count','total_return_bps','win_rate_bps','drawdown_bps','reputation_score']) assert.equal(evidence[key],null);
+assert.equal(evidence.evidence_count,2);assert.equal(evidence.rows[0].source_reference,null);assert.equal(evidence.rows[1].source_reference,null);
+assert.deepEqual(evidence.mint_summaries,[{mint:MINT,decimals:6,token_accounts:2,total_raw_amount:'20'}]);assert.equal(evidence.provenance.context_slot,456);assert.equal(evidence.provenance.min_context_slot,400);assert.equal(evidence.provenance.source_reference_policy,'NONE_NON_TRANSACTION_SNAPSHOT');assert.equal(verifySolanaWalletTokenAccountSnapshot(evidence),true);
+const deterministicOrder=await collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response([row({pubkey:MINT_LOWER,mint:MINT_LOWER,amount:'1'}),row({pubkey:MINT_UPPER,mint:MINT_UPPER,amount:'1'})]),traderWallet:WALLET,requestedAt,observedAt});
+assert.deepEqual(deterministicOrder.mint_summaries.map(({mint})=>mint),[MINT_UPPER,MINT_LOWER]);assert.equal(verifySolanaWalletTokenAccountSnapshot(deterministicOrder),true);
+for(const [field,value] of [['verified',true],['published',true],['live_execution_authorized',true],['metrics_available',true],['calculation_hash','a'.repeat(64)]]){const tamper=structuredClone(evidence);tamper[field]=value;assert.equal(verifySolanaWalletTokenAccountSnapshot(tamper),false);}
+const refTamper=structuredClone(evidence);refTamper.source_reference=`solana_rpc:${'1'.repeat(64)}@456`;assert.equal(verifySolanaWalletTokenAccountSnapshot(refTamper),false);
+const summaryTamper=structuredClone(evidence);summaryTamper.mint_summaries[0].total_raw_amount='21';assert.equal(verifySolanaWalletTokenAccountSnapshot(summaryTamper),false);
+const rowTamper=structuredClone(evidence);rowTamper.rows[0].raw_amount='13';assert.equal(verifySolanaWalletTokenAccountSnapshot(rowTamper),false);
+const floorTamper=structuredClone(evidence);floorTamper.provenance.min_context_slot=500;assert.equal(verifySolanaWalletTokenAccountSnapshot(floorTamper),false);
+const policyTamper=structuredClone(evidence);policyTamper.provenance.source_reference_policy='PROVIDER_SIGNATURE_SLOT';assert.equal(verifySolanaWalletTokenAccountSnapshot(policyTamper),false);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response(),traderWallet:'z'.repeat(44),requestedAt,observedAt}),/invalid_trader_wallet/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response([row({owner:MINT})]),traderWallet:WALLET,requestedAt,observedAt}),/wallet_not_token_account_owner/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response([row({amount:'18446744073709551616'})]),traderWallet:WALLET,requestedAt,observedAt}),/invalid_raw_amount/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response([row(),row({pubkey:TOKEN_2022,decimals:9})]),traderWallet:WALLET,requestedAt,observedAt}),/mint_decimals_mismatch/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response([row(),row()]),traderWallet:WALLET,requestedAt,observedAt}),/duplicate_token_account/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response(),traderWallet:WALLET,endpointLabel:'https://rpc.example/?key=secret',requestedAt,observedAt}),/invalid_rpc_endpoint_label/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response(),traderWallet:WALLET,tokenProgramId:MINT,requestedAt,observedAt}),/unsupported_token_program/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response([],399),traderWallet:WALLET,minContextSlot:400,requestedAt,observedAt}),/context_slot_below_minimum/);
+await assert.rejects(()=>collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response(),traderWallet:WALLET,minContextSlot:-1,requestedAt,observedAt}),/invalid_min_context_slot/);
+const empty=await collectSolanaWalletTokenAccountSnapshot({rpc:async()=>response([]),traderWallet:WALLET,requestedAt,observedAt});assert.equal(empty.evidence_count,0);assert.deepEqual(empty.mint_summaries,[]);assert.equal(verifySolanaWalletTokenAccountSnapshot(empty),true);
+console.log('Solana wallet token account snapshot regression: SYNTHETIC / TEST-ONLY PASS');
