@@ -46,7 +46,12 @@ const pool = {
       inserted.push(row);
       return { rows: [row] };
     }
-    if (sql.includes('FROM trader_evidence_collection_runs')) return { rows: inserted };
+    if (sql.includes('FROM trader_evidence_collection_runs')) {
+      const rows = sql.includes("source_type='SOLANA_RPC'")
+        ? inserted.filter((row) => row.source_type === 'SOLANA_RPC')
+        : inserted;
+      return { rows: rows.slice(0, params[1] ?? rows.length) };
+    }
     throw new Error(`unexpected_sql:${sql}`);
   }
 };
@@ -103,6 +108,27 @@ assert.equal(listed[0].verified, false);
 assert.equal(listed[0].published, false);
 
 const pristine = structuredClone(inserted[0]);
+const reconciliationRow = {
+  ...pristine,
+  collection_id: '22222222-2222-4222-8222-222222222222',
+  source_type: 'INTERNAL_RECONCILIATION',
+  source_reference: null,
+  collection_status: 'RECORDED',
+  metrics_available: true,
+  trades_count: 2,
+  total_return_bps: 50,
+  win_rate_bps: 5000,
+  drawdown_bps: 25,
+  reputation_score: 10,
+  calculation_hash: 'a'.repeat(64)
+};
+inserted.push(reconciliationRow);
+const automaticOnly = await service.listCollections(trader.trader_id, 20);
+assert.equal(automaticOnly.length, 1, 'automatic listing must exclude INTERNAL_RECONCILIATION rows');
+assert.equal(automaticOnly[0].collection_id, pristine.collection_id);
+assert.equal(automaticOnly[0].source_type, 'SOLANA_RPC');
+inserted.pop();
+
 const unsafeCases = [
   ['metrics_available', true, /automatic_evidence_safety_invariant_violation/],
   ['trades_count', 7, /automatic_evidence_safety_invariant_violation/],
@@ -114,8 +140,7 @@ const unsafeCases = [
   ['verified', true, /automatic_evidence_safety_invariant_violation/],
   ['published', true, /automatic_evidence_safety_invariant_violation/],
   ['live_execution_authorized', true, /automatic_evidence_safety_invariant_violation/],
-  ['collection_status', 'VERIFIED', /automatic_evidence_status_invalid/],
-  ['source_type', 'INTERNAL_RECONCILIATION', /automatic_evidence_source_type_invalid/]
+  ['collection_status', 'VERIFIED', /automatic_evidence_status_invalid/]
 ];
 for (const [field, value, expected] of unsafeCases) {
   inserted[0] = { ...pristine, [field]: value };
