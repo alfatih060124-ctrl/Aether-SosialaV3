@@ -57,6 +57,8 @@ export function createSolanaHolderConcentrationService({
         rpc(fetchImpl, url, 'getTokenLargestAccounts', [mint, { commitment: 'confirmed' }], timeoutMs)
       ]);
       const supply = positiveBigInt(supplyResult?.value?.amount, 'token_supply_invalid');
+      const decimals = Number(supplyResult?.value?.decimals);
+      if (!Number.isSafeInteger(decimals) || decimals < 0 || decimals > 18) throw new Error('token_decimals_invalid');
       const rows = Array.isArray(largestResult?.value) ? largestResult.value.slice(0, 10) : [];
       if (rows.length === 0) throw new Error('token_largest_accounts_missing');
       let top10 = 0n;
@@ -65,6 +67,7 @@ export function createSolanaHolderConcentrationService({
       if (!Number.isFinite(pct) || pct < 0 || pct > 100) throw new Error('top10_holder_pct_invalid');
       return Object.freeze({
         top10_holder_pct: pct,
+        token_decimals: decimals,
         largest_accounts_observed: rows.length,
         source: 'SOLANA_RPC',
         read_only: true,
