@@ -184,8 +184,38 @@ export function buildSolanaRpcProvenance({
     newest_signature: canonical[0]?.signature || null,
     newest_slot: canonical[0]?.slot ?? null,
     oldest_signature: canonical.at(-1)?.signature || null,
+    signature_rows: canonical,
     source_hash: sourceHash
   };
+}
+
+export function verifySolanaRpcProvenance(provenance) {
+  try {
+    if (!provenance || typeof provenance !== 'object' || Array.isArray(provenance)) return false;
+    if (provenance.schema_version !== 8 || provenance.source_type !== 'SOLANA_RPC') return false;
+    const rebuilt = buildSolanaRpcProvenance({
+      walletAddress: provenance.wallet_address,
+      signatures: provenance.signature_rows,
+      endpointLabel: provenance.rpc_endpoint_label,
+      pagesFetched: provenance.pages_fetched,
+      pageSize: provenance.page_size,
+      maxPages: provenance.max_pages,
+      collectionComplete: provenance.collection_complete,
+      commitment: provenance.rpc_commitment
+    });
+    return (
+      rebuilt.source_hash === provenance.source_hash &&
+      rebuilt.signatures_observed === provenance.signatures_observed &&
+      rebuilt.successful_signatures_observed === provenance.successful_signatures_observed &&
+      rebuilt.failed_signatures_observed === provenance.failed_signatures_observed &&
+      rebuilt.newest_signature === provenance.newest_signature &&
+      rebuilt.newest_slot === provenance.newest_slot &&
+      rebuilt.oldest_signature === provenance.oldest_signature &&
+      JSON.stringify(rebuilt.signature_rows) === JSON.stringify(provenance.signature_rows)
+    );
+  } catch {
+    return false;
+  }
 }
 
 export async function collectSolanaRpcEvidence({
