@@ -41,6 +41,20 @@ function candidateDiscoveryScore(row) {
   return liquidity + volume;
 }
 
+function discoveryDexId(row) {
+  return String(row?.dex_id || '').trim();
+}
+
+function candidateVenueBreadth(row) {
+  return Array.isArray(row?._aether_discovery_dex_ids) ? row._aether_discovery_dex_ids.length : 0;
+}
+
+function compareCandidatePriority(a, b) {
+  const venueDelta = candidateVenueBreadth(b) - candidateVenueBreadth(a);
+  if (venueDelta !== 0) return venueDelta;
+  return candidateDiscoveryScore(b) - candidateDiscoveryScore(a);
+}
+
 async function getJson(url, timeoutMs = 10000, retries = 3) {
   let lastError = null;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -156,8 +170,24 @@ try {
       for (const row of discovery.items.slice(0, perViewLimit)) {
         const key = String(row?.primary_mint || '').trim();
         if (!key) continue;
+        const dexId = discoveryDexId(row);
         const existing = candidateMap.get(key);
-        if (!existing || candidateDiscoveryScore(row) > candidateDiscoveryScore(existing)) candidateMap.set(key, row);
+        if (!existing) {
+          candidateMap.set(key, {
+            ...row,
+            _aether_discovery_dex_ids: dexId ? [dexId] : [],
+            _aether_discovery_views: [discoveryView]
+          });
+          continue;
+        }
+        const mergedDexIds = [...new Set([...(existing._aether_discovery_dex_ids || []), ...(dexId ? [dexId] : [])])];
+        const mergedViews = [...new Set([...(existing._aether_discovery_views || []), discoveryView])];
+        const preferred = candidateDiscoveryScore(row) > candidateDiscoveryScore(existing) ? row : existing;
+        candidateMap.set(key, {
+          ...preferred,
+          _aether_discovery_dex_ids: mergedDexIds,
+          _aether_discovery_views: mergedViews
+        });
       }
     } catch (error) {
       discoveryErrors.push({ view: discoveryView, error: String(error?.message || error) });
@@ -166,7 +196,7 @@ try {
   if (!candidateMap.size) throw new Error('market_discovery_unavailable');
 
   const rows = [...candidateMap.values()]
-    .sort((a, b) => candidateDiscoveryScore(b) - candidateDiscoveryScore(a))
+    .sort(compareCandidatePriority)
     .slice(0, candidateLimit);
   const results = [];
 
@@ -401,6 +431,8 @@ try {
     discovery_views: discoveryViews,
     discovery_errors: discoveryErrors,
     candidates_discovered: candidateMap.size,
+    multi_venue_candidates_discovered: [...candidateMap.values()].filter(row => candidateVenueBreadth(row) >= 2).length,
+    candidate_priority_mode: 'DISCOVERY_DEX_BREADTH_THEN_LIQUIDITY_VOLUME',
     candidates_scanned: rows.length,
     candidate_limit: candidateLimit,
     sol_usd_reference: solUsd,
