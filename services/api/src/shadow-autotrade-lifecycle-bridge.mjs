@@ -30,10 +30,10 @@ export function createShadowAutoTradeLifecycleBridge(pool, options = {}) {
       }
 
       const action = String(decision.action || '').toUpperCase();
-      const price = currentPrice(assessment);
       const sourceId = String(context.source_id || context.assessment_id || assessment?.assessment_id || `${assessment?.token_mint || 'token'}:${Date.now()}`);
 
       if (action === 'BUY') {
+        const price = currentPrice(assessment);
         const amountUsdc = finitePositive(decision.requested_amount_usd, 'requested_amount_usd');
         return lifecycle.openPosition({
           follower_user_id: mandate.follower_user_id,
@@ -57,7 +57,7 @@ export function createShadowAutoTradeLifecycleBridge(pool, options = {}) {
         if (!positionId) throw new Error('shadow_position_id_required_for_sell');
         return lifecycle.closePosition({
           position_id: positionId,
-          exit_price_usdc: price,
+          exit_price_usdc: currentPrice(assessment),
           source_id: sourceId,
           idempotency_key: `shadow:autotrade:sell:${positionId}:${sourceId}`,
           exit_reasons: decision.reason_codes || []
@@ -67,7 +67,7 @@ export function createShadowAutoTradeLifecycleBridge(pool, options = {}) {
       if (action === 'HOLD' && position.position_id) {
         return lifecycle.markPosition({
           position_id: position.position_id,
-          mark_price_usdc: price,
+          mark_price_usdc: currentPrice(assessment),
           source_id: sourceId,
           idempotency_key: `shadow:autotrade:mark:${position.position_id}:${sourceId}`
         });
