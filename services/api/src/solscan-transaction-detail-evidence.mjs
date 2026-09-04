@@ -148,7 +148,7 @@ function missingRow() {
 function envelope(provenanceInput) {
   const provenance = { ...provenanceInput };
   return {
-    schema: 'aether.solscan.transaction_detail_evidence.v1',
+    schema: 'aether.solscan.transaction_detail_evidence.v2',
     collection_status: 'PENDING_DATA',
     metrics_available: false,
     trades_count: null,
@@ -156,6 +156,7 @@ function envelope(provenanceInput) {
     win_rate_bps: null,
     drawdown_bps: null,
     reputation_score: null,
+    calculation_hash: null,
     verified: false,
     published: false,
     live_execution_authorized: false,
@@ -179,16 +180,16 @@ export async function collectSolscanTransactionDetailEvidence({ query, transacti
   const response = await query(request);
   if (!plain(response) || response.success !== true || !(response.data === null || plain(response.data))) fail('invalid_solscan_response');
   const row = response.data === null ? missingRow() : normalizeFound(response.data, requested_signature, requested_wallet, observedMs);
-  return envelope({ provider: 'SOLSCAN_PRO_V2', source_label, endpoint_path: '/v2.0/transaction/detail', requested_signature, requested_wallet, requested_at: requestedAt, observed_at: observedAt, row });
+  return envelope({ provider: 'SOLSCAN_PRO_V2', source_label, endpoint_path: '/v2.0/transaction/detail', requested_signature, requested_wallet, requested_at: requestedAt, observed_at: observedAt, source_reference_policy: 'PROVIDER_VALIDATED_SIGNATURE_SLOT', row });
 }
 
 export function verifySolscanTransactionDetailEvidence(evidence) {
-  if (!plain(evidence) || evidence.schema !== 'aether.solscan.transaction_detail_evidence.v1') return false;
+  if (!plain(evidence) || evidence.schema !== 'aether.solscan.transaction_detail_evidence.v2') return false;
   try {
     if (evidence.collection_status !== 'PENDING_DATA' || evidence.metrics_available !== false || evidence.verified !== false || evidence.published !== false || evidence.live_execution_authorized !== false || evidence.reconciliation_required !== true) return false;
-    for (const key of ['trades_count', 'total_return_bps', 'win_rate_bps', 'drawdown_bps', 'reputation_score']) if (evidence[key] !== null) return false;
+    for (const key of ['trades_count', 'total_return_bps', 'win_rate_bps', 'drawdown_bps', 'reputation_score', 'calculation_hash']) if (evidence[key] !== null) return false;
     const provenance = evidence.provenance;
-    if (!plain(provenance) || provenance.provider !== 'SOLSCAN_PRO_V2' || provenance.endpoint_path !== '/v2.0/transaction/detail') return false;
+    if (!plain(provenance) || provenance.provider !== 'SOLSCAN_PRO_V2' || provenance.endpoint_path !== '/v2.0/transaction/detail' || provenance.source_reference_policy !== 'PROVIDER_VALIDATED_SIGNATURE_SLOT') return false;
     solId(provenance.requested_signature, 64, 'bad_signature');
     solId(provenance.requested_wallet, 32, 'bad_wallet');
     label(provenance.source_label);
