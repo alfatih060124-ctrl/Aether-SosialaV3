@@ -94,6 +94,7 @@ export function createJupiterQuoteEvidenceService({
       ...routeEvidence(payload),
       context_slot: Number.isSafeInteger(Number(payload.contextSlot)) ? Number(payload.contextSlot) : null,
       time_taken_seconds: finiteNonNegative(payload.timeTaken),
+      provider_quote_response: payload,
       source: 'JUPITER_QUOTE_API',
       api_key_used: Boolean(String(apiKey || '').trim()),
       read_only: true,
