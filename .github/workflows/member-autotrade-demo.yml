@@ -1,0 +1,42 @@
+name: Member Auto Trade Demo Regression
+
+on:
+  pull_request:
+    paths:
+      - 'migrations/021_member_autotrade_demo_wallet.sql'
+      - 'services/api/src/demo-autotrade-ledger.mjs'
+      - 'services/api/src/member-autotrade-demo.mjs'
+      - 'services/api/src/member-autotrade-route.mjs'
+      - 'api/index.mjs'
+      - 'public/account-auto-strategy.js'
+      - 'scripts/member-autotrade-demo-regression.mjs'
+      - '.github/workflows/member-autotrade-demo.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'migrations/021_member_autotrade_demo_wallet.sql'
+      - 'services/api/src/demo-autotrade-ledger.mjs'
+      - 'services/api/src/member-autotrade-demo.mjs'
+      - 'services/api/src/member-autotrade-route.mjs'
+      - 'api/index.mjs'
+      - 'public/account-auto-strategy.js'
+      - 'scripts/member-autotrade-demo-regression.mjs'
+      - '.github/workflows/member-autotrade-demo.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        run: |
+          node --check services/api/src/demo-autotrade-ledger.mjs
+          node --check services/api/src/member-autotrade-demo.mjs
+          node --check services/api/src/member-autotrade-route.mjs
+          node --check api/index.mjs
+          node --check scripts/member-autotrade-demo-regression.mjs
+      - name: Run demo-wallet regression
+        run: node scripts/member-autotrade-demo-regression.mjs
