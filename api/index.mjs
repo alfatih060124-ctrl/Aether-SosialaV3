@@ -31,6 +31,7 @@ const SESSION_GET_ROUTES = new Set([
   '/api/account/copy-trades',
   '/api/account/positions',
   '/api/account/auto-strategy/demo',
+  '/api/account/engine-rental',
 ]);
 
 const SESSION_POST_ROUTES = new Set([
@@ -39,6 +40,7 @@ const SESSION_POST_ROUTES = new Set([
   '/api/account/copy-mandates',
   '/api/account/autotrade/evaluate',
   '/api/account/auto-strategy/simulate',
+  '/api/account/engine-rental/checkout',
 ]);
 
 const json = (res, status, body) => {
