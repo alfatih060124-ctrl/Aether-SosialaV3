@@ -14,6 +14,7 @@ export async function persistAuthenticatedAutoTradeDecisionAtomically({
   requestBody,
   resolveAssessment,
   resolveRuntimeRisk,
+  resolvePosition,
   liveEnabled = false,
   createMandateRepository = createCopyMandateRuntimeRepository,
   createSignalRepository = createSignalIntelligenceRepository,
@@ -42,6 +43,7 @@ export async function persistAuthenticatedAutoTradeDecisionAtomically({
       auditRepository: auditFactory(client),
       resolveAssessment,
       resolveRuntimeRisk,
+      resolvePosition,
       liveEnabled
     });
 
