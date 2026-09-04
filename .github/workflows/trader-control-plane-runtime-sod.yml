@@ -1,0 +1,25 @@
+name: Trader Control Plane Runtime SoD Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/trader-control-plane-role-auth.mjs'
+      - 'services/api/src/trader-control-plane-runtime-sod.mjs'
+      - 'scripts/trader-control-plane-runtime-sod-regression.mjs'
+      - '.github/workflows/trader-control-plane-runtime-sod.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run immutable audit-history SoD regression
+        run: node scripts/trader-control-plane-runtime-sod-regression.mjs
