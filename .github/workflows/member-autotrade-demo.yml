@@ -9,7 +9,10 @@ on:
       - 'services/api/src/member-autotrade-route.mjs'
       - 'api/index.mjs'
       - 'public/account-auto-strategy.js'
+      - 'public/autotrade-demo.html'
+      - 'vercel.json'
       - 'scripts/member-autotrade-demo-regression.mjs'
+      - 'scripts/member-autotrade-demo-page-regression.mjs'
       - '.github/workflows/member-autotrade-demo.yml'
   push:
     branches: [main]
@@ -20,7 +23,10 @@ on:
       - 'services/api/src/member-autotrade-route.mjs'
       - 'api/index.mjs'
       - 'public/account-auto-strategy.js'
+      - 'public/autotrade-demo.html'
+      - 'vercel.json'
       - 'scripts/member-autotrade-demo-regression.mjs'
+      - 'scripts/member-autotrade-demo-page-regression.mjs'
       - '.github/workflows/member-autotrade-demo.yml'
 
 jobs:
@@ -38,5 +44,8 @@ jobs:
           node --check services/api/src/member-autotrade-route.mjs
           node --check api/index.mjs
           node --check scripts/member-autotrade-demo-regression.mjs
+          node --check scripts/member-autotrade-demo-page-regression.mjs
       - name: Run demo-wallet regression
         run: node scripts/member-autotrade-demo-regression.mjs
+      - name: Run demo-page regression
+        run: node scripts/member-autotrade-demo-page-regression.mjs
