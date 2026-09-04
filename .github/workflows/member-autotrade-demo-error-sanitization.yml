@@ -1,0 +1,27 @@
+name: Member Auto Trade Demo Error Sanitization Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/member-autotrade-route.mjs'
+      - 'scripts/member-autotrade-demo-error-sanitization-regression.mjs'
+      - '.github/workflows/member-autotrade-demo-error-sanitization.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/api/src/member-autotrade-route.mjs'
+      - 'scripts/member-autotrade-demo-error-sanitization-regression.mjs'
+      - '.github/workflows/member-autotrade-demo-error-sanitization.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        run: node --check scripts/member-autotrade-demo-error-sanitization-regression.mjs
+      - name: Run error sanitization regression
+        run: node scripts/member-autotrade-demo-error-sanitization-regression.mjs
