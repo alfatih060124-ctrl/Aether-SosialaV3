@@ -4,6 +4,7 @@ import { settleDemoAction, demoEquity } from './demo-autotrade-ledger.mjs';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value)));
 const asNumber = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+const signed = value => `${Number(value) >= 0 ? '+' : ''}${asNumber(value).toFixed(4)}`;
 
 async function feeConfig(client) {
   const q = await client.query(`SELECT performance_fee_bps FROM platform_fee_config WHERE config_id=1 AND enabled=true LIMIT 1`);
@@ -136,9 +137,12 @@ export async function runMemberAutoTradeDemoStep(pool, session, input = {}) {
     ])).rows[0];
 
     await client.query('COMMIT');
+    const wallet = projectAccount(updated, feeBps);
+    const walletLabel = `${result.scenario_label} · Demo balance ${wallet.balance_usdc.toFixed(4)} USDC · Net PnL ${signed(settlement.net_pnl_usdc)} · Performance fee ${settlement.performance_fee_usdc.toFixed(4)} USDC`;
     return Object.freeze({
       ...result,
-      demo_wallet: projectAccount(updated, feeBps),
+      scenario_label: walletLabel,
+      demo_wallet: wallet,
       demo_trade: trade,
       simulator_runtime: 'PRIMARY_VM_PERSISTENT_DEMO',
       authenticated_session: true,
