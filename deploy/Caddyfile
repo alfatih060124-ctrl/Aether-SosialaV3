@@ -1,6 +1,6 @@
 # Public API ingress. Read-only product data plus narrowly-scoped
-# wallet authentication/account lanes are exposed here. Execution,
-# simulation, billing, signal mutation, and Admin remain fenced inside PRIMARY_VM.
+# wallet authentication/account lanes and SHADOW demo lanes are exposed here.
+# LIVE execution, billing, Admin, signer material, and transaction submission remain fenced inside PRIMARY_VM.
 api.aether.boats {
   encode zstd gzip
 
@@ -13,7 +13,7 @@ api.aether.boats {
 
   @public_read {
     method GET
-    path /api/health /api/readiness /api/version /api/execution/status /api/signals/config /api/autotrade/status /api/trades /api/traders /api/traders/* /api/marketplace/fees /api/auth/session /api/account/wallet-portfolio /api/account/trader /api/account/copy-mandates /api/account/copy-trades /api/account/positions
+    path /api/health /api/readiness /api/version /api/execution/status /api/signals/config /api/autotrade/status /api/trades /api/traders /api/traders/* /api/marketplace/fees /api/auth/session /api/account/wallet-portfolio /api/account/trader /api/account/copy-mandates /api/account/copy-trades /api/account/positions /api/account/auto-strategy/demo
   }
 
   handle @public_read {
@@ -22,7 +22,7 @@ api.aether.boats {
 
   @wallet_auth_write {
     method POST
-    path /api/auth/challenge /api/auth/verify /api/auth/logout /api/account/trader/challenge /api/account/trader/apply /api/account/copy-mandates /api/account/autotrade/evaluate
+    path /api/auth/challenge /api/auth/verify /api/auth/logout /api/account/trader/challenge /api/account/trader/apply /api/account/copy-mandates /api/account/autotrade/evaluate /api/account/auto-strategy/simulate
   }
 
   handle @wallet_auth_write {
@@ -36,6 +36,13 @@ api.aether.boats {
 
   handle @account_patch {
     reverse_proxy 127.0.0.1:8080
+  }
+
+  @autotrade_demo_ui path /autotrade-demo /autotrade-demo.html
+  handle @autotrade_demo_ui {
+    root * /opt/aether-v3/public
+    rewrite * /autotrade-demo.html
+    file_server
   }
 
   handle {
