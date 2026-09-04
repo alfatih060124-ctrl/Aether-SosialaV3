@@ -40,23 +40,48 @@ assert.throws(
 assert.throws(
   () => authorizePublication(
     { actor: 'ops:publisher-01', role: 'TRADER_PUBLISHER' },
-    { verified: false, verification_actor: 'ops:verifier-01' }
+    { verified: false, verification_actor: 'ops:verifier-01', evidence_recorded_by: 'ops:evidence-01' }
   ),
   /trader_publication_requires_prior_verification/
 );
 
 const publication = authorizePublication(
   { actor: 'ops:publisher-01', role: 'TRADER_PUBLISHER' },
-  { verified: true, verification_actor: 'ops:verifier-01' }
+  { verified: true, verification_actor: 'ops:verifier-01', evidence_recorded_by: 'ops:evidence-01' }
 );
 assert.equal(publication.live_execution_authorized, false);
+assert.equal(publication.evidence_recorded_by, 'ops:evidence-01');
 
 assert.throws(
   () => authorizePublication(
     { actor: 'ops:verifier-01', role: 'TRADER_PUBLISHER' },
-    { verified: true, verification_actor: 'ops:verifier-01' }
+    { verified: true, verification_actor: 'ops:verifier-01', evidence_recorded_by: 'ops:evidence-01' }
   ),
   /trader_publisher_must_differ_from_verifier/
+);
+
+assert.throws(
+  () => authorizePublication(
+    { actor: 'ops:evidence-01', role: 'TRADER_PUBLISHER' },
+    { verified: true, verification_actor: 'ops:verifier-01', evidence_recorded_by: 'ops:evidence-01' }
+  ),
+  /trader_publisher_must_differ_from_evidence_recorder/
+);
+
+assert.throws(
+  () => authorizePublication(
+    { actor: 'ops:publisher-01', role: 'TRADER_PUBLISHER' },
+    { verified: true, verification_actor: 'ops:evidence-01', evidence_recorded_by: 'ops:evidence-01' }
+  ),
+  /trader_verifier_must_differ_from_evidence_recorder/
+);
+
+assert.throws(
+  () => authorizePublication(
+    { actor: 'ops:publisher-01', role: 'TRADER_PUBLISHER' },
+    { verified: true, verification_actor: 'ops:verifier-01' }
+  ),
+  /trader_control_actor_invalid/
 );
 
 assert.equal(assertDistinctTraderControlCredentials({
@@ -73,4 +98,4 @@ assert.throws(
   /trader_control_role_credentials_must_be_distinct/
 );
 
-console.log(JSON.stringify({ ok: true, contract: TRADER_CONTROL_PLANE_SOD_CONTRACT.schema, tests: 12, posture: 'SHADOW_FAIL_CLOSED' }));
+console.log(JSON.stringify({ ok: true, contract: TRADER_CONTROL_PLANE_SOD_CONTRACT.schema, tests: 16, posture: 'SHADOW_FAIL_CLOSED' }));
