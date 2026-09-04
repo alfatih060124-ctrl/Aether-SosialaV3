@@ -11,11 +11,17 @@ import {
 const JUPITER_ORIGIN = 'https://api.jup.ag';
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const WSOL_MINT = 'So11111111111111111111111111111111111111112';
+const DISCOVERY_VIEWS = new Set(['trending', 'new', 'gainers', 'volume']);
 const apiKey = String(process.env.JUPITER_API_KEY || '').trim();
 const rpcUrl = String(process.env.SOLANA_RPC_URL || '').trim();
-const view = String(process.env.AETHER_MARKET_VIEW || 'trending').trim().toLowerCase();
-const limitRaw = Number(process.env.AETHER_MARKET_PROBE_LIMIT || 10);
-const limit = Number.isSafeInteger(limitRaw) ? Math.min(20, Math.max(1, limitRaw)) : 10;
+const legacyView = String(process.env.AETHER_MARKET_VIEW || '').trim().toLowerCase();
+const discoveryViewsRaw = String(process.env.AETHER_MARKET_VIEWS || legacyView || 'trending,gainers,volume');
+const discoveryViews = [...new Set(discoveryViewsRaw.split(',').map(item => item.trim().toLowerCase()).filter(Boolean))];
+if (!discoveryViews.length || discoveryViews.some(item => !DISCOVERY_VIEWS.has(item))) throw new Error('invalid_market_discovery_views');
+const limitRaw = Number(process.env.AETHER_MARKET_PROBE_LIMIT || 20);
+const perViewLimit = Number.isSafeInteger(limitRaw) ? Math.min(20, Math.max(1, limitRaw)) : 20;
+const candidateLimitRaw = Number(process.env.AETHER_CROSS_VENUE_CANDIDATE_LIMIT || 40);
+const candidateLimit = Number.isSafeInteger(candidateLimitRaw) ? Math.min(60, Math.max(1, candidateLimitRaw)) : 40;
 const minLiquidityUsd = Math.max(0, Number(process.env.SIGNAL_MIN_LIQUIDITY_USD || 500000));
 const minVolume24hUsd = Math.max(0, Number(process.env.SIGNAL_MIN_VOLUME_24H_USD || 250000));
 const maxTop10HolderPct = Math.max(0, Number(process.env.SIGNAL_MAX_TOP10_HOLDER_PCT || 35));
@@ -28,6 +34,12 @@ const maxDexPairAttempts = Number.isSafeInteger(dexPairAttemptsRaw) ? Math.min(1
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function finite(value) { const n = Number(value); return Number.isFinite(n) ? n : null; }
+
+function candidateDiscoveryScore(row) {
+  const liquidity = finite(row?.liquidity_usd) ?? 0;
+  const volume = finite(row?.volume_24h_usd) ?? 0;
+  return liquidity + volume;
+}
 
 async function getJson(url, timeoutMs = 10000, retries = 3) {
   let lastError = null;
@@ -135,8 +147,27 @@ try {
   await sleep(interRequestDelayMs);
   const labelsByProgram = await programLabels();
   await sleep(interRequestDelayMs);
-  const discovery = await market.getDiscovery(view);
-  const rows = discovery.items.slice(0, limit);
+
+  const candidateMap = new Map();
+  const discoveryErrors = [];
+  for (const discoveryView of discoveryViews) {
+    try {
+      const discovery = await market.getDiscovery(discoveryView);
+      for (const row of discovery.items.slice(0, perViewLimit)) {
+        const key = String(row?.primary_mint || '').trim();
+        if (!key) continue;
+        const existing = candidateMap.get(key);
+        if (!existing || candidateDiscoveryScore(row) > candidateDiscoveryScore(existing)) candidateMap.set(key, row);
+      }
+    } catch (error) {
+      discoveryErrors.push({ view: discoveryView, error: String(error?.message || error) });
+    }
+  }
+  if (!candidateMap.size) throw new Error('market_discovery_unavailable');
+
+  const rows = [...candidateMap.values()]
+    .sort((a, b) => candidateDiscoveryScore(b) - candidateDiscoveryScore(a))
+    .slice(0, candidateLimit);
   const results = [];
 
   for (const row of rows) {
@@ -305,7 +336,11 @@ try {
     status: 'ok',
     probe: 'AETHER_CROSS_VENUE_NET_EDGE_SHADOW',
     observed_at: new Date().toISOString(),
+    discovery_views: discoveryViews,
+    discovery_errors: discoveryErrors,
+    candidates_discovered: candidateMap.size,
     candidates_scanned: rows.length,
+    candidate_limit: candidateLimit,
     sol_usd_reference: solUsd,
     min_expected_net_edge_bps: minNetEdgeBps,
     max_dex_pair_attempts: maxDexPairAttempts,
