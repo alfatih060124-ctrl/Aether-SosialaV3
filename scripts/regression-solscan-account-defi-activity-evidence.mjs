@@ -19,7 +19,7 @@ await assert.rejects(()=>collect([row,{...row,trans_id:SIG2,block_id:101,block_t
 await assert.rejects(()=>collect([row,{...row,block_id:99,block_time:1767225600}]),/duplicate_tx_hash/);
 await assert.rejects(()=>collect([{...row,from_address:O,to_address:P}]),/wallet_not_activity_party/);
 await assert.rejects(()=>collect([{...row,activity_type:'ACTIVITY_TOKEN_ADD_LIQ'}]),/invalid_activity_type/);
-await assert.rejects(()=>collect([{...row,routers:[{...row.routers[0],amount1:'1e9'}]}]),/invalid_routers_0_amount1/);
+await assert.rejects(()=>collect([{...row,routers:[{...row.routers[0],amount1:'1e9'}]}]),/invalid_routers_0_0_amount1/);
 await assert.rejects(()=>collect([{...row,block_time:1767225700}]),/future_block_time/);
 await assert.rejects(()=>collect(undefined,{sourceLabel:'https://secret.example/?token=x'}),/invalid_solscan_source_label/);
 await assert.rejects(()=>collect(undefined,{pageSize:11}),/invalid_page_size/);
