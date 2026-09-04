@@ -16,8 +16,10 @@ function base58(bytes) {
   return '1'.repeat(zeroes) + (out || '1');
 }
 
+// SYNTHETIC / TEST-ONLY identifiers. Never production signatures, wallets, trades, metrics, or source references.
 const wallet = base58(new Uint8Array(32).fill(7));
 const signature = base58(new Uint8Array(64).fill(9));
+const canonicalReference = `solana_rpc:${signature}@123`;
 const trader = {
   trader_id: '11111111-1111-4111-8111-111111111111',
   wallet_address: wallet,
@@ -37,8 +39,9 @@ const pool = {
       const row = {
         collection_id: params[0], trader_id: params[1], source_type: params[2], source_reference: params[3],
         observed_at: params[4], collection_status: 'PENDING_DATA', reason: params[5], provenance: JSON.parse(params[6]),
-        metrics_available: false, verified: false, published: false, live_execution_authorized: false,
-        created_at: new Date('2026-09-01T00:00:00.000Z')
+        metrics_available: false, trades_count: null, total_return_bps: null, win_rate_bps: null,
+        drawdown_bps: null, reputation_score: null, verified: false, published: false,
+        live_execution_authorized: false, created_at: new Date('2026-09-01T00:00:00.000Z')
       };
       inserted.push(row);
       return { rows: [row] };
@@ -71,20 +74,32 @@ const service = createAutomaticEvidenceService(pool, {
 const collection = await service.collectSolana(trader.trader_id, { limit: 10, max_pages: 2 });
 assert.equal(rpcCalls, 1);
 assert.equal(collection.source_type, 'SOLANA_RPC');
-assert.equal(collection.source_reference, signature);
+assert.equal(collection.source_reference, canonicalReference);
 assert.equal(collection.collection_status, 'PENDING_DATA');
 assert.equal(collection.reason, 'reconciled_trade_performance_required');
 assert.equal(collection.metrics_available, false);
+assert.equal(collection.trades_count, null);
+assert.equal(collection.total_return_bps, null);
+assert.equal(collection.win_rate_bps, null);
+assert.equal(collection.drawdown_bps, null);
+assert.equal(collection.reputation_score, null);
 assert.equal(collection.verified, false);
 assert.equal(collection.published, false);
 assert.equal(collection.live_execution_authorized, false);
 assert.equal(collection.provenance.signatures_observed, 1);
+assert.equal(collection.provenance.newest_signature, signature);
+assert.equal(collection.provenance.newest_slot, 123);
+assert.equal(collection.provenance.recorded_source_reference, canonicalReference);
+assert.equal(collection.provenance.source_reference_policy, 'SOLANA_RPC_SIGNATURE_SLOT');
 assert.equal(collection.provenance.rpc_endpoint_label, 'test-rpc');
 assert.ok(!JSON.stringify(collection).includes('rpc.example.invalid'), 'RPC URL must not be exposed in provenance');
 
 const listed = await service.listCollections(trader.trader_id, 20);
 assert.equal(listed.length, 1);
 assert.equal(listed[0].collection_id, collection.collection_id);
+assert.equal(listed[0].source_reference, canonicalReference);
+assert.equal(listed[0].verified, false);
+assert.equal(listed[0].published, false);
 
 assert.throws(() => createSolanaJsonRpcCaller({ rpcUrl: '' }), /solana_rpc_unconfigured/);
 assert.throws(() => createSolanaJsonRpcCaller({ rpcUrl: 'file:///tmp/rpc' }), /invalid_solana_rpc_url/);
