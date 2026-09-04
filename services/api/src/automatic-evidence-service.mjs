@@ -24,12 +24,6 @@ function strictOptionalBoundedInt(value, fallback, min, max, reason) {
   return value;
 }
 
-function optionalNumber(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
 function canonicalAutomaticSourceReference(collected) {
   const signature = collected?.provenance?.newest_signature ?? null;
   const slot = collected?.provenance?.newest_slot ?? null;
@@ -42,24 +36,44 @@ function canonicalAutomaticSourceReference(collected) {
   return `solana_rpc:${signature}@${slot}`;
 }
 
+function assertPendingAutomaticEvidenceRow(row) {
+  if (row?.source_type !== 'SOLANA_RPC') throw new Error('automatic_evidence_source_type_invalid');
+  if (row.collection_status !== 'PENDING_DATA') throw new Error('automatic_evidence_status_invalid');
+  if (
+    row.metrics_available !== false ||
+    row.trades_count !== null ||
+    row.total_return_bps !== null ||
+    row.win_rate_bps !== null ||
+    row.drawdown_bps !== null ||
+    row.reputation_score !== null ||
+    row.calculation_hash !== null ||
+    row.verified !== false ||
+    row.published !== false ||
+    row.live_execution_authorized !== false
+  ) {
+    throw new Error('automatic_evidence_safety_invariant_violation');
+  }
+}
+
 function projection(row) {
   if (!row) return null;
+  assertPendingAutomaticEvidenceRow(row);
   return {
     collection_id: row.collection_id,
     trader_id: row.trader_id,
     source_type: row.source_type,
     source_reference: row.source_reference,
     observed_at: row.observed_at,
-    collection_status: row.collection_status,
+    collection_status: 'PENDING_DATA',
     reason: row.reason,
     provenance: row.provenance || {},
-    metrics_available: row.metrics_available === true,
-    trades_count: optionalNumber(row.trades_count),
-    total_return_bps: optionalNumber(row.total_return_bps),
-    win_rate_bps: optionalNumber(row.win_rate_bps),
-    drawdown_bps: optionalNumber(row.drawdown_bps),
-    reputation_score: optionalNumber(row.reputation_score),
-    calculation_hash: row.calculation_hash || null,
+    metrics_available: false,
+    trades_count: null,
+    total_return_bps: null,
+    win_rate_bps: null,
+    drawdown_bps: null,
+    reputation_score: null,
+    calculation_hash: null,
     verified: false,
     published: false,
     live_execution_authorized: false,
