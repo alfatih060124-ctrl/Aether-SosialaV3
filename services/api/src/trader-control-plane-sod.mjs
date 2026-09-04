@@ -62,17 +62,21 @@ export function authorizeVerification(principal, { evidence_recorded_by } = {}) 
   });
 }
 
-export function authorizePublication(principal, { verified, verification_actor } = {}) {
+export function authorizePublication(principal, { verified, verification_actor, evidence_recorded_by } = {}) {
   const p = createTraderControlPrincipal(principal);
   if (p.role !== ROLE.PUBLISHER) throw new Error('trader_publisher_role_required');
   if (verified !== true) throw new Error('trader_publication_requires_prior_verification');
   const verificationActor = cleanActor(verification_actor);
+  const evidenceActor = cleanActor(evidence_recorded_by);
   if (p.actor === verificationActor) throw new Error('trader_publisher_must_differ_from_verifier');
+  if (p.actor === evidenceActor) throw new Error('trader_publisher_must_differ_from_evidence_recorder');
+  if (verificationActor === evidenceActor) throw new Error('trader_verifier_must_differ_from_evidence_recorder');
   return Object.freeze({
     authorized: true,
     actor: p.actor,
     role: p.role,
     verification_actor: verificationActor,
+    evidence_recorded_by: evidenceActor,
     live_execution_authorized: false
   });
 }
