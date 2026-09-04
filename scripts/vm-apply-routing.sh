@@ -52,8 +52,9 @@ say "verifying local primary runtime"
 curl -fsS --max-time 8 http://127.0.0.1:8080/api/readiness >/dev/null
 
 say "verifying public read path"
+public_status="$(curl -fsS --max-time 12 "$PUBLIC_API/api/execution/status")"
+printf '%s' "$public_status" | grep -F '"live_enabled":false' >/dev/null || fail "public execution status is not fail-closed"
 curl -fsS --max-time 12 "$PUBLIC_API/api/health" >/dev/null
-curl -fsS --max-time 12 "$PUBLIC_API/api/execution/status" | grep -q '"live_enabled":false'
 
 expect_blocked(){
   local method="$1" path="$2" code
@@ -93,11 +94,18 @@ admin_local(){
   curl -fsS --max-time 12 --resolve "$ADMIN_HOST:443:127.0.0.1" "$ADMIN_ORIGIN$1"
 }
 
+require_admin_text(){
+  local path="$1" needle="$2" label="$3" body
+  say "checking $label"
+  body="$(admin_local "$path")" || fail "$label is not reachable through local Caddy"
+  printf '%s' "$body" | grep -F "$needle" >/dev/null || fail "$label content mismatch"
+}
+
 say "verifying PRIMARY_VM operator auto-trade training surface locally"
-admin_local /operator-autotrade | grep -q 'AUTO TRADE OPERATOR SIMULATOR'
-admin_local /operator-modules/auto-trade-training.mjs | grep -q 'runAutoTradeTraining'
-admin_local /operator-modules/signal-intelligence.mjs | grep -q 'HARD_MIN_EXPECTED_NET_EDGE_BPS = 20'
-admin_local /operator-modules/auto-trade-engine.mjs | grep -q 'live_execution_authorized: false'
+require_admin_text /operator-autotrade 'AUTO TRADE OPERATOR SIMULATOR' 'operator page'
+require_admin_text /operator-modules/auto-trade-training.mjs 'runAutoTradeTraining' 'training module'
+require_admin_text /operator-modules/signal-intelligence.mjs 'HARD_MIN_EXPECTED_NET_EDGE_BPS = 20' 'signal edge floor module'
+require_admin_text /operator-modules/auto-trade-engine.mjs 'live_execution_authorized: false' 'auto-trade fail-closed module'
 
 say "checking external Admin reachability (non-fatal)"
 external_code="$(curl -sS --max-time 12 -o /dev/null -w '%{http_code}' "$ADMIN_ORIGIN/operator-autotrade" || true)"
