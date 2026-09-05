@@ -58,16 +58,21 @@ export function createSolanaPretradeNetworkFeeEstimator({
         await loadUnsignedMessageEvidence(Object.freeze({ ...context, read_only: true, strategy: 'TWO_LEG_ARBITRAGE' })),
         'pretrade_unsigned_message_evidence_required'
       );
-      if (messageEvidence.signed === true || messageEvidence.signer_requested === true) throw new Error('pretrade_unsigned_message_boundary_violation');
+      if (messageEvidence.signed === true || messageEvidence.transaction_signed === true || messageEvidence.signer_requested === true) {
+        throw new Error('pretrade_unsigned_message_boundary_violation');
+      }
       const message = text(messageEvidence.message_base64, 'pretrade_message_base64_required');
+      const transaction = text(messageEvidence.transaction_base64, 'pretrade_transaction_base64_required');
       const messageReference = text(messageEvidence.source_reference, 'pretrade_message_reference_required');
       const messageObservedAt = freshIso(messageEvidence.observed_at, timestamp, maxAge, 'pretrade_message_observed_at');
+      const messageSourceSlot = safeInt(messageEvidence.source_slot, 'pretrade_message_source_slot_required', 0);
+      const accountKeys = Array.isArray(messageEvidence.account_keys) ? messageEvidence.account_keys.map(String).filter(Boolean) : [];
 
       const [baseFeeRaw, simulationRaw, priorityRaw, solUsdRaw] = await Promise.all([
-        getFeeForMessage(Object.freeze({ message_base64: message, context })),
-        simulateUnsignedTransaction(Object.freeze({ message_base64: message, context })),
-        loadPriorityFeeEvidence(Object.freeze({ ...context, message_source_reference: messageReference })),
-        loadCurrentSolUsdEvidence(Object.freeze({ ...context, message_source_reference: messageReference }))
+        getFeeForMessage(Object.freeze({ message_base64: message, source_slot: messageSourceSlot, context })),
+        simulateUnsignedTransaction(Object.freeze({ transaction_base64: transaction, source_slot: messageSourceSlot, context })),
+        loadPriorityFeeEvidence(Object.freeze({ ...context, account_keys: accountKeys, source_slot: messageSourceSlot, message_source_reference: messageReference })),
+        loadCurrentSolUsdEvidence(Object.freeze({ ...context, source_slot: messageSourceSlot, message_source_reference: messageReference }))
       ]);
 
       const baseFee = verifiedObject(baseFeeRaw, 'pretrade_base_fee_evidence_required');
@@ -88,9 +93,10 @@ export function createSolanaPretradeNetworkFeeEstimator({
       if (!Number.isFinite(networkFeeUsdc) || networkFeeUsdc < 0) throw new Error('pretrade_network_fee_usdc_invalid');
 
       const sourceSlot = safeInt(baseFee.source_slot, 'pretrade_source_slot_required', 0);
-      if (safeInt(simulation.source_slot, 'pretrade_simulation_source_slot_required', 0) !== sourceSlot) throw new Error('pretrade_simulation_slot_mismatch');
-      if (safeInt(priority.source_slot, 'pretrade_priority_source_slot_required', 0) !== sourceSlot) throw new Error('pretrade_priority_slot_mismatch');
-      if (safeInt(solUsd.source_slot, 'pretrade_sol_usd_source_slot_required', 0) !== sourceSlot) throw new Error('pretrade_sol_usd_slot_mismatch');
+      if (sourceSlot < messageSourceSlot) throw new Error('pretrade_base_fee_slot_before_message');
+      if (safeInt(simulation.source_slot, 'pretrade_simulation_source_slot_required', 0) < messageSourceSlot) throw new Error('pretrade_simulation_slot_before_message');
+      if (safeInt(priority.source_slot, 'pretrade_priority_source_slot_required', 0) < messageSourceSlot) throw new Error('pretrade_priority_slot_before_message');
+      if (safeInt(solUsd.source_slot, 'pretrade_sol_usd_source_slot_required', 0) < messageSourceSlot) throw new Error('pretrade_sol_usd_slot_before_message');
 
       const observed = [
         messageObservedAt,
@@ -111,6 +117,7 @@ export function createSolanaPretradeNetworkFeeEstimator({
         micro_lamports_per_compute_unit: microLamportsPerComputeUnit,
         sol_usd: solUsdPrice,
         source_slot: sourceSlot,
+        message_source_slot: messageSourceSlot,
         source: 'SOLANA_PRETRADE_RPC_FEE_ESTIMATE',
         source_reference: [
           messageReference,
@@ -134,6 +141,7 @@ export const SOLANA_PRETRADE_NETWORK_FEE_ESTIMATOR = Object.freeze({
   mode: 'SHADOW',
   strategy: 'TWO_LEG_ARBITRAGE',
   requires_unsigned_message_evidence: true,
+  requires_serialized_unsigned_transaction: true,
   requires_get_fee_for_message: true,
   requires_read_only_simulation: true,
   requires_priority_fee_evidence: true,
