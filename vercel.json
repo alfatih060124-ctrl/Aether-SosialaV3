@@ -23,6 +23,7 @@
     { "src": "/autotrade-demo/?", "dest": "/public/autotrade-demo.html" },
     { "src": "/marketplace/?", "dest": "/public/marketplace.html" },
     { "src": "/market/?", "dest": "/public/market.html" },
+    { "src": "/", "has": [{ "type": "cookie", "key": "aether_session" }], "status": 307, "headers": { "Location": "/account" } },
     { "src": "/", "dest": "/public/index.html" },
     { "src": "/(.*)", "dest": "/public/index.html" }
   ]
