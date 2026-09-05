@@ -2,11 +2,26 @@ import { persistAuthenticatedAutoTradeDecisionAtomically } from './autotrade-ato
 import { createTrustedAutoTradeRuntimeRiskResolver } from './trusted-autotrade-runtime-risk.mjs';
 import { handleMemberPositionsRoute } from './member-positions-route.mjs';
 import { getMemberAutoTradeDemoState, runMemberAutoTradeDemoStep } from './member-autotrade-demo.mjs';
+import { createConfiguredMemberAutoTradeRealMarketRuntime } from './member-autotrade-real-market-runtime-factory.mjs';
 
 const MEMBER_ROUTE = '/api/account/autotrade/evaluate';
 const LEGACY_ROUTE = '/api/autotrade/evaluate';
 const DEMO_STATE_ROUTE = '/api/account/auto-strategy/demo';
 const DEMO_SIMULATE_ROUTE = '/api/account/auto-strategy/simulate';
+let configuredRealMarketRuntime = null;
+let configuredRealMarketRuntimeError = null;
+
+function defaultRealMarketRuntime() {
+  if (configuredRealMarketRuntime) return configuredRealMarketRuntime;
+  if (configuredRealMarketRuntimeError) return null;
+  try {
+    configuredRealMarketRuntime = createConfiguredMemberAutoTradeRealMarketRuntime();
+    return configuredRealMarketRuntime;
+  } catch (error) {
+    configuredRealMarketRuntimeError = error;
+    return null;
+  }
+}
 
 function statusFor(error) {
   const code = String(error?.message || '');
@@ -64,11 +79,13 @@ export async function handleMemberAutoTradeRoute({
         send(res, 401, { error: 'session_required', mode: 'SHADOW', live_execution_authorized: false });
         return true;
       }
+      const resolvedRealMarketRuntime = realMarketRuntime || defaultRealMarketRuntime();
       if (route === DEMO_STATE_ROUTE) {
         const state = await getMemberAutoTradeDemoState(pool, session.user_id, { limit: 20 });
         send(res, 200, {
           demo_wallet: state,
-          simulator_runtime: realMarketRuntime ? 'PRIMARY_VM_REAL_MARKET_TWO_LEG_SHADOW' : 'PRIMARY_VM_REAL_MARKET_UNCONFIGURED',
+          simulator_runtime: resolvedRealMarketRuntime ? 'PRIMARY_VM_REAL_MARKET_TWO_LEG_SHADOW' : 'PRIMARY_VM_REAL_MARKET_UNCONFIGURED',
+          runtime_error: resolvedRealMarketRuntime ? null : String(configuredRealMarketRuntimeError?.message || 'real_market_shadow_runtime_unconfigured'),
           strategy: 'TWO_LEG_ARBITRAGE',
           mode: 'SHADOW',
           funds_moved: false,
@@ -76,7 +93,8 @@ export async function handleMemberAutoTradeRoute({
         });
         return true;
       }
-      const result = await runMemberAutoTradeDemoStep(pool, session, await jsonBody(req), { realMarketRuntime });
+      if (!resolvedRealMarketRuntime) throw configuredRealMarketRuntimeError || new Error('real_market_shadow_runtime_unconfigured');
+      const result = await runMemberAutoTradeDemoStep(pool, session, await jsonBody(req), { realMarketRuntime: resolvedRealMarketRuntime });
       send(res, 200, result);
       return true;
     } catch (error) {
