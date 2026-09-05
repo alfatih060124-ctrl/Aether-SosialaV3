@@ -1,0 +1,24 @@
+name: Raydium Readonly Provider Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/raydium-readonly-provider.mjs'
+      - 'scripts/regression-raydium-readonly-provider.mjs'
+      - '.github/workflows/raydium-readonly-provider-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run Raydium readonly provider regression
+        run: node scripts/regression-raydium-readonly-provider.mjs
