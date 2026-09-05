@@ -18,6 +18,12 @@ function exactPair(pool, tokenMint, quoteMint) {
   return (a === tokenMint && b === quoteMint) || (a === quoteMint && b === tokenMint);
 }
 
+function requiredBps(value, code) {
+  const numeric = finite(value);
+  if (numeric === null || numeric < 0 || numeric > 10_000) throw new Error(code);
+  return numeric;
+}
+
 async function fetchJson(fetchImpl, url, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -76,12 +82,16 @@ export function createOrcaWhirlpoolReadOnlyQuoteLoader({
       if (!quote || typeof quote !== 'object') throw new Error('orca_onchain_quote_required');
       if (quote.quote_verified !== true) throw new Error('orca_onchain_quote_unverified');
       if (quote.costs_verified !== true) throw new Error('orca_onchain_costs_unverified');
-      const priceUsd = finite(quote.price_usd);
-      if (!(priceUsd > 0)) throw new Error('orca_onchain_price_required');
-      const feeBps = finite(quote.fee_bps);
-      if (feeBps === null || feeBps < 0 || feeBps > 10_000) throw new Error('orca_onchain_fee_bps_required');
-      const priceImpactBps = finite(quote.price_impact_bps);
-      if (priceImpactBps === null || priceImpactBps < 0 || priceImpactBps > 10_000) throw new Error('orca_onchain_price_impact_bps_required');
+
+      const buyPriceUsd = finite(quote.buy_price_usd);
+      const sellPriceUsd = finite(quote.sell_price_usd);
+      if (!(buyPriceUsd > 0)) throw new Error('orca_onchain_buy_price_required');
+      if (!(sellPriceUsd > 0)) throw new Error('orca_onchain_sell_price_required');
+      const buyFeeBps = requiredBps(quote.buy_fee_bps, 'orca_onchain_buy_fee_bps_required');
+      const sellFeeBps = requiredBps(quote.sell_fee_bps, 'orca_onchain_sell_fee_bps_required');
+      const buyPriceImpactBps = requiredBps(quote.buy_price_impact_bps, 'orca_onchain_buy_price_impact_bps_required');
+      const sellPriceImpactBps = requiredBps(quote.sell_price_impact_bps, 'orca_onchain_sell_price_impact_bps_required');
+
       const observedAt = text(quote.observed_at, 'orca_onchain_observed_at_required');
       if (!Number.isFinite(Date.parse(observedAt))) throw new Error('orca_onchain_observed_at_invalid');
       const quoteSource = text(quote.quote_source, 'orca_onchain_quote_source_required');
@@ -92,9 +102,12 @@ export function createOrcaWhirlpoolReadOnlyQuoteLoader({
         pool_address: poolAddress,
         token_mint: tokenMint,
         quote_mint: quoteMint,
-        price_usd: priceUsd,
-        fee_bps: feeBps,
-        price_impact_bps: priceImpactBps,
+        buy_price_usd: buyPriceUsd,
+        sell_price_usd: sellPriceUsd,
+        buy_fee_bps: buyFeeBps,
+        sell_fee_bps: sellFeeBps,
+        buy_price_impact_bps: buyPriceImpactBps,
+        sell_price_impact_bps: sellPriceImpactBps,
         liquidity_usd: finite(quote.liquidity_usd ?? pool.tvlUsdc ?? pool.tvl),
         quote_source: quoteSource,
         quote_verified: true,
