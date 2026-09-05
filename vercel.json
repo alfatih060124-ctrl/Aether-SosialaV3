@@ -1,5 +1,9 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
+  "git": {
+    "deploymentEnabled": false
+  },
   "builds": [
     { "src": "api/index.mjs", "use": "@vercel/node" },
     { "src": "api/chart.mjs", "use": "@vercel/node" },
