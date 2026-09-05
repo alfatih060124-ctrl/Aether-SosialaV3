@@ -23,7 +23,7 @@ function timestamp(value, name) {
 
 function canonicalReconciledTrades(rows = []) {
   if (!Array.isArray(rows)) throw new Error('invalid_reconciliation_rows');
-  return rows
+  const canonical = rows
     .filter(row => String(row?.reconciliation_status || '').toUpperCase() === 'RECONCILED')
     .map((row, i) => ({
       trade_id: text(row.trade_id, `trade_${i}_id`, 1, 120),
@@ -34,6 +34,17 @@ function canonicalReconciledTrades(rows = []) {
       source_signature: solanaBase58(row.source_signature, `trade_${i}_source_signature`, 32, 100)
     }))
     .sort((a, b) => a.executed_at.localeCompare(b.executed_at) || a.trade_id.localeCompare(b.trade_id));
+
+  const tradeIds = new Set();
+  const sourceSignatures = new Set();
+  for (const row of canonical) {
+    if (tradeIds.has(row.trade_id)) throw new Error('duplicate_reconciled_trade_id');
+    if (sourceSignatures.has(row.source_signature)) throw new Error('duplicate_reconciled_source_signature');
+    tradeIds.add(row.trade_id);
+    sourceSignatures.add(row.source_signature);
+  }
+
+  return canonical;
 }
 
 export function buildInternalReconciliationProvenance({ walletAddress, reconciliationBatchId, trades }) {
@@ -41,7 +52,8 @@ export function buildInternalReconciliationProvenance({ walletAddress, reconcili
   const batch = text(reconciliationBatchId, 'reconciliation_batch_id', 8, 160);
   const canonical = canonicalReconciledTrades(trades);
   const sourceHash = crypto.createHash('sha256').update(JSON.stringify({
-    v: 2,
+    v: 3,
+    deduplication: 'UNIQUE_TRADE_ID_AND_SOURCE_SIGNATURE',
     wallet_address: wallet,
     reconciliation_batch_id: batch,
     trades: canonical.map(row => ({
@@ -54,11 +66,12 @@ export function buildInternalReconciliationProvenance({ walletAddress, reconcili
     }))
   })).digest('hex');
   return {
-    schema_version: 2,
+    schema_version: 3,
     source_type: 'INTERNAL_RECONCILIATION',
     wallet_address: wallet,
     reconciliation_batch_id: batch,
     reconciled_trades: canonical.length,
+    deduplication: 'UNIQUE_TRADE_ID_AND_SOURCE_SIGNATURE',
     source_hash: sourceHash
   };
 }
