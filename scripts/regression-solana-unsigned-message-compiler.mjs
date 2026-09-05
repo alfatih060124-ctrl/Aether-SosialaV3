@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
-import { VersionedMessage, VersionedTransaction } from '@solana/web3.js';
+import { createRequire } from 'node:module';
 import { createSolanaUnsignedMessageCompiler } from '../services/api/src/solana-unsigned-message-compiler.mjs';
+
+const requireFromApi = createRequire(new URL('../services/api/package.json', import.meta.url));
+const { VersionedMessage, VersionedTransaction } = requireFromApi('@solana/web3.js');
 
 const compiler = createSolanaUnsignedMessageCompiler();
 const evidence = Object.freeze({
