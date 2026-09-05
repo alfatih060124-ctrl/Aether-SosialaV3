@@ -1,0 +1,35 @@
+name: Member Auto Trade Trusted Position Lifecycle Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/trusted-autotrade-position.mjs'
+      - 'services/api/src/autotrade-route-boundary.mjs'
+      - 'services/api/src/autotrade-persistence-boundary.mjs'
+      - 'services/api/src/autotrade-atomic-persistence.mjs'
+      - 'services/api/src/member-autotrade-route.mjs'
+      - 'services/api/src/shadow-autotrade-lifecycle-bridge.mjs'
+      - 'scripts/regression-member-autotrade-trusted-position-lifecycle.mjs'
+      - '.github/workflows/member-autotrade-trusted-position-lifecycle-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    # Pull-request checkout validates the current merge ref, including the latest main safety contracts.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check trusted position resolver
+        run: node --check services/api/src/trusted-autotrade-position.mjs
+      - name: Syntax check member route
+        run: node --check services/api/src/member-autotrade-route.mjs
+      - name: Syntax check route boundary
+        run: node --check services/api/src/autotrade-route-boundary.mjs
+      - name: Run trusted position lifecycle regression
+        run: node scripts/regression-member-autotrade-trusted-position-lifecycle.mjs

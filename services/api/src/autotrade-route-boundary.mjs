@@ -44,12 +44,38 @@ function requireResolver(fn, error) {
   return fn;
 }
 
+function positionReference(position) {
+  if (!position?.position_id) return Object.freeze({});
+  return Object.freeze({
+    position_id: position.position_id,
+    policy_id: position.policy_id || null,
+    trader_id: position.trader_id || null,
+    token_mint: position.token_mint || null,
+    status: position.status || null,
+    source: position.source || 'BACKEND_TRUSTED_POSITION',
+    caller_authority: false,
+    mode: 'SHADOW',
+    live_execution_authorized: false
+  });
+}
+
+function assertPositionSafety(position) {
+  if (
+    position?.caller_authority === true ||
+    position?.live_execution_authorized === true ||
+    position?.network_submission_authorized === true ||
+    position?.signer_required === true ||
+    (position?.mode && position.mode !== 'SHADOW')
+  ) throw new Error('invalid_trusted_position_authority');
+}
+
 export async function evaluateAuthenticatedAutoTradeRoute({
   session,
   requestBody,
   mandateRepository,
   resolveAssessment,
   resolveRuntimeRisk,
+  resolvePosition,
   liveEnabled = false
 }) {
   if (liveEnabled === true) throw new Error('autotrade_live_blocked');
@@ -67,11 +93,20 @@ export async function evaluateAuthenticatedAutoTradeRoute({
   if (resolved.assessment_id !== assessmentId) throw new Error('signal_assessment_id_mismatch');
   const assessment = requireObject(resolved.assessment, 'signal_assessment_required');
 
+  const trustedPosition = resolvePosition
+    ? requireObject(await resolvePosition({
+        authenticated_follower_user_id: authenticated.user_id,
+        policy_id: policyId,
+        assessment
+      }), 'autotrade_trusted_position_required')
+    : Object.freeze({});
+  assertPositionSafety(trustedPosition);
+
   const runtimeRisk = requireObject(await riskResolver({
     authenticated_follower_user_id: authenticated.user_id,
     policy_id: policyId,
     assessment,
-    position: Object.freeze({})
+    position: trustedPosition
   }), 'autotrade_runtime_risk_required');
   const riskMetadata = runtimeRisk.risk_metadata && typeof runtimeRisk.risk_metadata === 'object' && !Array.isArray(runtimeRisk.risk_metadata)
     ? runtimeRisk.risk_metadata
@@ -82,7 +117,7 @@ export async function evaluateAuthenticatedAutoTradeRoute({
     authenticatedFollowerUserId: authenticated.user_id,
     policyId,
     assessment,
-    position: Object.freeze({}),
+    position: trustedPosition,
     runtimeRisk,
     liveEnabled: false
   });
@@ -94,6 +129,7 @@ export async function evaluateAuthenticatedAutoTradeRoute({
     result.signer_required !== false
   ) throw new Error('autotrade_route_shadow_invariant_failed');
 
+  const reference = positionReference(trustedPosition);
   return Object.freeze({
     schema: 'aether.autotrade.authenticated_route_boundary.v2',
     assessment_id: assessmentId,
@@ -101,6 +137,7 @@ export async function evaluateAuthenticatedAutoTradeRoute({
     trader_id: result.trader_id,
     assessment: result.assessment,
     decision: result.decision,
+    position_reference: reference,
     audit_metadata: Object.freeze({
       ...result.audit_metadata,
       route_schema: 'aether.autotrade.authenticated_route_boundary.v2',
@@ -109,6 +146,8 @@ export async function evaluateAuthenticatedAutoTradeRoute({
       runtime_risk_base_currency: riskMetadata.base_currency || null,
       runtime_risk_portfolio_observed_at: riskMetadata.portfolio_observed_at || null,
       runtime_risk_daily_pnl_accounting_ready: riskMetadata.daily_pnl_accounting_ready === true,
+      trusted_position_source: trustedPosition.source || null,
+      trusted_position_id: trustedPosition.position_id || null,
       caller_mandate_authority: false,
       caller_identity_authority: false,
       caller_runtime_risk_authority: false,
