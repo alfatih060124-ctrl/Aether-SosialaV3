@@ -1,0 +1,26 @@
+name: SHADOW Simulation State Classification Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/jupiter-unsigned-simulation.mjs'
+      - 'scripts/regression-shadow-simulation-state-classification.mjs'
+      - '.github/workflows/shadow-simulation-state-classification-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: node --check scripts/regression-shadow-simulation-state-classification.mjs
+      - name: Run fail-closed regression
+        run: node scripts/regression-shadow-simulation-state-classification.mjs
