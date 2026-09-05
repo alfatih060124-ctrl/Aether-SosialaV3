@@ -6,7 +6,10 @@ const quote = 'USDC_MINT_TEST';
 const observedAt = '2026-09-05T08:30:00.000Z';
 const row = overrides => ({
   pool_address: 'pool-a', token_mint: token, quote_mint: quote,
-  price_usd: 1, fee_bps: 5, price_impact_bps: 4, liquidity_usd: 1_000_000,
+  buy_price_usd: 1.001, sell_price_usd: 0.999,
+  buy_fee_bps: 5, sell_fee_bps: 5,
+  buy_price_impact_bps: 4, sell_price_impact_bps: 4,
+  liquidity_usd: 1_000_000,
   quote_source: 'READ_ONLY_PROVIDER_TEST', quote_verified: true, costs_verified: true,
   observed_at: observedAt, ...overrides
 });
@@ -24,7 +27,7 @@ const loadPools = createOrcaRaydiumReadOnlyPoolLoader({
     raydiumRequests += 1;
     assert.equal(request.token_mint, token);
     assert.equal(request.quote_mint, quote);
-    return [row({ dex_id: 'raydium', pool_address: 'raydium-pool', price_usd: 1.01 })];
+    return [row({ dex_id: 'raydium', pool_address: 'raydium-pool', buy_price_usd: 1.011, sell_price_usd: 1.009 })];
   }
 });
 
@@ -32,6 +35,8 @@ const rows = await loadPools({ token_mint: token, quote_mint: quote, dexes: ['or
 assert.equal(rows.length, 2);
 assert.equal(rows[0].dex_id, 'orca');
 assert.equal(rows[1].dex_id, 'raydium');
+assert.equal(rows[0].buy_price_usd, 1.001);
+assert.equal(rows[1].sell_price_usd, 1.009);
 assert.equal(orcaRequests, 1);
 assert.equal(raydiumRequests, 1);
 assert.ok(rows.every(item => item.quote_verified && item.costs_verified));
@@ -44,8 +49,9 @@ async function expectFailure({ orca = [row({ dex_id: 'orca' })], raydium = [row(
   await assert.rejects(candidate({ token_mint: token, quote_mint: quote, dexes: ['orca', 'raydium'] }), pattern);
 }
 
-await expectFailure({ orca: [row({ dex_id: 'orca', fee_bps: undefined })], pattern: /orca_fee_bps_required/ });
-await expectFailure({ raydium: [row({ dex_id: 'raydium', pool_address: 'ray-pool', price_impact_bps: undefined })], pattern: /raydium_price_impact_bps_required/ });
+await expectFailure({ orca: [row({ dex_id: 'orca', buy_fee_bps: undefined })], pattern: /orca_buy_fee_bps_required/ });
+await expectFailure({ raydium: [row({ dex_id: 'raydium', pool_address: 'ray-pool', sell_price_impact_bps: undefined })], pattern: /raydium_sell_price_impact_bps_required/ });
+await expectFailure({ orca: [row({ dex_id: 'orca', buy_price_usd: undefined })], pattern: /orca_buy_price_required/ });
 await expectFailure({ orca: [row({ dex_id: 'orca', quote_verified: false })], pattern: /orca_quote_unverified/ });
 await expectFailure({ raydium: [row({ dex_id: 'raydium', pool_address: 'ray-pool', costs_verified: false })], pattern: /raydium_costs_unverified/ });
 await expectFailure({ orca: [], pattern: /orca_provider_no_verified_quotes/ });
