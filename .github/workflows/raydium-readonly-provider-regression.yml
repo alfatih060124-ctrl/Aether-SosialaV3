@@ -1,0 +1,35 @@
+name: Raydium Readonly Provider Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/package.json'
+      - 'services/api/src/raydium-readonly-provider.mjs'
+      - 'services/api/src/raydium-rpc-quote-pool.mjs'
+      - 'scripts/regression-raydium-readonly-provider.mjs'
+      - 'scripts/regression-raydium-rpc-quote-pool.mjs'
+      - '.github/workflows/raydium-readonly-provider-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: |
+          node --check services/api/src/raydium-readonly-provider.mjs
+          node --check services/api/src/raydium-rpc-quote-pool.mjs
+          node --check scripts/regression-raydium-readonly-provider.mjs
+          node --check scripts/regression-raydium-rpc-quote-pool.mjs
+      - name: Run Raydium readonly provider regression
+        run: node scripts/regression-raydium-readonly-provider.mjs
+      - name: Run Raydium RPC quote regression
+        run: node scripts/regression-raydium-rpc-quote-pool.mjs
