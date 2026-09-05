@@ -1,0 +1,27 @@
+name: Shadow Probe Holder Threshold Config Regression
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/vm-real-market-shadow-probe.mjs'
+      - 'scripts/regression-shadow-probe-holder-threshold-config.mjs'
+      - '.github/workflows/shadow-probe-holder-threshold-config-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/vm-real-market-shadow-probe.mjs'
+      - 'scripts/regression-shadow-probe-holder-threshold-config.mjs'
+      - '.github/workflows/shadow-probe-holder-threshold-config-regression.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax check
+        run: node --check scripts/regression-shadow-probe-holder-threshold-config.mjs
+      - name: Run fail-closed holder threshold regression
+        run: node scripts/regression-shadow-probe-holder-threshold-config.mjs
