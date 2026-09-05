@@ -49,4 +49,4 @@ jobs:
       - run: npm install --prefix services/api --ignore-scripts --no-audit --no-fund
       - name: Verify ORCA SDK dependencies resolve
         working-directory: services/api
-        run: node -e "Promise.all([import('@solana/kit'),import('@orca-so/whirlpools-client'),import('@orca-so/whirlpools-core'),import('@solana-program/token-2022')]).then(()=>console.log('orca sdk deps: ok'))"
+        run: node -e "Promise.all([import('@solana/kit'),import('@orca-so/whirlpools-client'),import('@orca-so/whirlpools-core'),import('@solana-program/token-2022')]).then(()=>console.log('orca sdk deps ok'))"
