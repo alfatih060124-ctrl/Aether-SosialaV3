@@ -7,15 +7,23 @@ on:
       - 'services/api/src/real-market-arbitrage-shadow.mjs'
       - 'services/api/src/orca-raydium-arbitrage-scanner.mjs'
       - 'services/api/src/orca-raydium-readonly-provider-adapter.mjs'
+      - 'services/api/src/orca-raydium-shadow-runtime.mjs'
+      - 'services/api/src/orca-raydium-shadow-qualification-runtime.mjs'
       - 'services/api/src/orca-whirlpool-readonly-provider.mjs'
       - 'services/api/src/orca-whirlpool-rpc-quote-pool.mjs'
+      - 'services/api/src/raydium-readonly-provider.mjs'
+      - 'services/api/src/raydium-rpc-quote-pool.mjs'
       - 'services/api/src/demo-autotrade-ledger.mjs'
       - 'services/api/src/signal-intelligence.mjs'
       - 'scripts/regression-real-market-arbitrage-shadow.mjs'
       - 'scripts/regression-orca-raydium-arbitrage-scanner.mjs'
       - 'scripts/regression-orca-raydium-readonly-provider-adapter.mjs'
+      - 'scripts/regression-orca-raydium-shadow-runtime.mjs'
+      - 'scripts/regression-orca-raydium-shadow-qualification-runtime.mjs'
       - 'scripts/regression-orca-whirlpool-readonly-provider.mjs'
       - 'scripts/regression-orca-whirlpool-rpc-quote-pool.mjs'
+      - 'scripts/regression-raydium-readonly-provider.mjs'
+      - 'scripts/regression-raydium-rpc-quote-pool.mjs'
       - '.github/workflows/real-market-arbitrage-shadow-regression.yml'
 
 permissions:
@@ -33,20 +41,32 @@ jobs:
       - run: node --check services/api/src/real-market-arbitrage-shadow.mjs
       - run: node --check services/api/src/orca-raydium-arbitrage-scanner.mjs
       - run: node --check services/api/src/orca-raydium-readonly-provider-adapter.mjs
+      - run: node --check services/api/src/orca-raydium-shadow-runtime.mjs
+      - run: node --check services/api/src/orca-raydium-shadow-qualification-runtime.mjs
       - run: node --check services/api/src/orca-whirlpool-readonly-provider.mjs
       - run: node --check services/api/src/orca-whirlpool-rpc-quote-pool.mjs
+      - run: node --check services/api/src/raydium-readonly-provider.mjs
+      - run: node --check services/api/src/raydium-rpc-quote-pool.mjs
       - run: node --check services/api/src/demo-autotrade-ledger.mjs
       - run: node --check scripts/regression-real-market-arbitrage-shadow.mjs
       - run: node --check scripts/regression-orca-raydium-arbitrage-scanner.mjs
       - run: node --check scripts/regression-orca-raydium-readonly-provider-adapter.mjs
+      - run: node --check scripts/regression-orca-raydium-shadow-runtime.mjs
+      - run: node --check scripts/regression-orca-raydium-shadow-qualification-runtime.mjs
       - run: node --check scripts/regression-orca-whirlpool-readonly-provider.mjs
       - run: node --check scripts/regression-orca-whirlpool-rpc-quote-pool.mjs
+      - run: node --check scripts/regression-raydium-readonly-provider.mjs
+      - run: node --check scripts/regression-raydium-rpc-quote-pool.mjs
       - run: node scripts/regression-real-market-arbitrage-shadow.mjs
       - run: node scripts/regression-orca-raydium-arbitrage-scanner.mjs
       - run: node scripts/regression-orca-raydium-readonly-provider-adapter.mjs
+      - run: node scripts/regression-orca-raydium-shadow-runtime.mjs
+      - run: node scripts/regression-orca-raydium-shadow-qualification-runtime.mjs
       - run: node scripts/regression-orca-whirlpool-readonly-provider.mjs
       - run: node scripts/regression-orca-whirlpool-rpc-quote-pool.mjs
+      - run: node scripts/regression-raydium-readonly-provider.mjs
+      - run: node scripts/regression-raydium-rpc-quote-pool.mjs
       - run: npm install --prefix services/api --ignore-scripts --no-audit --no-fund
-      - name: Verify ORCA SDK dependencies resolve
+      - name: Verify market SDK dependencies resolve
         working-directory: services/api
-        run: node -e "Promise.all([import('@solana/kit'),import('@orca-so/whirlpools-client'),import('@orca-so/whirlpools-core'),import('@solana-program/token-2022')]).then(()=>console.log('orca sdk deps ok'))"
+        run: node -e "Promise.all([import('@solana/kit'),import('@orca-so/whirlpools-client'),import('@orca-so/whirlpools-core'),import('@solana-program/token-2022'),import('@raydium-io/raydium-sdk-v2'),import('@solana/web3.js'),import('bn.js')]).then(()=>console.log('market sdk deps ok'))"
