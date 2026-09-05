@@ -24,6 +24,17 @@ function requiredBps(value, code) {
   return numeric;
 }
 
+function verifiedInstructionContext(quote) {
+  const context = quote?.instruction_context;
+  if (!context || typeof context !== 'object' || context.verified !== true) {
+    throw new Error('orca_onchain_instruction_context_required');
+  }
+  if (context.read_only !== true || context.live_execution_authorized === true || context.private_key_present === true || context.signature_present === true) {
+    throw new Error('orca_onchain_instruction_context_boundary_invalid');
+  }
+  return context;
+}
+
 async function fetchJson(fetchImpl, url, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -94,8 +105,12 @@ export function createOrcaWhirlpoolReadOnlyQuoteLoader({
 
       const observedAt = text(quote.observed_at, 'orca_onchain_observed_at_required');
       if (!Number.isFinite(Date.parse(observedAt))) throw new Error('orca_onchain_observed_at_invalid');
+      const observedSlot = Number(quote.observed_slot);
+      if (!Number.isSafeInteger(observedSlot) || observedSlot <= 0) throw new Error('orca_onchain_observed_slot_required');
       const quoteSource = text(quote.quote_source, 'orca_onchain_quote_source_required');
       if (!quoteSource.toUpperCase().includes('ORCA')) throw new Error('orca_onchain_quote_source_invalid');
+      const instructionContext = verifiedInstructionContext(quote);
+      if (Number(instructionContext.source_slot) !== observedSlot) throw new Error('orca_onchain_instruction_slot_mismatch');
 
       rows.push(Object.freeze({
         dex_id: 'orca',
@@ -112,7 +127,9 @@ export function createOrcaWhirlpoolReadOnlyQuoteLoader({
         quote_source: quoteSource,
         quote_verified: true,
         costs_verified: true,
-        observed_at: new Date(Date.parse(observedAt)).toISOString()
+        observed_at: new Date(Date.parse(observedAt)).toISOString(),
+        observed_slot: observedSlot,
+        instruction_context: instructionContext
       }));
     }
 
