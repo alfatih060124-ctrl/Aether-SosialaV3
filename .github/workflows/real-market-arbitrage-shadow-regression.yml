@@ -4,9 +4,13 @@ on:
   pull_request:
     paths:
       - 'services/api/src/real-market-arbitrage-shadow.mjs'
+      - 'services/api/src/orca-raydium-arbitrage-scanner.mjs'
+      - 'services/api/src/orca-raydium-readonly-provider-adapter.mjs'
       - 'services/api/src/demo-autotrade-ledger.mjs'
       - 'services/api/src/signal-intelligence.mjs'
       - 'scripts/regression-real-market-arbitrage-shadow.mjs'
+      - 'scripts/regression-orca-raydium-arbitrage-scanner.mjs'
+      - 'scripts/regression-orca-raydium-readonly-provider-adapter.mjs'
       - '.github/workflows/real-market-arbitrage-shadow-regression.yml'
 
 permissions:
@@ -22,6 +26,12 @@ jobs:
         with:
           node-version: '20'
       - run: node --check services/api/src/real-market-arbitrage-shadow.mjs
+      - run: node --check services/api/src/orca-raydium-arbitrage-scanner.mjs
+      - run: node --check services/api/src/orca-raydium-readonly-provider-adapter.mjs
       - run: node --check services/api/src/demo-autotrade-ledger.mjs
       - run: node --check scripts/regression-real-market-arbitrage-shadow.mjs
+      - run: node --check scripts/regression-orca-raydium-arbitrage-scanner.mjs
+      - run: node --check scripts/regression-orca-raydium-readonly-provider-adapter.mjs
       - run: node scripts/regression-real-market-arbitrage-shadow.mjs
+      - run: node scripts/regression-orca-raydium-arbitrage-scanner.mjs
+      - run: node scripts/regression-orca-raydium-readonly-provider-adapter.mjs
