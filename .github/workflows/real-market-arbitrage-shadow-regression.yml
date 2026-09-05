@@ -20,6 +20,7 @@ on:
       - 'scripts/regression-orca-raydium-readonly-provider-adapter.mjs'
       - 'scripts/regression-orca-raydium-shadow-runtime.mjs'
       - 'scripts/regression-orca-raydium-shadow-qualification-runtime.mjs'
+      - 'scripts/regression-orca-raydium-shadow-core-wiring-safety.mjs'
       - 'scripts/regression-orca-whirlpool-readonly-provider.mjs'
       - 'scripts/regression-orca-whirlpool-rpc-quote-pool.mjs'
       - 'scripts/regression-raydium-readonly-provider.mjs'
@@ -53,6 +54,7 @@ jobs:
       - run: node --check scripts/regression-orca-raydium-readonly-provider-adapter.mjs
       - run: node --check scripts/regression-orca-raydium-shadow-runtime.mjs
       - run: node --check scripts/regression-orca-raydium-shadow-qualification-runtime.mjs
+      - run: node --check scripts/regression-orca-raydium-shadow-core-wiring-safety.mjs
       - run: node --check scripts/regression-orca-whirlpool-readonly-provider.mjs
       - run: node --check scripts/regression-orca-whirlpool-rpc-quote-pool.mjs
       - run: node --check scripts/regression-raydium-readonly-provider.mjs
@@ -62,6 +64,7 @@ jobs:
       - run: node scripts/regression-orca-raydium-readonly-provider-adapter.mjs
       - run: node scripts/regression-orca-raydium-shadow-runtime.mjs
       - run: node scripts/regression-orca-raydium-shadow-qualification-runtime.mjs
+      - run: node scripts/regression-orca-raydium-shadow-core-wiring-safety.mjs
       - run: node scripts/regression-orca-whirlpool-readonly-provider.mjs
       - run: node scripts/regression-orca-whirlpool-rpc-quote-pool.mjs
       - run: node scripts/regression-raydium-readonly-provider.mjs
