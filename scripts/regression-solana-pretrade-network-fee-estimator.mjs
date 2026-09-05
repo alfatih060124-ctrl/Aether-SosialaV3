@@ -8,11 +8,22 @@ function build(overrides = {}) {
   return createSolanaPretradeNetworkFeeEstimator({
     now: () => NOW,
     maxEvidenceAgeMs: 15_000,
-    loadUnsignedMessageEvidence: async () => ({ verified: true, message_base64: 'dW5zaWduZWQ=', source_reference: 'message:two-leg', observed_at: observed, signed: false, signer_requested: false }),
-    getFeeForMessage: async () => ({ verified: true, base_fee_lamports: 5000, source_slot: 123, source_reference: 'rpc:getFeeForMessage@123', observed_at: observed }),
-    simulateUnsignedTransaction: async () => ({ verified: true, compute_units_consumed: 300000, source_slot: 123, source_reference: 'rpc:simulateTransaction@123', observed_at: observed }),
-    loadPriorityFeeEvidence: async () => ({ verified: true, micro_lamports_per_compute_unit: 1000, source_slot: 123, source_reference: 'rpc:getRecentPrioritizationFees@123', observed_at: observed }),
-    loadCurrentSolUsdEvidence: async () => ({ verified: true, sol_usd: 200, source_slot: 123, source_reference: 'price:SOLUSD@123', observed_at: observed }),
+    loadUnsignedMessageEvidence: async () => ({
+      verified: true,
+      message_base64: 'bWVzc2FnZQ==',
+      transaction_base64: 'dHJhbnNhY3Rpb24=',
+      source_reference: 'message:two-leg',
+      source_slot: 123,
+      observed_at: observed,
+      signed: false,
+      transaction_signed: false,
+      signer_requested: false,
+      account_keys: ['acct-1', 'acct-2']
+    }),
+    getFeeForMessage: async ({ source_slot }) => ({ verified: true, base_fee_lamports: 5000, source_slot, source_reference: `rpc:getFeeForMessage@${source_slot}`, observed_at: observed }),
+    simulateUnsignedTransaction: async ({ source_slot }) => ({ verified: true, compute_units_consumed: 300000, source_slot, source_reference: `rpc:simulateTransaction@${source_slot}`, observed_at: observed }),
+    loadPriorityFeeEvidence: async ({ source_slot }) => ({ verified: true, micro_lamports_per_compute_unit: 1000, source_slot, source_reference: `rpc:getRecentPrioritizationFees@${source_slot}`, observed_at: observed }),
+    loadCurrentSolUsdEvidence: async ({ source_slot }) => ({ verified: true, sol_usd: 200, source_slot, source_reference: `price:SOLUSD@${source_slot}`, observed_at: observed }),
     ...overrides
   });
 }
@@ -26,29 +37,16 @@ assert.equal(result.priority_fee_lamports, 300);
 assert.equal(result.total_roundtrip_fee_lamports, 5300);
 assert.equal(result.network_fee_usdc, 0.00106);
 assert.equal(result.source_slot, 123);
+assert.equal(result.message_source_slot, 123);
 assert.equal(result.transaction_signed, false);
 assert.equal(result.signer_requested, false);
 assert.equal(result.network_submission_authorized, false);
 assert.equal(result.live_execution_authorized, false);
 
-await assert.rejects(
-  build({ getFeeForMessage: async () => ({ verified: false }) }).estimate(),
-  /pretrade_base_fee_evidence_required_unverified/
-);
-
-await assert.rejects(
-  build({ simulateUnsignedTransaction: async () => ({ verified: true, compute_units_consumed: 300000, source_slot: 124, source_reference: 'sim@124', observed_at: observed }) }).estimate(),
-  /pretrade_simulation_slot_mismatch/
-);
-
-await assert.rejects(
-  build({ loadPriorityFeeEvidence: async () => ({ verified: true, micro_lamports_per_compute_unit: 1000, source_slot: 123, source_reference: 'priority@123', observed_at: '2026-09-05T16:44:00.000Z' }) }).estimate(),
-  /pretrade_priority_observed_at_stale/
-);
-
-await assert.rejects(
-  build({ loadUnsignedMessageEvidence: async () => ({ verified: true, message_base64: 'dW5zaWduZWQ=', source_reference: 'message:bad', observed_at: observed, signed: true }) }).estimate(),
-  /pretrade_unsigned_message_boundary_violation/
-);
+await assert.rejects(build({ getFeeForMessage: async () => ({ verified: false }) }).estimate(), /pretrade_base_fee_evidence_required_unverified/);
+await assert.rejects(build({ simulateUnsignedTransaction: async () => ({ verified: true, compute_units_consumed: 300000, source_slot: 122, source_reference: 'sim@122', observed_at: observed }) }).estimate(), /pretrade_simulation_slot_before_message/);
+await assert.rejects(build({ loadPriorityFeeEvidence: async () => ({ verified: true, micro_lamports_per_compute_unit: 1000, source_slot: 123, source_reference: 'priority@123', observed_at: '2026-09-05T16:44:00.000Z' }) }).estimate(), /pretrade_priority_observed_at_stale/);
+await assert.rejects(build({ loadUnsignedMessageEvidence: async () => ({ verified: true, message_base64: 'bWVzc2FnZQ==', transaction_base64: 'dHJhbnNhY3Rpb24=', source_reference: 'message:bad', source_slot: 123, observed_at: observed, transaction_signed: true }) }).estimate(), /pretrade_unsigned_message_boundary_violation/);
+await assert.rejects(build({ loadUnsignedMessageEvidence: async () => ({ verified: true, message_base64: 'bWVzc2FnZQ==', source_reference: 'message:missing-tx', source_slot: 123, observed_at: observed }) }).estimate(), /pretrade_transaction_base64_required/);
 
 console.log('solana pretrade network fee estimator regression ok');
