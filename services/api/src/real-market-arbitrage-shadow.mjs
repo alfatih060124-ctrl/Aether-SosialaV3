@@ -16,19 +16,30 @@ function assertRoute(route, side) {
   if (!dexId) throw new Error(`${side}_dex_required`);
   if (!ALLOWED_DEXES.has(dexId)) throw new Error(`${side}_dex_not_allowed`);
   if (route.quote_verified !== true) throw new Error(`${side}_quote_unverified`);
+  if (!String(route.quote_source || '').trim()) throw new Error(`${side}_quote_source_required`);
+
+  const feeBps = finite(route.fee_bps);
+  if (feeBps === null) throw new Error(`${side}_fee_bps_required`);
+  if (feeBps < 0 || feeBps > 10000) throw new Error(`${side}_fee_bps_invalid`);
+
+  const priceImpactBps = finite(route.price_impact_bps);
+  if (priceImpactBps === null) throw new Error(`${side}_price_impact_bps_required`);
+  if (priceImpactBps < 0 || priceImpactBps > 10000) throw new Error(`${side}_price_impact_bps_invalid`);
+
   return {
     pool_address: String(route.pool_address),
     dex_id: dexId,
     price_usd: price,
-    fee_bps: clamp(finite(route.fee_bps, 0), 0, 10000),
-    price_impact_bps: clamp(finite(route.price_impact_bps, 0), 0, 10000),
+    fee_bps: feeBps,
+    price_impact_bps: priceImpactBps,
     liquidity_usd: finite(route.liquidity_usd, null),
-    quote_source: String(route.quote_source || 'UNKNOWN'),
-    quote_verified: true
+    quote_source: String(route.quote_source),
+    quote_verified: true,
+    route_costs_verified: true
   };
 }
 
-export function simulateTwoLegArbitrage({ notional_usdc, buy_route, sell_route, network_fee_usdc = 0 }) {
+export function simulateTwoLegArbitrage({ notional_usdc, buy_route, sell_route, network_fee_usdc, network_fee_verified = false }) {
   const notional = finite(notional_usdc);
   if (!(notional > 0)) throw new Error('arbitrage_notional_required');
   const buy = assertRoute(buy_route, 'buy');
@@ -39,13 +50,17 @@ export function simulateTwoLegArbitrage({ notional_usdc, buy_route, sell_route, 
     throw new Error('arbitrage_orca_raydium_pair_required');
   }
 
+  const networkFee = finite(network_fee_usdc);
+  if (networkFee === null) throw new Error('network_fee_usdc_required');
+  if (networkFee < 0 || networkFee > notional) throw new Error('network_fee_usdc_invalid');
+  if (network_fee_verified !== true) throw new Error('network_fee_unverified');
+
   const buyCostFactor = 1 - (buy.fee_bps + buy.price_impact_bps) / 10000;
   const sellCostFactor = 1 - (sell.fee_bps + sell.price_impact_bps) / 10000;
   if (!(buyCostFactor > 0) || !(sellCostFactor > 0)) throw new Error('arbitrage_route_cost_invalid');
 
   const tokenOut = (notional * buyCostFactor) / buy.price_usd;
   const grossSellUsdc = tokenOut * sell.price_usd;
-  const networkFee = clamp(finite(network_fee_usdc, 0), 0, notional);
   const finalUsdc = Math.max(0, grossSellUsdc * sellCostFactor - networkFee);
   const grossEdgeBps = ((sell.price_usd / buy.price_usd) - 1) * 10000;
   const netEdgeBps = ((finalUsdc / notional) - 1) * 10000;
@@ -65,7 +80,10 @@ export function simulateTwoLegArbitrage({ notional_usdc, buy_route, sell_route, 
       sell_fee_bps: sell.fee_bps,
       sell_price_impact_bps: sell.price_impact_bps,
       network_fee_usdc: round8(networkFee),
-      costs_verified: true
+      buy_route_costs_verified: buy.route_costs_verified,
+      sell_route_costs_verified: sell.route_costs_verified,
+      network_fee_verified: true,
+      costs_verified: buy.route_costs_verified === true && sell.route_costs_verified === true && network_fee_verified === true
     }),
     buy_route: Object.freeze(buy),
     sell_route: Object.freeze(sell)
@@ -78,7 +96,8 @@ export function evaluateRealMarketArbitrageShadow({ opportunity = {}, notional_u
     notional_usdc,
     buy_route: opportunity.buy_route,
     sell_route: opportunity.sell_route,
-    network_fee_usdc: opportunity.network_fee_usdc
+    network_fee_usdc: opportunity.network_fee_usdc,
+    network_fee_verified: opportunity.network_fee_verified
   });
 
   const liquidityValues = [simulation.buy_route.liquidity_usd, simulation.sell_route.liquidity_usd].filter(Number.isFinite);
@@ -91,7 +110,7 @@ export function evaluateRealMarketArbitrageShadow({ opportunity = {}, notional_u
     spread_bps: risk_evidence.spread_bps,
     estimated_price_impact_bps: simulation.buy_route.price_impact_bps + simulation.sell_route.price_impact_bps,
     expected_net_edge_bps: simulation.net_edge_bps,
-    net_edge_costs_included: true,
+    net_edge_costs_included: simulation.cost_breakdown.costs_verified === true,
     top10_holder_pct: risk_evidence.top10_holder_pct,
     token_age_hours: risk_evidence.token_age_hours,
     route_count: risk_evidence.route_count,
