@@ -55,8 +55,8 @@ assert.equal(price.sol_usd, 200);
 assert.equal(price.source_slot, 502);
 assert.deepEqual(calls, ['getFeeForMessage', 'simulateTransaction', 'getRecentPrioritizationFees']);
 
-await assert.rejects(
-  createSolanaPretradeRpcEvidenceProvider({ rpcUrl: 'http://insecure.test', fetchImpl, loadCurrentSolUsdPrice: async () => ({}) }),
+assert.throws(
+  () => createSolanaPretradeRpcEvidenceProvider({ rpcUrl: 'http://insecure.test', fetchImpl, loadCurrentSolUsdPrice: async () => ({}) }),
   /pretrade_rpc_https_required/
 );
 
