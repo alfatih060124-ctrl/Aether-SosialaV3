@@ -6,6 +6,11 @@ const SIGNATURE_BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,100}$/;
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const CONFIRMATION_STATUSES = new Set(['processed', 'confirmed', 'finalized']);
 const QUERY_COMMITMENTS = new Set(['confirmed', 'finalized']);
+const FINALITY_RANK = new Map([
+  ['processed', 0],
+  ['confirmed', 1],
+  ['finalized', 2]
+]);
 
 function decodedBase58ByteLength(value) {
   let decoded = 0n;
@@ -61,6 +66,13 @@ function normalizeCommitment(value) {
   return commitment;
 }
 
+function assertConfirmationMeetsCommitment(status, commitment) {
+  if (status === null) return;
+  if (FINALITY_RANK.get(status) < FINALITY_RANK.get(commitment)) {
+    throw new Error('rpc_confirmation_below_commitment');
+  }
+}
+
 function normalizeEndpointLabel(value) {
   if (value === null || value === undefined || value === '') return 'solana-rpc';
   if (typeof value !== 'string') throw new Error('invalid_rpc_endpoint_label');
@@ -111,19 +123,22 @@ function canonicalJsonValue(value) {
   return normalized;
 }
 
-function canonicalSignatures(rows = []) {
+function canonicalSignatures(rows = [], commitment = 'finalized') {
   if (!Array.isArray(rows)) throw new Error('invalid_rpc_signature_response');
+  const normalizedCommitment = normalizeCommitment(commitment);
   const deduped = new Map();
   for (const row of rows) {
     const signature = assertSignature(row?.signature);
     const rawBlockTime = row?.blockTime ?? row?.block_time;
     const rawConfirmationStatus = row?.confirmationStatus ?? row?.confirmation_status;
+    const confirmationStatus = normalizeConfirmationStatus(rawConfirmationStatus);
+    assertConfirmationMeetsCommitment(confirmationStatus, normalizedCommitment);
     const normalized = {
       signature,
       slot: normalizeSlot(row?.slot),
       block_time: normalizeBlockTime(rawBlockTime),
       err: canonicalJsonValue(row?.err ?? null),
-      confirmation_status: normalizeConfirmationStatus(rawConfirmationStatus)
+      confirmation_status: confirmationStatus
     };
     const existing = deduped.get(signature);
     if (!existing) {
@@ -153,12 +168,12 @@ export function buildSolanaRpcProvenance({
   commitment = 'finalized'
 }) {
   const wallet = assertWallet(walletAddress);
-  const canonical = canonicalSignatures(signatures);
+  const normalizedCommitment = normalizeCommitment(commitment);
+  const canonical = canonicalSignatures(signatures, normalizedCommitment);
   const normalizedEndpointLabel = normalizeEndpointLabel(endpointLabel);
   const collection = normalizeCollectionMetadata({ pagesFetched, pageSize, maxPages, collectionComplete });
-  const normalizedCommitment = normalizeCommitment(commitment);
   const sourceHash = crypto.createHash('sha256').update(JSON.stringify({
-    v: 8,
+    v: 9,
     wallet,
     source: {
       type: 'SOLANA_RPC',
@@ -169,7 +184,7 @@ export function buildSolanaRpcProvenance({
     collection
   })).digest('hex');
   return {
-    schema_version: 8,
+    schema_version: 9,
     source_type: 'SOLANA_RPC',
     wallet_address: wallet,
     rpc_endpoint_label: normalizedEndpointLabel,
@@ -257,7 +272,7 @@ export async function collectSolanaRpcEvidence({
     before = nextBefore;
   }
 
-  const signatures = canonicalSignatures(rows);
+  const signatures = canonicalSignatures(rows, normalizedCommitment);
   const provenance = buildSolanaRpcProvenance({
     walletAddress: wallet,
     signatures,
