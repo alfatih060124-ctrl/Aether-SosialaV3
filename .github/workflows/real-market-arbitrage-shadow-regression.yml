@@ -14,6 +14,7 @@ on:
       - 'services/api/src/solana-pretrade-network-fee-estimator.mjs'
       - 'services/api/src/solana-pretrade-rpc-evidence-provider.mjs'
       - 'services/api/src/orca-raydium-unsigned-message-evidence-builder.mjs'
+      - 'services/api/src/solana-unsigned-message-compiler.mjs'
       - 'services/api/src/orca-whirlpool-readonly-provider.mjs'
       - 'services/api/src/orca-whirlpool-rpc-quote-pool.mjs'
       - 'services/api/src/raydium-readonly-provider.mjs'
@@ -31,6 +32,7 @@ on:
       - 'scripts/regression-solana-pretrade-network-fee-estimator.mjs'
       - 'scripts/regression-solana-pretrade-rpc-evidence-provider.mjs'
       - 'scripts/regression-orca-raydium-unsigned-message-evidence-builder.mjs'
+      - 'scripts/regression-solana-unsigned-message-compiler.mjs'
       - 'scripts/regression-orca-whirlpool-readonly-provider.mjs'
       - 'scripts/regression-orca-whirlpool-rpc-quote-pool.mjs'
       - '.github/workflows/real-market-arbitrage-shadow-regression.yml'
@@ -57,6 +59,7 @@ jobs:
       - run: node --check services/api/src/solana-pretrade-network-fee-estimator.mjs
       - run: node --check services/api/src/solana-pretrade-rpc-evidence-provider.mjs
       - run: node --check services/api/src/orca-raydium-unsigned-message-evidence-builder.mjs
+      - run: node --check services/api/src/solana-unsigned-message-compiler.mjs
       - run: node --check services/api/src/orca-whirlpool-readonly-provider.mjs
       - run: node --check services/api/src/orca-whirlpool-rpc-quote-pool.mjs
       - run: node --check services/api/src/raydium-readonly-provider.mjs
@@ -73,8 +76,10 @@ jobs:
       - run: node --check scripts/regression-solana-pretrade-network-fee-estimator.mjs
       - run: node --check scripts/regression-solana-pretrade-rpc-evidence-provider.mjs
       - run: node --check scripts/regression-orca-raydium-unsigned-message-evidence-builder.mjs
+      - run: node --check scripts/regression-solana-unsigned-message-compiler.mjs
       - run: node --check scripts/regression-orca-whirlpool-readonly-provider.mjs
       - run: node --check scripts/regression-orca-whirlpool-rpc-quote-pool.mjs
+      - run: npm install --prefix services/api --ignore-scripts --no-audit --no-fund
       - run: node scripts/regression-real-market-arbitrage-shadow.mjs
       - run: node scripts/regression-orca-raydium-arbitrage-scanner.mjs
       - run: node scripts/regression-orca-raydium-readonly-provider-adapter.mjs
@@ -85,9 +90,9 @@ jobs:
       - run: node scripts/regression-solana-pretrade-network-fee-estimator.mjs
       - run: node scripts/regression-solana-pretrade-rpc-evidence-provider.mjs
       - run: node scripts/regression-orca-raydium-unsigned-message-evidence-builder.mjs
+      - run: node scripts/regression-solana-unsigned-message-compiler.mjs
       - run: node scripts/regression-orca-whirlpool-readonly-provider.mjs
       - run: node scripts/regression-orca-whirlpool-rpc-quote-pool.mjs
-      - run: npm install --prefix services/api --ignore-scripts --no-audit --no-fund
       - name: Verify ORCA and Raydium SDK dependencies resolve
         working-directory: services/api
         run: node -e "Promise.all([import('@solana/kit'),import('@orca-so/whirlpools-client'),import('@orca-so/whirlpools-core'),import('@solana-program/token-2022'),import('@raydium-io/raydium-sdk-v2'),import('@solana/web3.js'),import('bn.js')]).then(()=>console.log('orca raydium sdk deps ok'))"
