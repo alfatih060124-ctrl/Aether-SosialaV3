@@ -15,6 +15,7 @@ on:
       - 'services/api/src/solana-pretrade-network-fee-estimator.mjs'
       - 'services/api/src/solana-pretrade-rpc-evidence-provider.mjs'
       - 'services/api/src/solana-pretrade-fee-pipeline.mjs'
+      - 'services/api/src/solana-onchain-sol-usd-evidence-loader.mjs'
       - 'services/api/src/orca-raydium-unsigned-message-evidence-builder.mjs'
       - 'services/api/src/solana-unsigned-message-compiler.mjs'
       - 'services/api/src/orca-whirlpool-readonly-provider.mjs'
@@ -35,6 +36,7 @@ on:
       - 'scripts/regression-solana-pretrade-network-fee-estimator.mjs'
       - 'scripts/regression-solana-pretrade-rpc-evidence-provider.mjs'
       - 'scripts/regression-solana-pretrade-fee-pipeline.mjs'
+      - 'scripts/regression-solana-onchain-sol-usd-evidence-loader.mjs'
       - 'scripts/regression-orca-raydium-unsigned-message-evidence-builder.mjs'
       - 'scripts/regression-solana-unsigned-message-compiler.mjs'
       - 'scripts/regression-orca-whirlpool-readonly-provider.mjs'
@@ -64,6 +66,7 @@ jobs:
       - run: node --check services/api/src/solana-pretrade-network-fee-estimator.mjs
       - run: node --check services/api/src/solana-pretrade-rpc-evidence-provider.mjs
       - run: node --check services/api/src/solana-pretrade-fee-pipeline.mjs
+      - run: node --check services/api/src/solana-onchain-sol-usd-evidence-loader.mjs
       - run: node --check services/api/src/orca-raydium-unsigned-message-evidence-builder.mjs
       - run: node --check services/api/src/solana-unsigned-message-compiler.mjs
       - run: node --check services/api/src/orca-whirlpool-readonly-provider.mjs
@@ -83,6 +86,7 @@ jobs:
       - run: node --check scripts/regression-solana-pretrade-network-fee-estimator.mjs
       - run: node --check scripts/regression-solana-pretrade-rpc-evidence-provider.mjs
       - run: node --check scripts/regression-solana-pretrade-fee-pipeline.mjs
+      - run: node --check scripts/regression-solana-onchain-sol-usd-evidence-loader.mjs
       - run: node --check scripts/regression-orca-raydium-unsigned-message-evidence-builder.mjs
       - run: node --check scripts/regression-solana-unsigned-message-compiler.mjs
       - run: node --check scripts/regression-orca-whirlpool-readonly-provider.mjs
@@ -99,6 +103,7 @@ jobs:
       - run: node scripts/regression-solana-pretrade-network-fee-estimator.mjs
       - run: node scripts/regression-solana-pretrade-rpc-evidence-provider.mjs
       - run: node scripts/regression-solana-pretrade-fee-pipeline.mjs
+      - run: node scripts/regression-solana-onchain-sol-usd-evidence-loader.mjs
       - run: node scripts/regression-orca-raydium-unsigned-message-evidence-builder.mjs
       - run: node scripts/regression-solana-unsigned-message-compiler.mjs
       - run: node scripts/regression-orca-whirlpool-readonly-provider.mjs
