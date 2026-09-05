@@ -44,13 +44,24 @@ const tokenSource = overrides => async context => ({
   risk_flags: [],
   ...overrides
 });
-
-const collector = createOrcaRaydiumShadowRiskEvidenceCollector({
-  loadMarketRiskSource: marketSource(),
-  loadTokenRiskSource: tokenSource(),
-  now: () => nowMs,
-  maxEvidenceAgeMs: 5_000
+const sellSimulationSource = overrides => async context => ({
+  verified: true,
+  source: 'SOLANA_UNSIGNED_SELL_SIMULATION',
+  source_reference: `sell-sim:${context.token_mint}`,
+  observed_at: observedAt,
+  sell_simulation_ok: true,
+  ...overrides
 });
+
+const makeCollector = ({ market = {}, token = {}, sell = {}, maxEvidenceAgeMs = 5_000 } = {}) => createOrcaRaydiumShadowRiskEvidenceCollector({
+  loadMarketRiskSource: marketSource(market),
+  loadTokenRiskSource: tokenSource(token),
+  loadSellSimulationSource: sellSimulationSource(sell),
+  now: () => nowMs,
+  maxEvidenceAgeMs
+});
+
+const collector = makeCollector();
 const evidence = await collector.loadRiskEvidence({ opportunity, notional_usdc: 100 });
 assert.equal(evidence.verified, true);
 assert.equal(evidence.data.liquidity_usd, 800_000);
@@ -61,29 +72,34 @@ assert.equal(evidence.data.sell_simulation_ok, true);
 assert.equal(evidence.data.transferable, true);
 assert.equal(evidence.live_execution_authorized, false);
 assert.equal(ORCA_RAYDIUM_SHADOW_RISK_EVIDENCE_COLLECTOR.verified_token_source_required, true);
+assert.equal(ORCA_RAYDIUM_SHADOW_RISK_EVIDENCE_COLLECTOR.verified_sell_simulation_source_required, true);
 
-const staleCollector = createOrcaRaydiumShadowRiskEvidenceCollector({
-  loadMarketRiskSource: marketSource({ observed_at: new Date(nowMs - 60_000).toISOString() }),
-  loadTokenRiskSource: tokenSource(),
-  now: () => nowMs,
-  maxEvidenceAgeMs: 5_000
-});
-await assert.rejects(() => staleCollector.loadRiskEvidence({ opportunity }), /shadow_market_risk_source_observed_at_stale/);
-
-const unverifiedToken = createOrcaRaydiumShadowRiskEvidenceCollector({
-  loadMarketRiskSource: marketSource(),
-  loadTokenRiskSource: tokenSource({ verified: false }),
-  now: () => nowMs
-});
-await assert.rejects(() => unverifiedToken.loadRiskEvidence({ opportunity }), /shadow_token_risk_source_unverified/);
-
-const badRouteCollector = createOrcaRaydiumShadowRiskEvidenceCollector({
-  loadMarketRiskSource: marketSource(),
-  loadTokenRiskSource: tokenSource(),
-  now: () => nowMs
-});
 await assert.rejects(
-  () => badRouteCollector.loadRiskEvidence({ opportunity: { ...opportunity, sell_route: { ...opportunity.sell_route, costs_verified: false } } }),
+  () => makeCollector({ market: { observed_at: new Date(nowMs - 60_000).toISOString() } }).loadRiskEvidence({ opportunity }),
+  /shadow_market_risk_source_observed_at_stale/
+);
+await assert.rejects(
+  () => makeCollector({ token: { verified: false } }).loadRiskEvidence({ opportunity }),
+  /shadow_token_risk_source_unverified/
+);
+await assert.rejects(
+  () => makeCollector({ sell: { verified: false } }).loadRiskEvidence({ opportunity }),
+  /shadow_sell_simulation_source_unverified/
+);
+await assert.rejects(
+  () => makeCollector({ sell: { sell_simulation_ok: false } }).loadRiskEvidence({ opportunity }),
+  /shadow_sell_simulation_not_verified/
+);
+await assert.rejects(
+  () => makeCollector({ token: { top10_holder_pct: null } }).loadRiskEvidence({ opportunity }),
+  /shadow_holder_top10_required/
+);
+await assert.rejects(
+  () => makeCollector({ market: { volatility_1h_bps: '   ' } }).loadRiskEvidence({ opportunity }),
+  /shadow_market_volatility_required/
+);
+await assert.rejects(
+  () => makeCollector().loadRiskEvidence({ opportunity: { ...opportunity, sell_route: { ...opportunity.sell_route, costs_verified: false } } }),
   /shadow_risk_route_costs_unverified/
 );
 
