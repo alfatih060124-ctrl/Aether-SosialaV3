@@ -2,7 +2,12 @@ const ALLOWED_DEXES = Object.freeze(new Set(['orca', 'raydium']));
 const DEFAULT_CACHE_TTL_MS = 5_000;
 const DEFAULT_MAX_MARKET_AGE_MS = 5_000;
 
-const finite = value => Number.isFinite(Number(value)) ? Number(value) : null;
+const finite = value => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' && !value.trim()) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
 const normalizeDex = value => String(value || '').trim().toLowerCase();
 const normalizeMint = value => String(value || '').trim();
 
@@ -66,7 +71,7 @@ function compareDirection(buy, sell) {
     buy_route: buy,
     sell_route: sell,
     market_source: 'ORCA_RAYDIUM_REAL_MARKET',
-    observed_at: buy.observed_at > sell.observed_at ? buy.observed_at : sell.observed_at,
+    observed_at: buy.observed_at < sell.observed_at ? buy.observed_at : sell.observed_at,
     strategy: 'TWO_LEG_ARBITRAGE',
     execution_ready: false,
     live_execution_authorized: false
@@ -87,6 +92,7 @@ export function createOrcaRaydiumArbitrageScanner({
     const pairKey = keyForPair(tokenMint, quoteMint);
     const cached = cache.get(pairKey);
     if (cached && timestamp < cached.expires_at) return cached.value;
+    if (cached) cache.delete(pairKey);
 
     const rows = await loadPools({ token_mint: tokenMint, quote_mint: quoteMint, dexes: ['orca', 'raydium'] });
     if (!Array.isArray(rows)) throw new Error('scanner_provider_payload_invalid');
@@ -112,7 +118,9 @@ export function createOrcaRaydiumArbitrageScanner({
       execution_ready: false,
       live_execution_authorized: false
     });
-    cache.set(pairKey, { value, expires_at: timestamp + Math.max(1, Number(cacheTtlMs) || DEFAULT_CACHE_TTL_MS) });
+    const ttlMs = Math.max(1, finite(cacheTtlMs) || DEFAULT_CACHE_TTL_MS);
+    const freshnessDeadline = Math.min(...normalized.map(pool => Date.parse(pool.observed_at) + maxMarketAgeMs));
+    cache.set(pairKey, { value, expires_at: Math.min(timestamp + ttlMs, freshnessDeadline) });
     return value;
   }
 
