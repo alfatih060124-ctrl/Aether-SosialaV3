@@ -5,8 +5,25 @@ import {
 } from '../services/api/src/orca-raydium-shadow-runtime.mjs';
 
 const observedAt = new Date().toISOString();
+const observedSlot = 1;
 const tokenMint = 'TokenMint111111111111111111111111111111111';
 const quoteMint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+
+const instructionContext = dex => Object.freeze({
+  verified: true,
+  source: `${dex.toUpperCase()}_TEST_RPC`,
+  source_slot: observedSlot,
+  observed_at: observedAt,
+  pool_type: dex === 'raydium' ? 'CPMM' : undefined,
+  buy: Object.freeze({ test_only: true }),
+  sell: Object.freeze({ test_only: true }),
+  read_only: true,
+  private_key_present: false,
+  signature_present: false,
+  signer_requested: false,
+  network_submission_authorized: false,
+  live_execution_authorized: false
+});
 
 const poolQuote = dex => async request => ({
   buy_price_usd: dex === 'orca' ? 1 : 1.01,
@@ -20,8 +37,11 @@ const poolQuote = dex => async request => ({
   quote_verified: true,
   costs_verified: true,
   observed_at: observedAt,
-  observed_slot: 1,
+  observed_slot: observedSlot,
+  instruction_context: instructionContext(dex),
   pool_type: 'CPMM',
+  read_only: true,
+  live_execution_authorized: false,
   request
 });
 
@@ -54,6 +74,8 @@ assert.equal(scan.read_only, true);
 assert.equal(scan.live_execution_authorized, false);
 assert.equal(scan.pools.length, 2);
 assert.equal(scan.opportunities.length, 2);
+assert.equal(scan.opportunities[0].buy_route.instruction_context.verified, true);
+assert.equal(scan.opportunities[0].sell_route.instruction_context.source_slot, observedSlot);
 assert.equal(runtime.mode, 'SHADOW');
 assert.equal(runtime.execution_dispatched, false);
 assert.equal(runtime.transaction_created, false);
