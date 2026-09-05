@@ -59,15 +59,19 @@ await expectFail([
   pool({ dex_id: 'meteora', pool_address: 'other-pool' })
 ], /scanner_dex_not_allowed/);
 
-await expectFail([
-  pool({ dex_id: 'orca' }),
-  pool({ dex_id: 'raydium', pool_address: 'ray-pool', fee_bps: undefined })
-], /scanner_fee_bps_required/);
+for (const missingFee of [undefined, null, '', '   ']) {
+  await expectFail([
+    pool({ dex_id: 'orca' }),
+    pool({ dex_id: 'raydium', pool_address: 'ray-pool', fee_bps: missingFee })
+  ], /scanner_fee_bps_required/);
+}
 
-await expectFail([
-  pool({ dex_id: 'orca' }),
-  pool({ dex_id: 'raydium', pool_address: 'ray-pool', price_impact_bps: undefined })
-], /scanner_price_impact_bps_required/);
+for (const missingImpact of [undefined, null, '', '   ']) {
+  await expectFail([
+    pool({ dex_id: 'orca' }),
+    pool({ dex_id: 'raydium', pool_address: 'ray-pool', price_impact_bps: missingImpact })
+  ], /scanner_price_impact_bps_required/);
+}
 
 await expectFail([
   pool({ dex_id: 'orca' }),
@@ -92,5 +96,38 @@ await expectFail([
   pool({ dex_id: 'orca' }),
   pool({ dex_id: 'raydium', pool_address: 'ray-pool', token_mint: 'OTHER_TOKEN' })
 ], /scanner_pair_mismatch/);
+
+const olderObservedAt = '2026-09-05T07:59:58.500Z';
+const timestampScanner = createOrcaRaydiumArbitrageScanner({
+  now: () => nowMs,
+  loadPools: async () => [
+    pool({ dex_id: 'orca', pool_address: 'orca-older', observed_at: olderObservedAt, price_usd: 1 }),
+    pool({ dex_id: 'raydium', pool_address: 'ray-newer', observed_at: observedAt, price_usd: 1.01 })
+  ]
+});
+const timestampResult = await timestampScanner.scanPair({ token_mint: token, quote_mint: quote });
+assert.equal(timestampResult.opportunities[0].observed_at, olderObservedAt, 'opportunity freshness must use the older required leg');
+assert.equal(timestampResult.opportunities[1].observed_at, olderObservedAt, 'reverse opportunity freshness must use the older required leg');
+
+let cacheNow = Date.parse(observedAt) + 4900;
+let cacheCalls = 0;
+const cacheScanner = createOrcaRaydiumArbitrageScanner({
+  now: () => cacheNow,
+  cacheTtlMs: 5000,
+  maxMarketAgeMs: 5000,
+  loadPools: async () => {
+    cacheCalls += 1;
+    const refreshedObservedAt = cacheCalls === 1 ? observedAt : new Date(cacheNow).toISOString();
+    return [
+      pool({ dex_id: 'orca', pool_address: 'orca-cache', observed_at: refreshedObservedAt }),
+      pool({ dex_id: 'raydium', pool_address: 'ray-cache', observed_at: refreshedObservedAt, price_usd: 1.01 })
+    ];
+  }
+});
+await cacheScanner.scanPair({ token_mint: token, quote_mint: quote });
+assert.equal(cacheCalls, 1);
+cacheNow += 200;
+await cacheScanner.scanPair({ token_mint: token, quote_mint: quote });
+assert.equal(cacheCalls, 2, 'cache must expire at the oldest quote freshness deadline, not only cache TTL');
 
 console.log('orca-raydium arbitrage scanner regression: ok');
