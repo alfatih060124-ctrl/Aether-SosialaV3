@@ -9,6 +9,41 @@ export function demoEquity(account) {
   return round(cash + principal);
 }
 
+export function settleDemoArbitrage({ account, notionalUsdc, finalUsdc, performanceFeeBps = 1000 }) {
+  if (!account || typeof account !== 'object') throw new Error('demo_account_required');
+  const cashBefore = finite(account.cash_balance_usdc);
+  const open = account.open_position && typeof account.open_position === 'object' ? account.open_position : {};
+  if (finite(open.notional_usdc) > 0) throw new Error('arbitrage_open_position_not_allowed');
+  const notional = round(Math.max(0, Math.min(cashBefore, finite(notionalUsdc))));
+  if (!(notional > 0)) throw new Error('arbitrage_notional_unavailable');
+  const simulatedFinal = round(Math.max(0, finite(finalUsdc)));
+  const grossPnl = round(simulatedFinal - notional);
+  const feeBps = clampBps(performanceFeeBps);
+  const performanceFee = grossPnl > 0 ? round(grossPnl * feeBps / 10000) : 0;
+  const netPnl = round(grossPnl - performanceFee);
+  const cashAfter = round(cashBefore + netPnl);
+  const pnlBps = Math.round((netPnl / notional) * 10000);
+  return Object.freeze({
+    settlement_status: 'ARBITRAGE_CLOSED',
+    notional_usdc: notional,
+    gross_pnl_usdc: grossPnl,
+    performance_fee_usdc: performanceFee,
+    net_pnl_usdc: netPnl,
+    pnl_bps: pnlBps,
+    balance_before_usdc: round(cashBefore),
+    balance_after_usdc: cashAfter,
+    cash_balance_usdc: cashAfter,
+    open_position: Object.freeze({}),
+    trades_closed_delta: 1,
+    winning_trades_delta: netPnl > 0 ? 1 : 0,
+    losing_trades_delta: netPnl < 0 ? 1 : 0,
+    performance_fee_bps: feeBps,
+    mode: 'SHADOW',
+    strategy: 'TWO_LEG_ARBITRAGE',
+    live_execution_authorized: false
+  });
+}
+
 export function settleDemoAction({ account, engineAction, requestedAmountUsdc = 0, positionPnlBps = 0, performanceFeeBps = 1000, now = new Date().toISOString() }) {
   if (!account || typeof account !== 'object') throw new Error('demo_account_required');
   const action = String(engineAction || '').toUpperCase();

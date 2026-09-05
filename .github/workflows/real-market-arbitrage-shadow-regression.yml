@@ -1,0 +1,27 @@
+name: Real Market Arbitrage Shadow Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/real-market-arbitrage-shadow.mjs'
+      - 'services/api/src/demo-autotrade-ledger.mjs'
+      - 'services/api/src/signal-intelligence.mjs'
+      - 'scripts/regression-real-market-arbitrage-shadow.mjs'
+      - '.github/workflows/real-market-arbitrage-shadow-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check services/api/src/real-market-arbitrage-shadow.mjs
+      - run: node --check services/api/src/demo-autotrade-ledger.mjs
+      - run: node --check scripts/regression-real-market-arbitrage-shadow.mjs
+      - run: node scripts/regression-real-market-arbitrage-shadow.mjs
