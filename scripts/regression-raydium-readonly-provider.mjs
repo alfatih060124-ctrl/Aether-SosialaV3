@@ -4,6 +4,8 @@ import { createRaydiumReadOnlyQuoteLoader, RAYDIUM_READONLY_PROVIDER } from '../
 const token = 'TOKEN_MINT_TEST';
 const quote = 'USDC_MINT_TEST';
 const observedAt = '2026-09-05T14:00:00.000Z';
+const clmmProgram = 'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK';
+const cpmmProgram = 'CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C';
 let discoveryCalls = 0;
 let quoteCalls = 0;
 
@@ -22,10 +24,11 @@ const fetchImpl = async url => {
       return {
         success: true,
         data: {
-          count: 2,
+          count: 3,
           data: [
-            { id: 'raydium-pool-good', type: 'Concentrated', mintA: { address: token }, mintB: { address: quote }, tvl: '900000' },
-            { id: 'raydium-pool-other', mintA: { address: token }, mintB: { address: 'OTHER' } }
+            { id: 'raydium-pool-good', type: 'Concentrated', programId: clmmProgram, mintA: { address: token }, mintB: { address: quote }, tvl: '900000' },
+            { id: 'raydium-pool-unsupported', type: 'Standard', programId: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', mintA: { address: token }, mintB: { address: quote } },
+            { id: 'raydium-pool-other', programId: cpmmProgram, mintA: { address: token }, mintB: { address: 'OTHER' } }
           ]
         }
       };
@@ -41,7 +44,7 @@ const verifiedQuote = overrides => ({
   buy_price_impact_bps: 5,
   sell_price_impact_bps: 5,
   liquidity_usd: 900_000,
-  quote_source: 'RAYDIUM_ONCHAIN_RPC',
+  quote_source: 'RAYDIUM_ONCHAIN_RPC_CLMM_SLOT_123',
   quote_verified: true,
   costs_verified: true,
   observed_at: observedAt,
@@ -54,6 +57,8 @@ const loader = createRaydiumReadOnlyQuoteLoader({
   quotePool: async request => {
     quoteCalls += 1;
     assert.equal(request.pool_address, 'raydium-pool-good');
+    assert.equal(request.program_id, clmmProgram);
+    assert.equal(request.pool_type, 'CLMM');
     assert.equal(request.token_mint, token);
     assert.equal(request.quote_mint, quote);
     assert.equal(request.notional_usdc, 50);
@@ -70,11 +75,14 @@ assert.equal(quoteCalls, 1);
 assert.equal(rows.length, 1);
 assert.equal(rows[0].dex_id, 'raydium');
 assert.equal(rows[0].pool_address, 'raydium-pool-good');
+assert.equal(rows[0].program_id, clmmProgram);
+assert.equal(rows[0].pool_type, 'CLMM');
 assert.equal(rows[0].buy_price_usd, 1.004);
 assert.equal(rows[0].sell_price_usd, 1.002);
 assert.equal(rows[0].buy_fee_bps, 25);
 assert.equal(rows[0].quote_verified, true);
 assert.equal(rows[0].costs_verified, true);
+assert.deepEqual(RAYDIUM_READONLY_PROVIDER.supported_program_ids, [clmmProgram, cpmmProgram]);
 assert.equal(RAYDIUM_READONLY_PROVIDER.live_execution_authorized, false);
 
 await assert.rejects(
@@ -89,11 +97,22 @@ const noPair = createRaydiumReadOnlyQuoteLoader({
   fetchImpl: async () => ({
     ok: true,
     status: 200,
-    json: async () => ({ success: true, data: { data: [{ id: 'x', mintA: { address: token }, mintB: { address: 'OTHER' } }] } })
+    json: async () => ({ success: true, data: { data: [{ id: 'x', programId: clmmProgram, mintA: { address: token }, mintB: { address: 'OTHER' } }] } })
   }),
   quotePool: async () => ({})
 });
 await assert.rejects(noPair({ token_mint: token, quote_mint: quote, read_only: true, strategy: 'TWO_LEG_ARBITRAGE' }), /raydium_no_exact_pair_pools/);
+
+const unsupportedPair = createRaydiumReadOnlyQuoteLoader({
+  quoteNotionalUsdc: 50,
+  fetchImpl: async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true, data: { data: [{ id: 'amm-v4', programId: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', mintA: { address: token }, mintB: { address: quote } }] } })
+  }),
+  quotePool: async () => ({})
+});
+await assert.rejects(unsupportedPair({ token_mint: token, quote_mint: quote, read_only: true, strategy: 'TWO_LEG_ARBITRAGE' }), /raydium_no_supported_exact_pair_pools/);
 
 const unsuccessful = createRaydiumReadOnlyQuoteLoader({
   quoteNotionalUsdc: 50,
@@ -106,7 +125,7 @@ function onePoolFetch() {
   return async () => ({
     ok: true,
     status: 200,
-    json: async () => ({ success: true, data: { data: [{ id: 'p', mintA: { address: token }, mintB: { address: quote } }] } })
+    json: async () => ({ success: true, data: { data: [{ id: 'p', programId: clmmProgram, mintA: { address: token }, mintB: { address: quote } }] } })
   });
 }
 
