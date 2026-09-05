@@ -128,5 +128,7 @@ await expectQuoteFailure(verifiedQuote({ sell_price_impact_bps: '   ' }), /raydi
 await expectQuoteFailure(verifiedQuote({ buy_price_usd: null }), /raydium_onchain_buy_price_required/);
 await expectQuoteFailure(verifiedQuote({ sell_price_usd: '' }), /raydium_onchain_sell_price_required/);
 await expectQuoteFailure(verifiedQuote({ quote_source: 'OTHER_RPC' }), /raydium_onchain_quote_source_invalid/);
+await expectQuoteFailure(verifiedQuote({ quote_source: 'RAYDIUM_API_V3' }), /raydium_onchain_quote_source_invalid/);
+await expectQuoteFailure(verifiedQuote({ quote_source: 'NOT_RAYDIUM_ONCHAIN_RPC' }), /raydium_onchain_quote_source_invalid/);
 
 console.log('raydium readonly provider regression: ok');
