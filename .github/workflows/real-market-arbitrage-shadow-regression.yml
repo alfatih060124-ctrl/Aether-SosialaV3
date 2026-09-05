@@ -10,6 +10,7 @@ on:
       - 'services/api/src/orca-raydium-shadow-runtime.mjs'
       - 'services/api/src/orca-raydium-shadow-qualification-runtime.mjs'
       - 'services/api/src/orca-raydium-shadow-evidence-adapter.mjs'
+      - 'services/api/src/orca-raydium-shadow-risk-evidence-collector.mjs'
       - 'services/api/src/orca-whirlpool-readonly-provider.mjs'
       - 'services/api/src/orca-whirlpool-rpc-quote-pool.mjs'
       - 'services/api/src/raydium-readonly-provider.mjs'
@@ -23,6 +24,7 @@ on:
       - 'scripts/regression-orca-raydium-shadow-runtime.mjs'
       - 'scripts/regression-orca-raydium-shadow-qualification-runtime.mjs'
       - 'scripts/regression-orca-raydium-shadow-evidence-adapter.mjs'
+      - 'scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs'
       - 'scripts/regression-orca-whirlpool-readonly-provider.mjs'
       - 'scripts/regression-orca-whirlpool-rpc-quote-pool.mjs'
       - '.github/workflows/real-market-arbitrage-shadow-regression.yml'
@@ -45,6 +47,7 @@ jobs:
       - run: node --check services/api/src/orca-raydium-shadow-runtime.mjs
       - run: node --check services/api/src/orca-raydium-shadow-qualification-runtime.mjs
       - run: node --check services/api/src/orca-raydium-shadow-evidence-adapter.mjs
+      - run: node --check services/api/src/orca-raydium-shadow-risk-evidence-collector.mjs
       - run: node --check services/api/src/orca-whirlpool-readonly-provider.mjs
       - run: node --check services/api/src/orca-whirlpool-rpc-quote-pool.mjs
       - run: node --check services/api/src/raydium-readonly-provider.mjs
@@ -57,6 +60,7 @@ jobs:
       - run: node --check scripts/regression-orca-raydium-shadow-runtime.mjs
       - run: node --check scripts/regression-orca-raydium-shadow-qualification-runtime.mjs
       - run: node --check scripts/regression-orca-raydium-shadow-evidence-adapter.mjs
+      - run: node --check scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs
       - run: node --check scripts/regression-orca-whirlpool-readonly-provider.mjs
       - run: node --check scripts/regression-orca-whirlpool-rpc-quote-pool.mjs
       - run: node scripts/regression-real-market-arbitrage-shadow.mjs
@@ -65,6 +69,7 @@ jobs:
       - run: node scripts/regression-orca-raydium-shadow-runtime.mjs
       - run: node scripts/regression-orca-raydium-shadow-qualification-runtime.mjs
       - run: node scripts/regression-orca-raydium-shadow-evidence-adapter.mjs
+      - run: node scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs
       - run: node scripts/regression-orca-whirlpool-readonly-provider.mjs
       - run: node scripts/regression-orca-whirlpool-rpc-quote-pool.mjs
       - run: npm install --prefix services/api --ignore-scripts --no-audit --no-fund
