@@ -2,11 +2,26 @@ import { persistAuthenticatedAutoTradeDecisionAtomically } from './autotrade-ato
 import { createTrustedAutoTradeRuntimeRiskResolver } from './trusted-autotrade-runtime-risk.mjs';
 import { handleMemberPositionsRoute } from './member-positions-route.mjs';
 import { getMemberAutoTradeDemoState, runMemberAutoTradeDemoStep } from './member-autotrade-demo.mjs';
+import { createConfiguredMemberAutoTradeRealMarketRuntime } from './member-autotrade-real-market-runtime-factory.mjs';
 
 const MEMBER_ROUTE = '/api/account/autotrade/evaluate';
 const LEGACY_ROUTE = '/api/autotrade/evaluate';
 const DEMO_STATE_ROUTE = '/api/account/auto-strategy/demo';
 const DEMO_SIMULATE_ROUTE = '/api/account/auto-strategy/simulate';
+let configuredRealMarketRuntime = null;
+let configuredRealMarketRuntimeError = null;
+
+function defaultRealMarketRuntime() {
+  if (configuredRealMarketRuntime) return configuredRealMarketRuntime;
+  if (configuredRealMarketRuntimeError) return null;
+  try {
+    configuredRealMarketRuntime = createConfiguredMemberAutoTradeRealMarketRuntime();
+    return configuredRealMarketRuntime;
+  } catch (error) {
+    configuredRealMarketRuntimeError = error;
+    return null;
+  }
+}
 
 function statusFor(error) {
   const code = String(error?.message || '');
@@ -17,8 +32,8 @@ function statusFor(error) {
     'copy_mandate_follower_mismatch', 'copy_mandate_not_active', 'copy_mandate_disabled',
     'trader_not_copyable', 'trader_not_shadow', 'copy_mandate_scope_violation'
   ].includes(code)) return 403;
-  if (code === 'autotrade_usdc_balance_required') return 409;
-  if (code === 'solana_rpc_unconfigured') return 503;
+  if (['autotrade_usdc_balance_required', 'legacy_demo_open_position_requires_reset'].includes(code)) return 409;
+  if (['solana_rpc_unconfigured', 'real_market_shadow_runtime_unconfigured'].includes(code)) return 503;
   if (['solana_rpc_http_error', 'solana_rpc_error', 'solana_rpc_timeout'].includes(code)) return 502;
   if (code.startsWith('invalid_') || code.endsWith('_required') || code.includes('_mismatch')) return 400;
   return 500;
@@ -38,6 +53,7 @@ export async function handleMemberAutoTradeRoute({
   liveEnabled,
   walletPortfolio,
   assessmentProjection,
+  realMarketRuntime,
   persistDecision = persistAuthenticatedAutoTradeDecisionAtomically,
   createRiskResolver = createTrustedAutoTradeRuntimeRiskResolver
 }) {
@@ -63,18 +79,29 @@ export async function handleMemberAutoTradeRoute({
         send(res, 401, { error: 'session_required', mode: 'SHADOW', live_execution_authorized: false });
         return true;
       }
+      const resolvedRealMarketRuntime = realMarketRuntime || defaultRealMarketRuntime();
       if (route === DEMO_STATE_ROUTE) {
         const state = await getMemberAutoTradeDemoState(pool, session.user_id, { limit: 20 });
-        send(res, 200, { demo_wallet: state, simulator_runtime: 'PRIMARY_VM_PERSISTENT_DEMO', mode: 'SHADOW', funds_moved: false, live_execution_authorized: false });
+        send(res, 200, {
+          demo_wallet: state,
+          simulator_runtime: resolvedRealMarketRuntime ? 'PRIMARY_VM_REAL_MARKET_TWO_LEG_SHADOW' : 'PRIMARY_VM_REAL_MARKET_UNCONFIGURED',
+          runtime_error: resolvedRealMarketRuntime ? null : String(configuredRealMarketRuntimeError?.message || 'real_market_shadow_runtime_unconfigured'),
+          strategy: 'TWO_LEG_ARBITRAGE',
+          mode: 'SHADOW',
+          funds_moved: false,
+          live_execution_authorized: false
+        });
         return true;
       }
-      const result = await runMemberAutoTradeDemoStep(pool, session, await jsonBody(req));
+      if (!resolvedRealMarketRuntime) throw configuredRealMarketRuntimeError || new Error('real_market_shadow_runtime_unconfigured');
+      const result = await runMemberAutoTradeDemoStep(pool, session, await jsonBody(req), { realMarketRuntime: resolvedRealMarketRuntime });
       send(res, 200, result);
       return true;
     } catch (error) {
       send(res, statusFor(error), {
         error: String(error?.message || 'persistent_demo_failed'),
         mode: 'SHADOW',
+        strategy: 'TWO_LEG_ARBITRAGE',
         execution_dispatched: false,
         funds_moved: false,
         live_execution_authorized: false
