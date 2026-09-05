@@ -4,6 +4,7 @@ import { createOrcaWhirlpoolReadOnlyQuoteLoader } from '../services/api/src/orca
 const token = 'TOKEN_MINT_TEST';
 const quote = 'USDC_MINT_TEST';
 const observedAt = '2026-09-05T09:00:00.000Z';
+const observedSlot = 123456;
 let discoveryCalls = 0;
 let quoteCalls = 0;
 
@@ -24,6 +25,17 @@ const fetchImpl = async url => {
   };
 };
 
+const instructionContext = overrides => ({
+  verified: true,
+  source_slot: observedSlot,
+  observed_at: observedAt,
+  read_only: true,
+  private_key_present: false,
+  signature_present: false,
+  live_execution_authorized: false,
+  ...overrides
+});
+
 const verifiedQuote = overrides => ({
   buy_price_usd: 1.011,
   sell_price_usd: 1.009,
@@ -36,6 +48,8 @@ const verifiedQuote = overrides => ({
   quote_verified: true,
   costs_verified: true,
   observed_at: observedAt,
+  observed_slot: observedSlot,
+  instruction_context: instructionContext(),
   ...overrides
 });
 
@@ -63,6 +77,9 @@ assert.equal(rows[0].sell_price_usd, 1.009);
 assert.equal(rows[0].buy_fee_bps, 20);
 assert.equal(rows[0].quote_verified, true);
 assert.equal(rows[0].costs_verified, true);
+assert.equal(rows[0].observed_slot, observedSlot);
+assert.equal(rows[0].instruction_context.verified, true);
+assert.equal(rows[0].instruction_context.source_slot, observedSlot);
 
 await assert.rejects(async () => createOrcaWhirlpoolReadOnlyQuoteLoader({ fetchImpl, quotePool: async () => ({}), quoteNotionalUsdc: 0 }), /orca_quote_notional_usdc_required/);
 await assert.rejects(loader({ token_mint: token, quote_mint: quote, read_only: false, strategy: 'TWO_LEG_ARBITRAGE' }), /orca_read_only_required/);
@@ -96,5 +113,9 @@ await expectQuoteFailure(verifiedQuote({ buy_price_impact_bps: null }), /orca_on
 await expectQuoteFailure(verifiedQuote({ sell_price_impact_bps: '   ' }), /orca_onchain_sell_price_impact_bps_required/);
 await expectQuoteFailure(verifiedQuote({ buy_price_usd: null }), /orca_onchain_buy_price_required/);
 await expectQuoteFailure(verifiedQuote({ sell_price_usd: '' }), /orca_onchain_sell_price_required/);
+await expectQuoteFailure(verifiedQuote({ instruction_context: null }), /orca_onchain_instruction_context_required/);
+await expectQuoteFailure(verifiedQuote({ instruction_context: instructionContext({ verified: false }) }), /orca_onchain_instruction_context_required/);
+await expectQuoteFailure(verifiedQuote({ instruction_context: instructionContext({ source_slot: 999 }) }), /orca_onchain_instruction_slot_mismatch/);
+await expectQuoteFailure(verifiedQuote({ instruction_context: instructionContext({ live_execution_authorized: true }) }), /orca_onchain_instruction_context_boundary_invalid/);
 
 console.log('orca whirlpool readonly provider regression: ok');

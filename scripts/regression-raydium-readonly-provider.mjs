@@ -4,6 +4,7 @@ import { createRaydiumReadOnlyQuoteLoader, RAYDIUM_READONLY_PROVIDER } from '../
 const token = 'TOKEN_MINT_TEST';
 const quote = 'USDC_MINT_TEST';
 const observedAt = '2026-09-05T14:00:00.000Z';
+const observedSlot = 456789;
 let discoveryCalls = 0;
 let quoteCalls = 0;
 
@@ -33,6 +34,17 @@ const fetchImpl = async url => {
   };
 };
 
+const instructionContext = overrides => ({
+  verified: true,
+  source_slot: observedSlot,
+  observed_at: observedAt,
+  read_only: true,
+  private_key_present: false,
+  signature_present: false,
+  live_execution_authorized: false,
+  ...overrides
+});
+
 const verifiedQuote = overrides => ({
   buy_price_usd: 1.004,
   sell_price_usd: 1.002,
@@ -45,6 +57,8 @@ const verifiedQuote = overrides => ({
   quote_verified: true,
   costs_verified: true,
   observed_at: observedAt,
+  observed_slot: observedSlot,
+  instruction_context: instructionContext(),
   ...overrides
 });
 
@@ -75,6 +89,9 @@ assert.equal(rows[0].sell_price_usd, 1.002);
 assert.equal(rows[0].buy_fee_bps, 25);
 assert.equal(rows[0].quote_verified, true);
 assert.equal(rows[0].costs_verified, true);
+assert.equal(rows[0].observed_slot, observedSlot);
+assert.equal(rows[0].instruction_context.verified, true);
+assert.equal(rows[0].instruction_context.source_slot, observedSlot);
 assert.equal(RAYDIUM_READONLY_PROVIDER.live_execution_authorized, false);
 
 await assert.rejects(
@@ -128,5 +145,9 @@ await expectQuoteFailure(verifiedQuote({ sell_price_impact_bps: '   ' }), /raydi
 await expectQuoteFailure(verifiedQuote({ buy_price_usd: null }), /raydium_onchain_buy_price_required/);
 await expectQuoteFailure(verifiedQuote({ sell_price_usd: '' }), /raydium_onchain_sell_price_required/);
 await expectQuoteFailure(verifiedQuote({ quote_source: 'OTHER_RPC' }), /raydium_onchain_quote_source_invalid/);
+await expectQuoteFailure(verifiedQuote({ instruction_context: null }), /raydium_onchain_instruction_context_required/);
+await expectQuoteFailure(verifiedQuote({ instruction_context: instructionContext({ verified: false }) }), /raydium_onchain_instruction_context_required/);
+await expectQuoteFailure(verifiedQuote({ instruction_context: instructionContext({ source_slot: 1 }) }), /raydium_onchain_instruction_slot_mismatch/);
+await expectQuoteFailure(verifiedQuote({ instruction_context: instructionContext({ live_execution_authorized: true }) }), /raydium_onchain_instruction_context_boundary_invalid/);
 
 console.log('raydium readonly provider regression: ok');

@@ -23,6 +23,16 @@ function requiredBps(value, code) {
   return numeric;
 }
 
+function verifiedInstructionContext(pool, observedSlot) {
+  const context = pool?.instruction_context;
+  if (!context || typeof context !== 'object' || context.verified !== true) throw new Error('scanner_instruction_context_required');
+  if (context.read_only !== true || context.live_execution_authorized === true || context.private_key_present === true || context.signature_present === true) {
+    throw new Error('scanner_instruction_context_boundary_invalid');
+  }
+  if (Number(context.source_slot) !== observedSlot) throw new Error('scanner_instruction_context_slot_mismatch');
+  return context;
+}
+
 function normalizePoolEvidence(pool, { now, maxMarketAgeMs }) {
   if (!pool || typeof pool !== 'object') throw new Error('scanner_pool_evidence_required');
   const dexId = normalizeDex(pool.dex_id);
@@ -46,9 +56,12 @@ function normalizePoolEvidence(pool, { now, maxMarketAgeMs }) {
   const quoteSource = requiredText(pool.quote_source, 'scanner_quote_source_required');
   const observedAtMs = Date.parse(String(pool.observed_at || ''));
   if (!Number.isFinite(observedAtMs)) throw new Error('scanner_observed_at_required');
+  const observedSlot = Number(pool.observed_slot);
+  if (!Number.isSafeInteger(observedSlot) || observedSlot <= 0) throw new Error('scanner_observed_slot_required');
   const ageMs = now - observedAtMs;
   if (ageMs < 0) throw new Error('scanner_future_quote_rejected');
   if (ageMs > maxMarketAgeMs) throw new Error('scanner_stale_quote_rejected');
+  const instructionContext = verifiedInstructionContext(pool, observedSlot);
 
   return Object.freeze({
     dex_id: dexId,
@@ -65,7 +78,9 @@ function normalizePoolEvidence(pool, { now, maxMarketAgeMs }) {
     quote_source: quoteSource,
     quote_verified: true,
     costs_verified: true,
-    observed_at: new Date(observedAtMs).toISOString()
+    observed_at: new Date(observedAtMs).toISOString(),
+    observed_slot: observedSlot,
+    instruction_context: instructionContext
   });
 }
 
@@ -88,7 +103,9 @@ function routeForSide(pool, side) {
     quote_source: pool.quote_source,
     quote_verified: true,
     costs_verified: true,
-    observed_at: pool.observed_at
+    observed_at: pool.observed_at,
+    observed_slot: pool.observed_slot,
+    instruction_context: pool.instruction_context
   });
 }
 
@@ -108,6 +125,7 @@ function compareDirection(buyPool, sellPool) {
     market_source: 'ORCA_RAYDIUM_REAL_MARKET',
     observed_at: buy.observed_at < sell.observed_at ? buy.observed_at : sell.observed_at,
     strategy: 'TWO_LEG_ARBITRAGE',
+    read_only: true,
     execution_ready: false,
     live_execution_authorized: false
   });
