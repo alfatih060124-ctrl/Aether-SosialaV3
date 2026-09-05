@@ -1,0 +1,49 @@
+name: Auto Trade Daily PnL Readiness Regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/api/src/auto-trade-engine.mjs'
+      - 'services/api/src/copy-mandate-autotrade-adapter.mjs'
+      - 'services/api/src/persisted-autotrade-service.mjs'
+      - 'services/api/src/autotrade-route-boundary.mjs'
+      - 'services/api/src/trusted-autotrade-runtime-risk.mjs'
+      - 'services/api/src/member-autotrade-route.mjs'
+      - 'scripts/autotrade-daily-pnl-readiness-regression.mjs'
+      - '.github/workflows/autotrade-daily-pnl-readiness-regression.yml'
+  pull_request:
+    paths:
+      - 'services/api/src/auto-trade-engine.mjs'
+      - 'services/api/src/copy-mandate-autotrade-adapter.mjs'
+      - 'services/api/src/persisted-autotrade-service.mjs'
+      - 'services/api/src/autotrade-route-boundary.mjs'
+      - 'services/api/src/trusted-autotrade-runtime-risk.mjs'
+      - 'services/api/src/member-autotrade-route.mjs'
+      - 'scripts/autotrade-daily-pnl-readiness-regression.mjs'
+      - '.github/workflows/autotrade-daily-pnl-readiness-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check regression boundary
+        run: |
+          node --check services/api/src/auto-trade-engine.mjs
+          node --check services/api/src/copy-mandate-autotrade-adapter.mjs
+          node --check services/api/src/persisted-autotrade-service.mjs
+          node --check services/api/src/autotrade-route-boundary.mjs
+          node --check services/api/src/trusted-autotrade-runtime-risk.mjs
+          node --check services/api/src/member-autotrade-route.mjs
+          node --check scripts/autotrade-daily-pnl-readiness-regression.mjs
+      - name: Run Auto Trade daily PnL readiness regression
+        run: node scripts/autotrade-daily-pnl-readiness-regression.mjs
