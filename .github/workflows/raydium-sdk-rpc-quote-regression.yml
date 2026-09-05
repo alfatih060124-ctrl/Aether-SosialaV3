@@ -4,7 +4,10 @@ on:
   pull_request:
     paths:
       - 'services/api/src/raydium-sdk-rpc-quote-pool.mjs'
+      - 'services/api/src/raydium-runtime-sdk-module.mjs'
+      - 'services/api/package.json'
       - 'scripts/regression-raydium-sdk-rpc-quote-pool.mjs'
+      - 'scripts/regression-raydium-runtime-sdk-module.mjs'
       - '.github/workflows/raydium-sdk-rpc-quote-regression.yml'
   workflow_dispatch:
 
@@ -20,5 +23,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Install API runtime dependencies
+        working-directory: services/api
+        run: npm install --ignore-scripts --no-audit --no-fund
       - name: Run Raydium SDK RPC quote regression
         run: node scripts/regression-raydium-sdk-rpc-quote-pool.mjs
+      - name: Run Raydium runtime SDK import regression
+        run: node scripts/regression-raydium-runtime-sdk-module.mjs
