@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { settleDemoAction } from '../services/api/src/demo-autotrade-ledger.mjs';
+import { settleDemoArbitrage } from '../services/api/src/demo-autotrade-ledger.mjs';
 
 const base = {
   initial_balance_usdc: 100,
@@ -7,45 +7,47 @@ const base = {
   open_position: {}
 };
 
-const buy = settleDemoAction({ account: base, engineAction: 'BUY', requestedAmountUsdc: 100, performanceFeeBps: 1000 });
-assert.equal(buy.settlement_status, 'OPENED');
-assert.equal(buy.cash_balance_usdc, 0);
-assert.equal(buy.balance_after_usdc, 100);
-
-const profitable = settleDemoAction({
-  account: { ...base, cash_balance_usdc: buy.cash_balance_usdc, open_position: buy.open_position },
-  engineAction: 'SELL',
-  positionPnlBps: 1111,
+const profitable = settleDemoArbitrage({
+  account: base,
+  notionalUsdc: 100,
+  finalUsdc: 101,
   performanceFeeBps: 1000
 });
-assert.equal(profitable.settlement_status, 'CLOSED');
-assert.equal(profitable.performance_fee_usdc > 0, true);
-assert.equal(profitable.net_pnl_usdc > 9.99 && profitable.net_pnl_usdc < 10.01, true);
-assert.equal(profitable.balance_after_usdc > 109.99 && profitable.balance_after_usdc < 110.01, true);
+assert.equal(profitable.settlement_status, 'ARBITRAGE_CLOSED');
+assert.equal(profitable.strategy, 'TWO_LEG_ARBITRAGE');
+assert.equal(profitable.gross_pnl_usdc, 1);
+assert.equal(profitable.performance_fee_usdc, 0.1);
+assert.equal(profitable.net_pnl_usdc, 0.9);
+assert.equal(profitable.balance_after_usdc, 100.9);
 assert.equal(profitable.winning_trades_delta, 1);
+assert.deepEqual(profitable.open_position, {});
+assert.equal(profitable.live_execution_authorized, false);
 
-const lossBuy = settleDemoAction({ account: { ...base, cash_balance_usdc: 100 }, engineAction: 'BUY', requestedAmountUsdc: 50 });
-const loss = settleDemoAction({
-  account: { ...base, cash_balance_usdc: lossBuy.cash_balance_usdc, open_position: lossBuy.open_position },
-  engineAction: 'SELL',
-  positionPnlBps: -700,
+const loss = settleDemoArbitrage({
+  account: base,
+  notionalUsdc: 50,
+  finalUsdc: 49.5,
   performanceFeeBps: 1000
 });
 assert.equal(loss.performance_fee_usdc, 0);
-assert.equal(loss.net_pnl_usdc, -3.5);
-assert.equal(loss.balance_after_usdc, 96.5);
+assert.equal(loss.net_pnl_usdc, -0.5);
+assert.equal(loss.balance_after_usdc, 99.5);
 assert.equal(loss.losing_trades_delta, 1);
+assert.deepEqual(loss.open_position, {});
 
-const duplicateBuy = settleDemoAction({
-  account: { ...base, cash_balance_usdc: 90, open_position: { notional_usdc: 10 } },
-  engineAction: 'BUY',
-  requestedAmountUsdc: 10
-});
-assert.equal(duplicateBuy.settlement_status, 'OPEN_POSITION_EXISTS');
-assert.equal(duplicateBuy.balance_after_usdc, 100);
+await assert.rejects(
+  async () => settleDemoArbitrage({
+    account: { ...base, cash_balance_usdc: 90, open_position: { notional_usdc: 10 } },
+    notionalUsdc: 10,
+    finalUsdc: 10.1
+  }),
+  /arbitrage_open_position_not_allowed/
+);
 
-const noOpenSell = settleDemoAction({ account: base, engineAction: 'SELL', positionPnlBps: 800 });
-assert.equal(noOpenSell.settlement_status, 'NO_OPEN_POSITION');
-assert.equal(noOpenSell.balance_after_usdc, 100);
-
-console.log(JSON.stringify({ ok: true, schema: 'aether.member_autotrade_demo.regression.v1', mode: 'SHADOW', live_execution_authorized: false }));
+console.log(JSON.stringify({
+  ok: true,
+  schema: 'aether.member_autotrade_demo.regression.v2',
+  mode: 'SHADOW',
+  strategy: 'TWO_LEG_ARBITRAGE',
+  live_execution_authorized: false
+}));
