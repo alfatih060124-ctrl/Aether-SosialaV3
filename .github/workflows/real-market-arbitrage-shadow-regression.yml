@@ -12,6 +12,7 @@ on:
       - 'services/api/src/orca-raydium-shadow-evidence-adapter.mjs'
       - 'services/api/src/orca-raydium-shadow-risk-evidence-collector.mjs'
       - 'services/api/src/solana-pretrade-network-fee-estimator.mjs'
+      - 'services/api/src/solana-pretrade-rpc-evidence-provider.mjs'
       - 'services/api/src/orca-raydium-unsigned-message-evidence-builder.mjs'
       - 'services/api/src/orca-whirlpool-readonly-provider.mjs'
       - 'services/api/src/orca-whirlpool-rpc-quote-pool.mjs'
@@ -28,6 +29,7 @@ on:
       - 'scripts/regression-orca-raydium-shadow-evidence-adapter.mjs'
       - 'scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs'
       - 'scripts/regression-solana-pretrade-network-fee-estimator.mjs'
+      - 'scripts/regression-solana-pretrade-rpc-evidence-provider.mjs'
       - 'scripts/regression-orca-raydium-unsigned-message-evidence-builder.mjs'
       - 'scripts/regression-orca-whirlpool-readonly-provider.mjs'
       - 'scripts/regression-orca-whirlpool-rpc-quote-pool.mjs'
@@ -53,6 +55,7 @@ jobs:
       - run: node --check services/api/src/orca-raydium-shadow-evidence-adapter.mjs
       - run: node --check services/api/src/orca-raydium-shadow-risk-evidence-collector.mjs
       - run: node --check services/api/src/solana-pretrade-network-fee-estimator.mjs
+      - run: node --check services/api/src/solana-pretrade-rpc-evidence-provider.mjs
       - run: node --check services/api/src/orca-raydium-unsigned-message-evidence-builder.mjs
       - run: node --check services/api/src/orca-whirlpool-readonly-provider.mjs
       - run: node --check services/api/src/orca-whirlpool-rpc-quote-pool.mjs
@@ -68,6 +71,7 @@ jobs:
       - run: node --check scripts/regression-orca-raydium-shadow-evidence-adapter.mjs
       - run: node --check scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs
       - run: node --check scripts/regression-solana-pretrade-network-fee-estimator.mjs
+      - run: node --check scripts/regression-solana-pretrade-rpc-evidence-provider.mjs
       - run: node --check scripts/regression-orca-raydium-unsigned-message-evidence-builder.mjs
       - run: node --check scripts/regression-orca-whirlpool-readonly-provider.mjs
       - run: node --check scripts/regression-orca-whirlpool-rpc-quote-pool.mjs
@@ -79,6 +83,7 @@ jobs:
       - run: node scripts/regression-orca-raydium-shadow-evidence-adapter.mjs
       - run: node scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs
       - run: node scripts/regression-solana-pretrade-network-fee-estimator.mjs
+      - run: node scripts/regression-solana-pretrade-rpc-evidence-provider.mjs
       - run: node scripts/regression-orca-raydium-unsigned-message-evidence-builder.mjs
       - run: node scripts/regression-orca-whirlpool-readonly-provider.mjs
       - run: node scripts/regression-orca-whirlpool-rpc-quote-pool.mjs
