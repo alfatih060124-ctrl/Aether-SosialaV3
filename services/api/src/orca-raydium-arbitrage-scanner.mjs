@@ -106,7 +106,7 @@ function compareDirection(buyPool, sellPool) {
     buy_route: buy,
     sell_route: sell,
     market_source: 'ORCA_RAYDIUM_REAL_MARKET',
-    observed_at: buy.observed_at > sell.observed_at ? buy.observed_at : sell.observed_at,
+    observed_at: buy.observed_at < sell.observed_at ? buy.observed_at : sell.observed_at,
     strategy: 'TWO_LEG_ARBITRAGE',
     execution_ready: false,
     live_execution_authorized: false
@@ -127,6 +127,7 @@ export function createOrcaRaydiumArbitrageScanner({
     const pairKey = keyForPair(tokenMint, quoteMint);
     const cached = cache.get(pairKey);
     if (cached && timestamp < cached.expires_at) return cached.value;
+    if (cached) cache.delete(pairKey);
 
     const rows = await loadPools({ token_mint: tokenMint, quote_mint: quoteMint, dexes: ['orca', 'raydium'] });
     if (!Array.isArray(rows)) throw new Error('scanner_provider_payload_invalid');
@@ -152,7 +153,9 @@ export function createOrcaRaydiumArbitrageScanner({
       execution_ready: false,
       live_execution_authorized: false
     });
-    cache.set(pairKey, { value, expires_at: timestamp + Math.max(1, Number(cacheTtlMs) || DEFAULT_CACHE_TTL_MS) });
+    const ttlMs = Math.max(1, finite(cacheTtlMs) || DEFAULT_CACHE_TTL_MS);
+    const freshnessDeadline = Math.min(...normalized.map(pool => Date.parse(pool.observed_at) + maxMarketAgeMs));
+    cache.set(pairKey, { value, expires_at: Math.min(timestamp + ttlMs, freshnessDeadline) });
     return value;
   }
 
