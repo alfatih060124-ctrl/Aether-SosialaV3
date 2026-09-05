@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS member_paper_arbitrage_accounts (
 CREATE TABLE IF NOT EXISTS member_paper_arbitrage_cycles (
   cycle_id uuid PRIMARY KEY,
   user_id uuid NOT NULL,
+  idempotency_key text NOT NULL,
   token_mint text NOT NULL,
   quote_mint text NOT NULL,
   buy_dex text NOT NULL CHECK (buy_dex IN ('orca','raydium')),
@@ -45,7 +46,8 @@ CREATE TABLE IF NOT EXISTS member_paper_arbitrage_cycles (
   funds_moved boolean NOT NULL DEFAULT false CHECK (funds_moved=false),
   live_execution_authorized boolean NOT NULL DEFAULT false CHECK (live_execution_authorized=false),
   created_at timestamptz NOT NULL DEFAULT now(),
-  CHECK (buy_dex <> sell_dex)
+  CHECK (buy_dex <> sell_dex),
+  UNIQUE(user_id,idempotency_key)
 );
 
 CREATE INDEX IF NOT EXISTS idx_member_paper_cycles_user_created
