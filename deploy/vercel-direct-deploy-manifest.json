@@ -18,6 +18,7 @@
     "services/api/src/signal-intelligence.mjs",
     "services/api/src/auto-trade-engine.mjs",
     "public/account-auto-strategy.js",
+    "public/account-member-autotrade.js",
     "public/account-wallet-portfolio.js",
     "public/account.html",
     "public/admin.html",
