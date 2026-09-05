@@ -1,5 +1,8 @@
 const RAYDIUM_API_BASE_URL = 'https://api-v3.raydium.io';
 const RAYDIUM_ONCHAIN_SOURCE_PREFIX = 'RAYDIUM_ONCHAIN_RPC';
+const RAYDIUM_CLMM_PROGRAM_ID = 'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK';
+const RAYDIUM_CPMM_PROGRAM_ID = 'CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C';
+const SUPPORTED_PROGRAMS = Object.freeze(new Set([RAYDIUM_CLMM_PROGRAM_ID, RAYDIUM_CPMM_PROGRAM_ID]));
 
 const finite = value => {
   if (value === null || value === undefined) return null;
@@ -34,6 +37,10 @@ function poolMints(pool) {
 function exactPair(pool, tokenMint, quoteMint) {
   const [a, b] = poolMints(pool);
   return (a === tokenMint && b === quoteMint) || (a === quoteMint && b === tokenMint);
+}
+
+function poolProgramId(pool) {
+  return String(pool?.programId ?? pool?.program_id ?? pool?.program ?? '').trim();
 }
 
 function discoveryRows(payload) {
@@ -94,15 +101,19 @@ export function createRaydiumReadOnlyQuoteLoader({
       `${String(apiBaseUrl).replace(/\/$/, '')}/pools/info/mint?${query}`,
       timeoutMs
     );
-    const candidates = pools.filter(pool => pool && exactPair(pool, tokenMint, quoteMint));
-    if (!candidates.length) throw new Error('raydium_no_exact_pair_pools');
+    const exactPairPools = pools.filter(pool => pool && exactPair(pool, tokenMint, quoteMint));
+    if (!exactPairPools.length) throw new Error('raydium_no_exact_pair_pools');
+    const candidates = exactPairPools.filter(pool => SUPPORTED_PROGRAMS.has(poolProgramId(pool)));
+    if (!candidates.length) throw new Error('raydium_no_supported_exact_pair_pools');
 
     const rows = [];
     for (const pool of candidates) {
       const poolAddress = text(pool.id ?? pool.address ?? pool.poolId, 'raydium_pool_address_required');
+      const programId = text(poolProgramId(pool), 'raydium_program_id_required');
       const quote = await quotePool(Object.freeze({
         pool_address: poolAddress,
-        pool_type: String(pool.type || pool.poolType || '').trim() || null,
+        pool_type: programId === RAYDIUM_CLMM_PROGRAM_ID ? 'CLMM' : 'CPMM',
+        program_id: programId,
         token_mint: tokenMint,
         quote_mint: quoteMint,
         notional_usdc: notionalUsdc,
@@ -132,6 +143,8 @@ export function createRaydiumReadOnlyQuoteLoader({
       rows.push(Object.freeze({
         dex_id: 'raydium',
         pool_address: poolAddress,
+        program_id: programId,
+        pool_type: programId === RAYDIUM_CLMM_PROGRAM_ID ? 'CLMM' : 'CPMM',
         token_mint: tokenMint,
         quote_mint: quoteMint,
         buy_price_usd: buyPriceUsd,
@@ -156,6 +169,7 @@ export function createRaydiumReadOnlyQuoteLoader({
 export const RAYDIUM_READONLY_PROVIDER = Object.freeze({
   api_base_url: RAYDIUM_API_BASE_URL,
   dex_id: 'raydium',
+  supported_program_ids: Object.freeze([RAYDIUM_CLMM_PROGRAM_ID, RAYDIUM_CPMM_PROGRAM_ID]),
   strategy: 'TWO_LEG_ARBITRAGE',
   read_only: true,
   live_execution_authorized: false
