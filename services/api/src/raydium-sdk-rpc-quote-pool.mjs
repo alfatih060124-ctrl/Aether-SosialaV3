@@ -10,6 +10,8 @@ const text = (value, code) => {
   return normalized;
 };
 
+const keyText = (value, code) => text(value?.toBase58?.() ?? value?.toString?.() ?? value, code);
+
 const POOL_TYPES = Object.freeze({
   CLMM: 'CLMM',
   CPMM: 'CPMM',
@@ -99,6 +101,36 @@ async function loadDefaultSdk() {
   return sdk;
 }
 
+function cpmmSideContext({ poolInfo, poolKeys, inputMint, inputRaw, outputRaw }) {
+  const inputIsA = String(poolInfo.mintA.address) === inputMint;
+  return Object.freeze({
+    input_vault: text(inputIsA ? poolKeys?.vault?.A : poolKeys?.vault?.B, 'raydium_cpmm_input_vault_required'),
+    output_vault: text(inputIsA ? poolKeys?.vault?.B : poolKeys?.vault?.A, 'raydium_cpmm_output_vault_required'),
+    input_token_program: text(inputIsA ? poolInfo.mintA?.programId : poolInfo.mintB?.programId, 'raydium_cpmm_input_token_program_required'),
+    output_token_program: text(inputIsA ? poolInfo.mintB?.programId : poolInfo.mintA?.programId, 'raydium_cpmm_output_token_program_required'),
+    input_mint: text(inputMint, 'raydium_cpmm_input_mint_required'),
+    output_mint: text(inputIsA ? poolInfo.mintB?.address : poolInfo.mintA?.address, 'raydium_cpmm_output_mint_required'),
+    amount_in: String(inputRaw),
+    amount_out_min: String(outputRaw)
+  });
+}
+
+function clmmSideContext({ poolInfo, rpcData, tickArrays, bitmapKey, inputMint, inputRaw, outputRaw }) {
+  const inputIsA = String(poolInfo.mintA.address) === inputMint;
+  if (!Array.isArray(tickArrays) || !tickArrays.length) throw new Error('raydium_clmm_tick_arrays_required');
+  return Object.freeze({
+    input_vault: keyText(inputIsA ? rpcData.vaultA : rpcData.vaultB, 'raydium_clmm_input_vault_required'),
+    output_vault: keyText(inputIsA ? rpcData.vaultB : rpcData.vaultA, 'raydium_clmm_output_vault_required'),
+    input_mint: text(inputMint, 'raydium_clmm_input_mint_required'),
+    output_mint: text(inputIsA ? poolInfo.mintB?.address : poolInfo.mintA?.address, 'raydium_clmm_output_mint_required'),
+    tick_arrays: Object.freeze(tickArrays.map(entry => keyText(entry?.address, 'raydium_clmm_tick_array_address_required'))),
+    tick_array_bitmap_extension: keyText(bitmapKey, 'raydium_clmm_bitmap_address_required'),
+    amount_in: String(inputRaw),
+    amount_out_min: String(outputRaw),
+    sqrt_price_limit_x64: '0'
+  });
+}
+
 export function createRaydiumSdkRpcQuotePool({
   raydium,
   sdkModule,
@@ -118,9 +150,7 @@ export function createRaydiumSdkRpcQuotePool({
     if (!(notionalUsdc > 0)) throw new Error('raydium_rpc_notional_required');
 
     const poolType = normalizePoolType(request.pool_type);
-    if (poolType === POOL_TYPES.AMM) {
-      throw new Error('raydium_rpc_amm_v4_quote_not_verified');
-    }
+    if (poolType === POOL_TYPES.AMM) throw new Error('raydium_rpc_amm_v4_quote_not_verified');
 
     const sdk = sdkModule || await loadDefaultSdk();
     const BN = sdk.BN || sdk.default?.BN;
@@ -128,14 +158,22 @@ export function createRaydiumSdkRpcQuotePool({
 
     let poolInfo;
     let quoteExactIn;
+    let commonInstructionContext;
 
     if (poolType === POOL_TYPES.CPMM) {
       if (typeof raydium.cpmm?.getPoolInfoFromRpc !== 'function') throw new Error('raydium_cpmm_rpc_loader_required');
       const data = await raydium.cpmm.getPoolInfoFromRpc(poolAddress);
       poolInfo = data?.poolInfo;
       const rpcData = data?.rpcData;
-      if (!poolInfo || !rpcData) throw new Error('raydium_cpmm_rpc_state_required');
+      const poolKeys = data?.poolKeys;
+      if (!poolInfo || !rpcData || !poolKeys) throw new Error('raydium_cpmm_rpc_state_required');
       if (!sdk.CurveCalculator || !sdk.FeeOn) throw new Error('raydium_cpmm_math_required');
+      commonInstructionContext = Object.freeze({
+        program_id: text(poolKeys.programId, 'raydium_cpmm_program_required'),
+        authority: text(poolKeys.authority, 'raydium_cpmm_authority_required'),
+        config_id: text(poolKeys.config?.id, 'raydium_cpmm_config_required'),
+        observation_id: text(poolKeys.observationId, 'raydium_cpmm_observation_required')
+      });
       quoteExactIn = async (inputMint, inputRaw) => {
         const baseIn = String(poolInfo.mintA.address) === inputMint;
         const result = sdk.CurveCalculator.swapBaseInput(
@@ -149,7 +187,13 @@ export function createRaydiumSdkRpcQuotePool({
           rpcData.feeOn === sdk.FeeOn.BothToken || rpcData.feeOn === sdk.FeeOn.OnlyTokenB
         );
         if (!result?.outputAmount || result?.tradeFee === undefined) throw new Error('raydium_cpmm_quote_invalid');
-        return { outputRaw: result.outputAmount.toString(), feeRaw: result.tradeFee.toString(), inputRaw: result.inputAmount?.toString?.() || inputRaw.toString() };
+        const outputRaw = result.outputAmount.toString();
+        return {
+          outputRaw,
+          feeRaw: result.tradeFee.toString(),
+          inputRaw: result.inputAmount?.toString?.() || inputRaw.toString(),
+          instruction: cpmmSideContext({ poolInfo, poolKeys, inputMint, inputRaw, outputRaw })
+        };
       };
     } else {
       if (typeof raydium.clmm?.getSwapPoolInfo !== 'function') throw new Error('raydium_clmm_rpc_loader_required');
@@ -187,7 +231,25 @@ export function createRaydiumSdkRpcQuotePool({
         const outputRaw = simulation?.amountCalculated?.toString?.();
         const feeRaw = simulation?.feeAmount?.toString?.() ?? simulation?.tradeFee?.toString?.();
         if (!outputRaw || feeRaw === undefined) throw new Error('raydium_clmm_quote_fee_unverified');
-        return { outputRaw, feeRaw, inputRaw: inputRaw.toString() };
+        commonInstructionContext = Object.freeze({
+          program_id: text(poolInfo.programId, 'raydium_clmm_program_required'),
+          amm_config: keyText(swapData.rpcData.configId, 'raydium_clmm_config_required'),
+          observation_id: keyText(swapData.rpcData.observationId, 'raydium_clmm_observation_required')
+        });
+        return {
+          outputRaw,
+          feeRaw,
+          inputRaw: inputRaw.toString(),
+          instruction: clmmSideContext({
+            poolInfo,
+            rpcData: swapData.rpcData,
+            tickArrays: swapData.tickArrays,
+            bitmapKey,
+            inputMint,
+            inputRaw,
+            outputRaw
+          })
+        };
       };
     }
 
@@ -223,7 +285,25 @@ export function createRaydiumSdkRpcQuotePool({
     const observed = now();
     if (!(observed instanceof Date) || !Number.isFinite(observed.getTime())) throw new Error('raydium_rpc_observed_at_invalid');
     const slot = typeof getSlot === 'function' ? await getSlot() : await raydium.connection?.getSlot?.();
-    if (!Number.isInteger(Number(slot)) || Number(slot) < 0) throw new Error('raydium_rpc_observed_slot_required');
+    if (!Number.isInteger(Number(slot)) || Number(slot) <= 0) throw new Error('raydium_rpc_observed_slot_required');
+    if (!commonInstructionContext) throw new Error('raydium_rpc_instruction_context_required');
+
+    const instructionContext = Object.freeze({
+      verified: true,
+      source: `RAYDIUM_${poolType}_SDK_ONCHAIN_RPC`,
+      source_slot: Number(slot),
+      observed_at: observed.toISOString(),
+      pool_type: poolType,
+      ...commonInstructionContext,
+      buy: buy.instruction,
+      sell: sell.instruction,
+      read_only: true,
+      private_key_present: false,
+      signature_present: false,
+      signer_requested: false,
+      network_submission_authorized: false,
+      live_execution_authorized: false
+    });
 
     return Object.freeze({
       buy_price_usd: buyPrice,
@@ -237,7 +317,10 @@ export function createRaydiumSdkRpcQuotePool({
       costs_verified: true,
       observed_at: observed.toISOString(),
       observed_slot: Number(slot),
-      pool_type: poolType
+      pool_type: poolType,
+      instruction_context: instructionContext,
+      read_only: true,
+      live_execution_authorized: false
     });
   };
 }
