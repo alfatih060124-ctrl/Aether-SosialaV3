@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { runAutoTradeTraining } from './auto-trade-training.mjs';
-import { settleDemoAction, demoEquity } from './demo-autotrade-ledger.mjs';
+import { settleDemoArbitrage, demoEquity } from './demo-autotrade-ledger.mjs';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value)));
 const asNumber = value => Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -45,6 +44,7 @@ function projectAccount(account, feeBps, history = []) {
     performance_fee_bps: feeBps,
     history,
     mode: 'SHADOW',
+    strategy: 'TWO_LEG_ARBITRAGE',
     currency: 'USDC_DEMO',
     persistent: true,
     funds_moved: false,
@@ -74,26 +74,51 @@ export async function getMemberAutoTradeDemoState(pool, userId, { limit = 20 } =
   }
 }
 
-export async function runMemberAutoTradeDemoStep(pool, session, input = {}) {
+function rejectedSettlement(account) {
+  const balance = demoEquity(account);
+  return Object.freeze({
+    settlement_status: 'REJECTED',
+    notional_usdc: 0,
+    gross_pnl_usdc: 0,
+    performance_fee_usdc: 0,
+    net_pnl_usdc: 0,
+    pnl_bps: null,
+    balance_before_usdc: balance,
+    balance_after_usdc: balance,
+    cash_balance_usdc: asNumber(account.cash_balance_usdc),
+    open_position: Object.freeze(account.open_position && typeof account.open_position === 'object' ? account.open_position : {}),
+    trades_closed_delta: 0,
+    winning_trades_delta: 0,
+    losing_trades_delta: 0
+  });
+}
+
+export async function runMemberAutoTradeDemoStep(pool, session, input = {}, { realMarketRuntime } = {}) {
   if (!pool || !session?.user_id) throw new Error('authenticated_session_required');
+  if (!realMarketRuntime || typeof realMarketRuntime.runNextOpportunity !== 'function') throw new Error('real_market_shadow_runtime_unconfigured');
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const account = await ensureAccount(client, session.user_id, input.capital_usd ?? 100);
+    if (asNumber(account?.open_position?.notional_usdc) > 0) throw new Error('legacy_demo_open_position_requires_reset');
     const feeBps = await feeConfig(client);
-    const capital = Math.max(10, demoEquity(account));
-    const result = runAutoTradeTraining({ ...input, capital_usd: capital });
-    if (result?.mode !== 'SHADOW' || result?.live_execution_authorized !== false || result?.funds_moved !== false) {
+
+    const result = await realMarketRuntime.runNextOpportunity({ demo_account: account });
+    if (result?.mode !== 'SHADOW' || result?.strategy !== 'TWO_LEG_ARBITRAGE' || result?.live_execution_authorized !== false || result?.funds_moved !== false) {
       throw new Error('demo_shadow_invariant_failed');
     }
 
-    const settlement = settleDemoAction({
-      account,
-      engineAction: result.decision?.action,
-      requestedAmountUsdc: result.decision?.requested_amount_usd,
-      positionPnlBps: result.position?.unrealized_pnl_bps,
-      performanceFeeBps: feeBps
-    });
+    const selected = result.selected || null;
+    const assessment = selected?.assessment || null;
+    const arbitrage = assessment?.arbitrage || null;
+    const settlement = selected
+      ? settleDemoArbitrage({
+          account,
+          notionalUsdc: arbitrage?.notional_usdc,
+          finalUsdc: arbitrage?.final_usdc,
+          performanceFeeBps: feeBps
+        })
+      : rejectedSettlement(account);
 
     const updated = (await client.query(`
       UPDATE member_autotrade_demo_accounts SET
@@ -117,19 +142,33 @@ export async function runMemberAutoTradeDemoStep(pool, session, input = {}) {
       JSON.stringify(settlement.open_position)
     ])).rows[0];
 
+    const decision = assessment?.decision || Object.freeze({ action: 'REJECT', reason_codes: Object.freeze(['NO_QUALIFIED_REAL_MARKET_OPPORTUNITY']) });
+    const opportunity = selected?.opportunity || null;
+    const engineAction = selected ? 'ARBITRAGE_SETTLE' : 'REJECT';
     const trade = (await client.query(`
       INSERT INTO member_autotrade_demo_trades(
         trade_id,user_id,scenario,engine_action,settlement_status,notional_usdc,gross_pnl_usdc,
         performance_fee_usdc,net_pnl_usdc,pnl_bps,balance_before_usdc,balance_after_usdc,engine_result
       ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb) RETURNING *
     `,[
-      randomUUID(),session.user_id,String(result.training_scenario),String(result.decision?.action || 'REJECT'),
+      randomUUID(),session.user_id,'REAL_MARKET_ORCA_RAYDIUM',engineAction,
       settlement.settlement_status,settlement.notional_usdc,settlement.gross_pnl_usdc,
       settlement.performance_fee_usdc,settlement.net_pnl_usdc,settlement.pnl_bps,
       settlement.balance_before_usdc,settlement.balance_after_usdc,JSON.stringify({
-        assessment_score: result.assessment?.quality_score ?? null,
-        reason_codes: result.decision?.reason_codes ?? [],
-        training_fixture: true,
+        token_mint: opportunity?.token_mint ?? null,
+        quote_mint: opportunity?.quote_mint ?? null,
+        buy_dex: opportunity?.buy_route?.dex_id ?? null,
+        sell_dex: opportunity?.sell_route?.dex_id ?? null,
+        expected_net_edge_bps: arbitrage?.expected_net_edge_bps ?? arbitrage?.net_edge_bps ?? null,
+        reason_codes: decision?.reason_codes ?? [],
+        qualified_count: result.qualified_count ?? 0,
+        candidate_count: result.candidate_count ?? 0,
+        market_source: result.market_source ?? null,
+        discovery_source: result.discovery_source ?? null,
+        discovery_execution_ready: false,
+        benchmark_source: 'REAL_MARKET_SHADOW',
+        training_fixture: false,
+        strategy: 'TWO_LEG_ARBITRAGE',
         execution_dispatched: false,
         funds_moved: false,
         live_execution_authorized: false
@@ -138,14 +177,26 @@ export async function runMemberAutoTradeDemoStep(pool, session, input = {}) {
 
     await client.query('COMMIT');
     const wallet = projectAccount(updated, feeBps);
-    const walletLabel = `${result.scenario_label} · Demo balance ${wallet.balance_usdc.toFixed(4)} USDC · Net PnL ${signed(settlement.net_pnl_usdc)} · Performance fee ${settlement.performance_fee_usdc.toFixed(4)} USDC`;
+    const edge = arbitrage?.expected_net_edge_bps ?? arbitrage?.net_edge_bps;
+    const label = selected
+      ? `ORCA ↔ Raydium arbitrage · NET edge ${Number.isFinite(Number(edge)) ? (Number(edge) / 100).toFixed(2) : '—'}% · Demo balance ${wallet.balance_usdc.toFixed(4)} USDC · Net PnL ${signed(settlement.net_pnl_usdc)} · Performance fee ${settlement.performance_fee_usdc.toFixed(4)} USDC`
+      : `No qualified ORCA ↔ Raydium opportunity · Demo balance ${wallet.balance_usdc.toFixed(4)} USDC`;
+
     return Object.freeze({
-      ...result,
-      scenario_label: walletLabel,
+      decision,
+      assessment,
+      opportunity,
+      scenario_label: label,
       demo_wallet: wallet,
       demo_trade: trade,
-      simulator_runtime: 'PRIMARY_VM_PERSISTENT_DEMO',
+      qualified: Boolean(selected),
+      candidate_count: result.candidate_count ?? 0,
+      qualified_count: result.qualified_count ?? 0,
+      market_source: result.market_source ?? null,
+      simulator_runtime: 'PRIMARY_VM_REAL_MARKET_TWO_LEG_SHADOW',
       authenticated_session: true,
+      mode: 'SHADOW',
+      strategy: 'TWO_LEG_ARBITRAGE',
       execution_dispatched: false,
       transaction_created: false,
       signer_requested: false,
