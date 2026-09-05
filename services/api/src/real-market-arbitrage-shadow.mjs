@@ -1,20 +1,24 @@
 import { evaluateSignalQuality } from './signal-intelligence.mjs';
 
 const HARD_MIN_NET_EDGE_BPS = 20;
+const ALLOWED_DEXES = Object.freeze(new Set(['orca','raydium']));
 const finite = (value, fallback = null) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const round8 = value => Math.round((Number(value) + Number.EPSILON) * 1e8) / 1e8;
+const normalizeDex = value => String(value || '').trim().toLowerCase();
 
 function assertRoute(route, side) {
   if (!route || typeof route !== 'object') throw new Error(`${side}_route_required`);
   const price = finite(route.price_usd);
   if (!(price > 0)) throw new Error(`${side}_price_required`);
   if (!String(route.pool_address || '').trim()) throw new Error(`${side}_pool_required`);
-  if (!String(route.dex_id || '').trim()) throw new Error(`${side}_dex_required`);
+  const dexId = normalizeDex(route.dex_id);
+  if (!dexId) throw new Error(`${side}_dex_required`);
+  if (!ALLOWED_DEXES.has(dexId)) throw new Error(`${side}_dex_not_allowed`);
   if (route.quote_verified !== true) throw new Error(`${side}_quote_unverified`);
   return {
     pool_address: String(route.pool_address),
-    dex_id: String(route.dex_id),
+    dex_id: dexId,
     price_usd: price,
     fee_bps: clamp(finite(route.fee_bps, 0), 0, 10000),
     price_impact_bps: clamp(finite(route.price_impact_bps, 0), 0, 10000),
@@ -30,6 +34,10 @@ export function simulateTwoLegArbitrage({ notional_usdc, buy_route, sell_route, 
   const buy = assertRoute(buy_route, 'buy');
   const sell = assertRoute(sell_route, 'sell');
   if (buy.pool_address === sell.pool_address) throw new Error('arbitrage_distinct_pools_required');
+  if (buy.dex_id === sell.dex_id) throw new Error('arbitrage_cross_dex_required');
+  if (!((buy.dex_id === 'orca' && sell.dex_id === 'raydium') || (buy.dex_id === 'raydium' && sell.dex_id === 'orca'))) {
+    throw new Error('arbitrage_orca_raydium_pair_required');
+  }
 
   const buyCostFactor = 1 - (buy.fee_bps + buy.price_impact_bps) / 10000;
   const sellCostFactor = 1 - (sell.fee_bps + sell.price_impact_bps) / 10000;
@@ -50,6 +58,7 @@ export function simulateTwoLegArbitrage({ notional_usdc, buy_route, sell_route, 
     gross_edge_bps: Math.round(grossEdgeBps * 100) / 100,
     net_edge_bps: Math.round(netEdgeBps * 100) / 100,
     net_pnl_usdc: round8(finalUsdc - notional),
+    dex_scope: Object.freeze(['ORCA','RAYDIUM']),
     cost_breakdown: Object.freeze({
       buy_fee_bps: buy.fee_bps,
       buy_price_impact_bps: buy.price_impact_bps,
@@ -110,6 +119,8 @@ export function evaluateRealMarketArbitrageShadow({ opportunity = {}, notional_u
     product: 'AETHER Auto Trade Arbitrage',
     mode: 'SHADOW',
     strategy: 'TWO_LEG_ARBITRAGE',
+    dex_scope: Object.freeze(['ORCA','RAYDIUM']),
+    market_discovery_scope: 'ORCA_RAYDIUM_ONLY',
     market_data_mode: 'REAL_MARKET_SHADOW',
     benchmark_eligible: qualified,
     training_fixture: false,
@@ -119,7 +130,7 @@ export function evaluateRealMarketArbitrageShadow({ opportunity = {}, notional_u
     decision: Object.freeze({
       action: qualified ? 'ARBITRAGE_SETTLE' : 'REJECT',
       requested_amount_usd: qualified ? simulation.notional_usdc : 0,
-      reason_codes: qualified ? ['TWO_LEG_ARBITRAGE_QUALIFIED','EXPECTED_NET_EDGE_AT_OR_ABOVE_0_20_PERCENT'] : assessment.hard_rejects.length ? assessment.hard_rejects : ['SIGNAL_QUALITY_NOT_QUALIFIED']
+      reason_codes: qualified ? ['TWO_LEG_ARBITRAGE_QUALIFIED','ORCA_RAYDIUM_SCOPE_CONFIRMED','EXPECTED_NET_EDGE_AT_OR_ABOVE_0_20_PERCENT'] : assessment.hard_rejects.length ? assessment.hard_rejects : ['SIGNAL_QUALITY_NOT_QUALIFIED']
     }),
     arbitrage: simulation,
     execution_dispatched: false,
@@ -132,3 +143,4 @@ export function evaluateRealMarketArbitrageShadow({ opportunity = {}, notional_u
 }
 
 export const REAL_MARKET_ARBITRAGE_MIN_NET_EDGE_BPS = HARD_MIN_NET_EDGE_BPS;
+export const REAL_MARKET_ARBITRAGE_ALLOWED_DEXES = Object.freeze(['ORCA','RAYDIUM']);
