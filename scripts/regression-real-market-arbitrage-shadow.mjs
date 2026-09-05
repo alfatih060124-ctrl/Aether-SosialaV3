@@ -17,19 +17,23 @@ const risk = {
 };
 const opportunity = {
   token_mint: 'TOKEN_MINT_TEST', quote_mint: 'USDC_MINT_TEST', observed_at: observedAt,
-  market_source: 'ORCA_RAYDIUM_REAL_MARKET_TEST', network_fee_usdc: 0.01,
+  market_source: 'ORCA_RAYDIUM_REAL_MARKET_TEST', network_fee_usdc: 0.01, network_fee_verified: true,
   buy_route: route(),
   sell_route: route({ pool_address: 'pool-b', dex_id: 'raydium', price_usd: 1.01 })
 };
 
-const sim = simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: opportunity.buy_route, sell_route: opportunity.sell_route, network_fee_usdc: 0.01 });
+const sim = simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: opportunity.buy_route, sell_route: opportunity.sell_route, network_fee_usdc: 0.01, network_fee_verified: true });
 assert.ok(sim.final_usdc > 1000);
 assert.ok(sim.net_edge_bps >= 20);
 assert.equal(sim.buy_route.dex_id, 'orca');
 assert.equal(sim.sell_route.dex_id, 'raydium');
 assert.deepEqual(sim.dex_scope, ['ORCA','RAYDIUM']);
+assert.equal(sim.cost_breakdown.buy_route_costs_verified, true);
+assert.equal(sim.cost_breakdown.sell_route_costs_verified, true);
+assert.equal(sim.cost_breakdown.network_fee_verified, true);
+assert.equal(sim.cost_breakdown.costs_verified, true);
 
-const reverse = simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: route({ dex_id: 'raydium' }), sell_route: route({ pool_address: 'pool-b', dex_id: 'orca', price_usd: 1.01 }), network_fee_usdc: 0.01 });
+const reverse = simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: route({ dex_id: 'raydium' }), sell_route: route({ pool_address: 'pool-b', dex_id: 'orca', price_usd: 1.01 }), network_fee_usdc: 0.01, network_fee_verified: true });
 assert.equal(reverse.buy_route.dex_id, 'raydium');
 assert.equal(reverse.sell_route.dex_id, 'orca');
 
@@ -62,9 +66,13 @@ const missingStrictEvidence = evaluateRealMarketArbitrageShadow({ opportunity, n
 assert.equal(missingStrictEvidence.decision.action, 'REJECT');
 assert.ok(missingStrictEvidence.assessment.hard_rejects.includes('MISSING_TOP10_HOLDER_PCT'));
 
-assert.throws(() => simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: route({ quote_verified: false }), sell_route: opportunity.sell_route }), /buy_quote_unverified/);
-assert.throws(() => simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: route({ dex_id: 'meteora' }), sell_route: opportunity.sell_route }), /buy_dex_not_allowed/);
-assert.throws(() => simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: route({ dex_id: 'orca' }), sell_route: route({ pool_address: 'pool-b', dex_id: 'orca', price_usd: 1.01 }) }), /arbitrage_cross_dex_required/);
+assert.throws(() => simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: route({ quote_verified: false }), sell_route: opportunity.sell_route, network_fee_usdc: 0.01, network_fee_verified: true }), /buy_quote_unverified/);
+assert.throws(() => simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: route({ fee_bps: undefined }), sell_route: opportunity.sell_route, network_fee_usdc: 0.01, network_fee_verified: true }), /buy_fee_bps_required/);
+assert.throws(() => simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: route({ price_impact_bps: undefined }), sell_route: opportunity.sell_route, network_fee_usdc: 0.01, network_fee_verified: true }), /buy_price_impact_bps_required/);
+assert.throws(() => simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: opportunity.buy_route, sell_route: opportunity.sell_route, network_fee_verified: true }), /network_fee_usdc_required/);
+assert.throws(() => simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: opportunity.buy_route, sell_route: opportunity.sell_route, network_fee_usdc: 0.01 }), /network_fee_unverified/);
+assert.throws(() => simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: route({ dex_id: 'meteora' }), sell_route: opportunity.sell_route, network_fee_usdc: 0.01, network_fee_verified: true }), /buy_dex_not_allowed/);
+assert.throws(() => simulateTwoLegArbitrage({ notional_usdc: 1000, buy_route: route({ dex_id: 'orca' }), sell_route: route({ pool_address: 'pool-b', dex_id: 'orca', price_usd: 1.01 }), network_fee_usdc: 0.01, network_fee_verified: true }), /arbitrage_cross_dex_required/);
 assert.throws(() => settleDemoArbitrage({ account: { cash_balance_usdc: 2000, open_position: { notional_usdc: 10 } }, notionalUsdc: 1000, finalUsdc: 1010 }), /arbitrage_open_position_not_allowed/);
 
 console.log('real-market-arbitrage-shadow regression: ok');
