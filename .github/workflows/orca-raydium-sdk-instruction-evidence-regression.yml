@@ -5,7 +5,11 @@ on:
     paths:
       - 'services/api/package.json'
       - 'services/api/src/orca-raydium-sdk-instruction-evidence-builder.mjs'
+      - 'services/api/src/orca-raydium-sdk-pretrade-fee-runtime.mjs'
+      - 'services/api/src/orca-raydium-unsigned-message-evidence-builder.mjs'
+      - 'services/api/src/solana-pretrade-fee-pipeline.mjs'
       - 'scripts/regression-orca-raydium-sdk-instruction-evidence-builder.mjs'
+      - 'scripts/regression-orca-raydium-sdk-pretrade-fee-runtime.mjs'
       - '.github/workflows/orca-raydium-sdk-instruction-evidence-regression.yml'
 
 permissions:
@@ -21,6 +25,9 @@ jobs:
         with:
           node-version: '20'
       - run: node --check services/api/src/orca-raydium-sdk-instruction-evidence-builder.mjs
+      - run: node --check services/api/src/orca-raydium-sdk-pretrade-fee-runtime.mjs
       - run: node --check scripts/regression-orca-raydium-sdk-instruction-evidence-builder.mjs
+      - run: node --check scripts/regression-orca-raydium-sdk-pretrade-fee-runtime.mjs
       - run: npm install --prefix services/api --ignore-scripts --no-audit --no-fund
       - run: node scripts/regression-orca-raydium-sdk-instruction-evidence-builder.mjs
+      - run: node scripts/regression-orca-raydium-sdk-pretrade-fee-runtime.mjs
