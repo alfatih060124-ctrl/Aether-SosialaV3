@@ -15,12 +15,15 @@
     { "src": "/aether-mark.svg", "dest": "/public/aether-mark.svg" },
     { "src": "/favicon.svg", "dest": "/public/favicon.svg" },
     { "src": "/og-aether.svg", "dest": "/public/og-aether.svg" },
+    { "src": "/account-auto-strategy.js", "dest": "/public/account-member-autotrade.js" },
+    { "src": "/account-auto-strategy-core.js", "dest": "/public/account-auto-strategy.js" },
     { "src": "/dashboard/?", "dest": "/public/dashboard.html" },
     { "src": "/onboarding/?", "dest": "/public/onboarding.html" },
     { "src": "/account/?", "dest": "/public/account.html" },
     { "src": "/autotrade-demo/?", "dest": "/public/autotrade-demo.html" },
     { "src": "/marketplace/?", "dest": "/public/marketplace.html" },
     { "src": "/market/?", "dest": "/public/market.html" },
+    { "src": "/", "has": [{ "type": "cookie", "key": "aether_session" }], "status": 307, "headers": { "Location": "/account" } },
     { "src": "/", "dest": "/public/index.html" },
     { "src": "/(.*)", "dest": "/public/index.html" }
   ]

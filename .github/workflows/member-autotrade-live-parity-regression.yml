@@ -1,0 +1,27 @@
+name: Member Auto Trade Live Parity Regression
+
+on:
+  pull_request:
+    paths:
+      - 'public/account-member-autotrade.js'
+      - 'services/api/src/live-arbitrage-execution.mjs'
+      - 'scripts/regression-member-autotrade-live-parity.mjs'
+      - 'vercel.json'
+      - '.github/workflows/member-autotrade-live-parity-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check public/account-member-autotrade.js
+      - run: node --check services/api/src/live-arbitrage-execution.mjs
+      - run: node --check scripts/regression-member-autotrade-live-parity.mjs
+      - run: node scripts/regression-member-autotrade-live-parity.mjs
