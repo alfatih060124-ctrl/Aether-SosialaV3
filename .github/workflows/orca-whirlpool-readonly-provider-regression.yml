@@ -1,0 +1,34 @@
+name: ORCA Whirlpool Readonly Provider Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/package.json'
+      - 'services/api/src/orca-whirlpool-readonly-provider.mjs'
+      - 'services/api/src/orca-whirlpool-rpc-quote-pool.mjs'
+      - 'scripts/regression-orca-whirlpool-readonly-provider.mjs'
+      - 'scripts/regression-orca-whirlpool-rpc-quote-pool.mjs'
+      - '.github/workflows/orca-whirlpool-readonly-provider-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check services/api/src/orca-whirlpool-readonly-provider.mjs
+      - run: node --check services/api/src/orca-whirlpool-rpc-quote-pool.mjs
+      - run: node --check scripts/regression-orca-whirlpool-readonly-provider.mjs
+      - run: node --check scripts/regression-orca-whirlpool-rpc-quote-pool.mjs
+      - run: node scripts/regression-orca-whirlpool-readonly-provider.mjs
+      - run: node scripts/regression-orca-whirlpool-rpc-quote-pool.mjs
+      - run: npm install --prefix services/api --ignore-scripts --no-audit --no-fund
+      - name: Verify ORCA SDK dependencies resolve
+        working-directory: services/api
+        run: node -e "Promise.all([import('@solana/kit'),import('@orca-so/whirlpools-client'),import('@orca-so/whirlpools-core'),import('@solana-program/token-2022')]).then(()=>console.log('orca sdk deps ok'))"

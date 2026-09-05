@@ -4,9 +4,9 @@ const DEFAULT_MAX_MARKET_AGE_MS = 5_000;
 
 const finite = value => {
   if (value === null || value === undefined) return null;
-  if (typeof value === 'string' && !value.trim()) return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
 };
 const normalizeDex = value => String(value || '').trim().toLowerCase();
 const normalizeMint = value => String(value || '').trim();
@@ -17,6 +17,12 @@ function requiredText(value, code) {
   return text;
 }
 
+function requiredBps(value, code) {
+  const numeric = finite(value);
+  if (numeric === null || numeric < 0 || numeric > 10_000) throw new Error(code);
+  return numeric;
+}
+
 function normalizePoolEvidence(pool, { now, maxMarketAgeMs }) {
   if (!pool || typeof pool !== 'object') throw new Error('scanner_pool_evidence_required');
   const dexId = normalizeDex(pool.dex_id);
@@ -25,12 +31,16 @@ function normalizePoolEvidence(pool, { now, maxMarketAgeMs }) {
   const tokenMint = requiredText(pool.token_mint, 'scanner_token_mint_required');
   const quoteMint = requiredText(pool.quote_mint, 'scanner_quote_mint_required');
   if (tokenMint === quoteMint) throw new Error('scanner_distinct_mints_required');
-  const priceUsd = finite(pool.price_usd);
-  if (!(priceUsd > 0)) throw new Error('scanner_price_required');
-  const feeBps = finite(pool.fee_bps);
-  if (feeBps === null || feeBps < 0 || feeBps > 10_000) throw new Error('scanner_fee_bps_required');
-  const priceImpactBps = finite(pool.price_impact_bps);
-  if (priceImpactBps === null || priceImpactBps < 0 || priceImpactBps > 10_000) throw new Error('scanner_price_impact_bps_required');
+
+  const buyPriceUsd = finite(pool.buy_price_usd);
+  const sellPriceUsd = finite(pool.sell_price_usd);
+  if (!(buyPriceUsd > 0)) throw new Error('scanner_buy_price_required');
+  if (!(sellPriceUsd > 0)) throw new Error('scanner_sell_price_required');
+  const buyFeeBps = requiredBps(pool.buy_fee_bps, 'scanner_buy_fee_bps_required');
+  const sellFeeBps = requiredBps(pool.sell_fee_bps, 'scanner_sell_fee_bps_required');
+  const buyPriceImpactBps = requiredBps(pool.buy_price_impact_bps, 'scanner_buy_price_impact_bps_required');
+  const sellPriceImpactBps = requiredBps(pool.sell_price_impact_bps, 'scanner_sell_price_impact_bps_required');
+
   if (pool.quote_verified !== true) throw new Error('scanner_quote_unverified');
   if (pool.costs_verified !== true) throw new Error('scanner_costs_unverified');
   const quoteSource = requiredText(pool.quote_source, 'scanner_quote_source_required');
@@ -39,14 +49,18 @@ function normalizePoolEvidence(pool, { now, maxMarketAgeMs }) {
   const ageMs = now - observedAtMs;
   if (ageMs < 0) throw new Error('scanner_future_quote_rejected');
   if (ageMs > maxMarketAgeMs) throw new Error('scanner_stale_quote_rejected');
+
   return Object.freeze({
     dex_id: dexId,
     pool_address: poolAddress,
     token_mint: tokenMint,
     quote_mint: quoteMint,
-    price_usd: priceUsd,
-    fee_bps: feeBps,
-    price_impact_bps: priceImpactBps,
+    buy_price_usd: buyPriceUsd,
+    sell_price_usd: sellPriceUsd,
+    buy_fee_bps: buyFeeBps,
+    sell_fee_bps: sellFeeBps,
+    buy_price_impact_bps: buyPriceImpactBps,
+    sell_price_impact_bps: sellPriceImpactBps,
     liquidity_usd: finite(pool.liquidity_usd),
     quote_source: quoteSource,
     quote_verified: true,
@@ -59,9 +73,30 @@ function keyForPair(tokenMint, quoteMint) {
   return `${tokenMint}::${quoteMint}`;
 }
 
-function compareDirection(buy, sell) {
-  if (buy.dex_id === sell.dex_id) return null;
-  if (buy.token_mint !== sell.token_mint || buy.quote_mint !== sell.quote_mint) return null;
+function routeForSide(pool, side) {
+  const buy = side === 'BUY';
+  return Object.freeze({
+    dex_id: pool.dex_id,
+    pool_address: pool.pool_address,
+    token_mint: pool.token_mint,
+    quote_mint: pool.quote_mint,
+    side,
+    price_usd: buy ? pool.buy_price_usd : pool.sell_price_usd,
+    fee_bps: buy ? pool.buy_fee_bps : pool.sell_fee_bps,
+    price_impact_bps: buy ? pool.buy_price_impact_bps : pool.sell_price_impact_bps,
+    liquidity_usd: pool.liquidity_usd,
+    quote_source: pool.quote_source,
+    quote_verified: true,
+    costs_verified: true,
+    observed_at: pool.observed_at
+  });
+}
+
+function compareDirection(buyPool, sellPool) {
+  if (buyPool.dex_id === sellPool.dex_id) return null;
+  if (buyPool.token_mint !== sellPool.token_mint || buyPool.quote_mint !== sellPool.quote_mint) return null;
+  const buy = routeForSide(buyPool, 'BUY');
+  const sell = routeForSide(sellPool, 'SELL');
   const grossEdgeBps = ((sell.price_usd / buy.price_usd) - 1) * 10_000;
   return Object.freeze({
     direction: `${buy.dex_id.toUpperCase()}_TO_${sell.dex_id.toUpperCase()}`,

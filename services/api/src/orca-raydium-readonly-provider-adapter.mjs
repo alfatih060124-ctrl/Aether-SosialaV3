@@ -1,9 +1,20 @@
-const finite = value => Number.isFinite(Number(value)) ? Number(value) : null;
+const finite = value => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
 const text = (value, code) => {
   const normalized = String(value || '').trim();
   if (!normalized) throw new Error(code);
   return normalized;
 };
+
+function requiredBps(value, code) {
+  const numeric = finite(value);
+  if (numeric === null || numeric < 0 || numeric > 10_000) throw new Error(code);
+  return numeric;
+}
 
 function normalizeProviderRow(row, expectedDex, tokenMint, quoteMint) {
   if (!row || typeof row !== 'object') throw new Error(`${expectedDex}_provider_row_required`);
@@ -12,12 +23,16 @@ function normalizeProviderRow(row, expectedDex, tokenMint, quoteMint) {
   const rowTokenMint = text(row.token_mint, `${expectedDex}_token_mint_required`);
   const rowQuoteMint = text(row.quote_mint, `${expectedDex}_quote_mint_required`);
   if (rowTokenMint !== tokenMint || rowQuoteMint !== quoteMint) throw new Error(`${expectedDex}_provider_pair_mismatch`);
-  const priceUsd = finite(row.price_usd);
-  if (!(priceUsd > 0)) throw new Error(`${expectedDex}_price_required`);
-  const feeBps = finite(row.fee_bps);
-  if (feeBps === null || feeBps < 0 || feeBps > 10_000) throw new Error(`${expectedDex}_fee_bps_required`);
-  const priceImpactBps = finite(row.price_impact_bps);
-  if (priceImpactBps === null || priceImpactBps < 0 || priceImpactBps > 10_000) throw new Error(`${expectedDex}_price_impact_bps_required`);
+
+  const buyPriceUsd = finite(row.buy_price_usd);
+  const sellPriceUsd = finite(row.sell_price_usd);
+  if (!(buyPriceUsd > 0)) throw new Error(`${expectedDex}_buy_price_required`);
+  if (!(sellPriceUsd > 0)) throw new Error(`${expectedDex}_sell_price_required`);
+  const buyFeeBps = requiredBps(row.buy_fee_bps, `${expectedDex}_buy_fee_bps_required`);
+  const sellFeeBps = requiredBps(row.sell_fee_bps, `${expectedDex}_sell_fee_bps_required`);
+  const buyPriceImpactBps = requiredBps(row.buy_price_impact_bps, `${expectedDex}_buy_price_impact_bps_required`);
+  const sellPriceImpactBps = requiredBps(row.sell_price_impact_bps, `${expectedDex}_sell_price_impact_bps_required`);
+
   if (row.quote_verified !== true) throw new Error(`${expectedDex}_quote_unverified`);
   if (row.costs_verified !== true) throw new Error(`${expectedDex}_costs_unverified`);
   const observedAt = text(row.observed_at, `${expectedDex}_observed_at_required`);
@@ -27,9 +42,12 @@ function normalizeProviderRow(row, expectedDex, tokenMint, quoteMint) {
     pool_address: text(row.pool_address, `${expectedDex}_pool_address_required`),
     token_mint: rowTokenMint,
     quote_mint: rowQuoteMint,
-    price_usd: priceUsd,
-    fee_bps: feeBps,
-    price_impact_bps: priceImpactBps,
+    buy_price_usd: buyPriceUsd,
+    sell_price_usd: sellPriceUsd,
+    buy_fee_bps: buyFeeBps,
+    sell_fee_bps: sellFeeBps,
+    buy_price_impact_bps: buyPriceImpactBps,
+    sell_price_impact_bps: sellPriceImpactBps,
     liquidity_usd: finite(row.liquidity_usd),
     quote_source: text(row.quote_source, `${expectedDex}_quote_source_required`),
     quote_verified: true,

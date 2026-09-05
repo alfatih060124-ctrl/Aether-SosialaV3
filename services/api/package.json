@@ -4,5 +4,11 @@
   "type": "module",
   "scripts": {"start": "node src/server.mjs"},
   "engines": {"node": ">=20"},
-  "dependencies": {"pg": "^8.16.3"}
+  "dependencies": {
+    "@orca-so/whirlpools-client": "7.0.0",
+    "@orca-so/whirlpools-core": "3.1.1",
+    "@solana-program/token-2022": "0.6.1",
+    "@solana/kit": "5.0.0",
+    "pg": "^8.16.3"
+  }
 }
