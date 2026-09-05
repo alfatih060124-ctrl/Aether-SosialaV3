@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { runAutoTradeTraining } from './auto-trade-training.mjs';
+import { runRealMarketShadowStep } from './real-market-shadow-demo.mjs';
 import { settleDemoAction, demoEquity } from './demo-autotrade-ledger.mjs';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value)));
@@ -45,6 +45,7 @@ function projectAccount(account, feeBps, history = []) {
     performance_fee_bps: feeBps,
     history,
     mode: 'SHADOW',
+    market_data_mode: 'REAL_MARKET',
     currency: 'USDC_DEMO',
     persistent: true,
     funds_moved: false,
@@ -61,7 +62,7 @@ export async function getMemberAutoTradeDemoState(pool, userId, { limit = 20 } =
     const feeBps = await feeConfig(client);
     const safeLimit = Math.max(1, Math.min(100, Number(limit) || 20));
     const history = (await client.query(`
-      SELECT trade_id,scenario,engine_action,settlement_status,notional_usdc,gross_pnl_usdc,performance_fee_usdc,net_pnl_usdc,pnl_bps,balance_before_usdc,balance_after_usdc,created_at
+      SELECT trade_id,scenario,engine_action,settlement_status,notional_usdc,gross_pnl_usdc,performance_fee_usdc,net_pnl_usdc,pnl_bps,balance_before_usdc,balance_after_usdc,engine_result,created_at
       FROM member_autotrade_demo_trades WHERE user_id=$1 ORDER BY created_at DESC LIMIT $2
     `,[userId,safeLimit])).rows;
     await client.query('COMMIT');
@@ -81,10 +82,9 @@ export async function runMemberAutoTradeDemoStep(pool, session, input = {}) {
     await client.query('BEGIN');
     const account = await ensureAccount(client, session.user_id, input.capital_usd ?? 100);
     const feeBps = await feeConfig(client);
-    const capital = Math.max(10, demoEquity(account));
-    const result = runAutoTradeTraining({ ...input, capital_usd: capital });
-    if (result?.mode !== 'SHADOW' || result?.live_execution_authorized !== false || result?.funds_moved !== false) {
-      throw new Error('demo_shadow_invariant_failed');
+    const result = await runRealMarketShadowStep({ account, input });
+    if (result?.mode !== 'SHADOW' || result?.market_data_mode !== 'REAL_MARKET' || result?.training_fixture !== false || result?.live_execution_authorized !== false || result?.funds_moved !== false) {
+      throw new Error('demo_real_market_shadow_invariant_failed');
     }
 
     const settlement = settleDemoAction({
@@ -94,6 +94,13 @@ export async function runMemberAutoTradeDemoStep(pool, session, input = {}) {
       positionPnlBps: result.position?.unrealized_pnl_bps,
       performanceFeeBps: feeBps
     });
+
+    let nextOpenPosition = settlement.open_position;
+    if (settlement.settlement_status === 'OPENED' && result.open_position_metadata) {
+      nextOpenPosition = { ...settlement.open_position, ...result.open_position_metadata };
+    } else if (settlement.settlement_status === 'HELD' && result.open_position_metadata && asNumber(account.open_position?.notional_usdc) > 0) {
+      nextOpenPosition = { ...account.open_position, ...result.open_position_metadata };
+    }
 
     const updated = (await client.query(`
       UPDATE member_autotrade_demo_accounts SET
@@ -114,8 +121,24 @@ export async function runMemberAutoTradeDemoStep(pool, session, input = {}) {
       settlement.trades_closed_delta,
       settlement.winning_trades_delta,
       settlement.losing_trades_delta,
-      JSON.stringify(settlement.open_position)
+      JSON.stringify(nextOpenPosition)
     ])).rows[0];
+
+    const engineResult = {
+      market_data_mode: 'REAL_MARKET',
+      market_source: result.market_source,
+      observed_at: result.observed_at,
+      token_mint: result.assessment?.snapshot?.mint || result.open_position_metadata?.token_mint || account.open_position?.token_mint || null,
+      expected_net_edge_bps: result.assessment?.expected_net_edge_bps ?? account.open_position?.expected_net_edge_bps ?? null,
+      minimum_expected_net_edge_bps: result.assessment?.minimum_expected_net_edge_bps ?? 20,
+      buy_pool: result.assessment?.snapshot?.buy_pool || null,
+      sell_pool: result.assessment?.snapshot?.sell_pool || null,
+      reason_codes: result.decision?.reason_codes ?? [],
+      training_fixture: false,
+      execution_dispatched: false,
+      funds_moved: false,
+      live_execution_authorized: false
+    };
 
     const trade = (await client.query(`
       INSERT INTO member_autotrade_demo_trades(
@@ -123,17 +146,10 @@ export async function runMemberAutoTradeDemoStep(pool, session, input = {}) {
         performance_fee_usdc,net_pnl_usdc,pnl_bps,balance_before_usdc,balance_after_usdc,engine_result
       ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb) RETURNING *
     `,[
-      randomUUID(),session.user_id,String(result.training_scenario),String(result.decision?.action || 'REJECT'),
+      randomUUID(),session.user_id,String(result.scenario),String(result.decision?.action || 'REJECT'),
       settlement.settlement_status,settlement.notional_usdc,settlement.gross_pnl_usdc,
       settlement.performance_fee_usdc,settlement.net_pnl_usdc,settlement.pnl_bps,
-      settlement.balance_before_usdc,settlement.balance_after_usdc,JSON.stringify({
-        assessment_score: result.assessment?.quality_score ?? null,
-        reason_codes: result.decision?.reason_codes ?? [],
-        training_fixture: true,
-        execution_dispatched: false,
-        funds_moved: false,
-        live_execution_authorized: false
-      })
+      settlement.balance_before_usdc,settlement.balance_after_usdc,JSON.stringify(engineResult)
     ])).rows[0];
 
     await client.query('COMMIT');
@@ -144,7 +160,7 @@ export async function runMemberAutoTradeDemoStep(pool, session, input = {}) {
       scenario_label: walletLabel,
       demo_wallet: wallet,
       demo_trade: trade,
-      simulator_runtime: 'PRIMARY_VM_PERSISTENT_DEMO',
+      simulator_runtime: 'PRIMARY_VM_REAL_MARKET_SHADOW',
       authenticated_session: true,
       execution_dispatched: false,
       transaction_created: false,
