@@ -1,5 +1,3 @@
-import { ComputeBudgetProgram, PublicKey, TransactionMessage } from '@solana/web3.js';
-
 const WSOL_MINT = 'So11111111111111111111111111111111111111112';
 const DEFAULT_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const DEFAULT_FEE_PAYER = '11111111111111111111111111111111';
@@ -68,9 +66,11 @@ export function createOrcaRaydiumShadowNetworkFeeSource({
   if (!scannerRuntime || typeof scannerRuntime.scanPair !== 'function') throw new Error('shadow_network_fee_scanner_required');
   if (typeof fetchImpl !== 'function') throw new Error('shadow_network_fee_fetch_required');
   const quoteMint = text(usdcMint, 'shadow_network_fee_usdc_mint_required');
-  const payer = new PublicKey(text(feePayer, 'shadow_network_fee_payer_required'));
+  const payerAddress = text(feePayer, 'shadow_network_fee_payer_required');
 
   return async function loadNetworkFeeEvidence() {
+    const { ComputeBudgetProgram, PublicKey, TransactionMessage } = await import('@solana/web3.js');
+    const payer = new PublicKey(payerAddress);
     const [latest, recentPriorityFees, solUsdScan] = await Promise.all([
       rpcCall(fetchImpl, endpoint, 'getLatestBlockhash', [{ commitment: 'confirmed' }], timeoutMs),
       rpcCall(fetchImpl, endpoint, 'getRecentPrioritizationFees', [[]], timeoutMs),
