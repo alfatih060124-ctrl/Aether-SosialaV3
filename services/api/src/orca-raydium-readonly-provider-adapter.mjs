@@ -16,6 +16,16 @@ function requiredBps(value, code) {
   return numeric;
 }
 
+function instructionContext(row, expectedDex, observedSlot) {
+  const context = row?.instruction_context;
+  if (!context || typeof context !== 'object' || context.verified !== true) throw new Error(`${expectedDex}_instruction_context_required`);
+  if (context.read_only !== true || context.live_execution_authorized === true || context.private_key_present === true || context.signature_present === true) {
+    throw new Error(`${expectedDex}_instruction_context_boundary_invalid`);
+  }
+  if (Number(context.source_slot) !== observedSlot) throw new Error(`${expectedDex}_instruction_context_slot_mismatch`);
+  return context;
+}
+
 function normalizeProviderRow(row, expectedDex, tokenMint, quoteMint) {
   if (!row || typeof row !== 'object') throw new Error(`${expectedDex}_provider_row_required`);
   const reportedDex = String(row.dex_id || expectedDex).trim().toLowerCase();
@@ -37,6 +47,10 @@ function normalizeProviderRow(row, expectedDex, tokenMint, quoteMint) {
   if (row.costs_verified !== true) throw new Error(`${expectedDex}_costs_unverified`);
   const observedAt = text(row.observed_at, `${expectedDex}_observed_at_required`);
   if (!Number.isFinite(Date.parse(observedAt))) throw new Error(`${expectedDex}_observed_at_invalid`);
+  const observedSlot = Number(row.observed_slot);
+  if (!Number.isSafeInteger(observedSlot) || observedSlot <= 0) throw new Error(`${expectedDex}_observed_slot_required`);
+  const verifiedContext = instructionContext(row, expectedDex, observedSlot);
+
   return Object.freeze({
     dex_id: expectedDex,
     pool_address: text(row.pool_address, `${expectedDex}_pool_address_required`),
@@ -52,7 +66,9 @@ function normalizeProviderRow(row, expectedDex, tokenMint, quoteMint) {
     quote_source: text(row.quote_source, `${expectedDex}_quote_source_required`),
     quote_verified: true,
     costs_verified: true,
-    observed_at: new Date(Date.parse(observedAt)).toISOString()
+    observed_at: new Date(Date.parse(observedAt)).toISOString(),
+    observed_slot: observedSlot,
+    instruction_context: verifiedContext
   });
 }
 
