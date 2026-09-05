@@ -1,0 +1,24 @@
+name: Raydium SDK RPC Quote Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/raydium-sdk-rpc-quote-pool.mjs'
+      - 'scripts/regression-raydium-sdk-rpc-quote-pool.mjs'
+      - '.github/workflows/raydium-sdk-rpc-quote-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run Raydium SDK RPC quote regression
+        run: node scripts/regression-raydium-sdk-rpc-quote-pool.mjs
