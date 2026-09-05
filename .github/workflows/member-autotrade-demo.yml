@@ -18,6 +18,7 @@ on:
       - 'scripts/member-autotrade-demo-regression.mjs'
       - 'scripts/member-autotrade-demo-page-regression.mjs'
       - 'scripts/regression-orca-raydium-shadow-network-fee-source.mjs'
+      - 'scripts/regression-member-autotrade-real-market-runtime-factory.mjs'
       - '.github/workflows/member-autotrade-demo.yml'
   push:
     branches: [main]
@@ -37,6 +38,7 @@ on:
       - 'scripts/member-autotrade-demo-regression.mjs'
       - 'scripts/member-autotrade-demo-page-regression.mjs'
       - 'scripts/regression-orca-raydium-shadow-network-fee-source.mjs'
+      - 'scripts/regression-member-autotrade-real-market-runtime-factory.mjs'
       - '.github/workflows/member-autotrade-demo.yml'
 
 jobs:
@@ -61,9 +63,12 @@ jobs:
           node --check scripts/member-autotrade-demo-regression.mjs
           node --check scripts/member-autotrade-demo-page-regression.mjs
           node --check scripts/regression-orca-raydium-shadow-network-fee-source.mjs
+          node --check scripts/regression-member-autotrade-real-market-runtime-factory.mjs
       - name: Run demo-wallet regression
         run: node scripts/member-autotrade-demo-regression.mjs
       - name: Run demo-page regression
         run: node scripts/member-autotrade-demo-page-regression.mjs
       - name: Run network-fee regression
         run: node scripts/regression-orca-raydium-shadow-network-fee-source.mjs
+      - name: Run runtime-factory regression
+        run: node scripts/regression-member-autotrade-real-market-runtime-factory.mjs
