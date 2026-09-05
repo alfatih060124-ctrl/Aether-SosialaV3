@@ -30,6 +30,8 @@ function sdkLoader({ tokenProgram = splProgram, quoteProgram = splProgram, pairO
           data: {
             tokenMintA: pairOk ? token : 'OTHER_TOKEN',
             tokenMintB: usdc,
+            tokenVaultA: 'vault-a',
+            tokenVaultB: 'vault-b',
             tickCurrentIndex: 0,
             tickSpacing: 64,
             feeTierIndexSeed: [64, 0],
@@ -51,10 +53,10 @@ function sdkLoader({ tokenProgram = splProgram, quoteProgram = splProgram, pairO
       swapQuoteByInputToken(inputAmount, specifiedTokenA) {
         if (specifiedTokenA) {
           assert.equal(inputAmount, 50_000_000n);
-          return { tokenEstOut: 99_500_000n, tradeFee: 150_000n };
+          return { tokenEstOut: 99_500_000n, tokenMinOut: 99_500_000n, tradeFee: 150_000n };
         }
         assert.equal(inputAmount, 100_000_000n);
-        return { tokenEstOut: 49_500_000n, tradeFee: 300_000n };
+        return { tokenEstOut: 49_500_000n, tokenMinOut: 49_500_000n, tradeFee: 300_000n };
       }
     },
     token2022: {
@@ -96,6 +98,19 @@ assert.equal(result.observed_slot, 123456);
 assert.match(result.quote_source, /^ORCA_WHIRLPOOLS_ONCHAIN_RPC_SLOT_123456$/);
 assert.equal(result.read_only, true);
 assert.equal(result.live_execution_authorized, false);
+assert.equal(result.instruction_context.verified, true);
+assert.equal(result.instruction_context.source_slot, 123456);
+assert.equal(result.instruction_context.token_vault_a, 'vault-a');
+assert.equal(result.instruction_context.token_vault_b, 'vault-b');
+assert.equal(result.instruction_context.oracle, 'oracle');
+assert.equal(result.instruction_context.buy.amount, '100000000');
+assert.equal(result.instruction_context.buy.other_amount_threshold, '49500000');
+assert.equal(result.instruction_context.buy.a_to_b, false);
+assert.equal(result.instruction_context.sell.amount, '50000000');
+assert.equal(result.instruction_context.sell.other_amount_threshold, '99500000');
+assert.equal(result.instruction_context.sell.a_to_b, true);
+assert.equal(result.instruction_context.private_key_present, false);
+assert.equal(result.instruction_context.network_submission_authorized, false);
 
 await assert.rejects(
   quotePool({ pool_address: pool, token_mint: token, quote_mint: usdc, notional_usdc: 100, read_only: false, strategy: 'TWO_LEG_ARBITRAGE' }),
