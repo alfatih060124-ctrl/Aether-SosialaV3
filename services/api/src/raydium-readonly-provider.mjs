@@ -35,6 +35,15 @@ function exactPair(pool, tokenMint, quoteMint) {
   return (a === tokenMint && b === quoteMint) || (a === quoteMint && b === tokenMint);
 }
 
+function verifiedInstructionContext(quote) {
+  const context = quote?.instruction_context;
+  if (!context || typeof context !== 'object' || context.verified !== true) throw new Error('raydium_onchain_instruction_context_required');
+  if (context.read_only !== true || context.live_execution_authorized === true || context.private_key_present === true || context.signature_present === true) {
+    throw new Error('raydium_onchain_instruction_context_boundary_invalid');
+  }
+  return context;
+}
+
 function discoveryRows(payload) {
   if (!payload || payload.success !== true) throw new Error('raydium_discovery_unsuccessful');
   if (Array.isArray(payload.data)) return payload.data;
@@ -88,11 +97,7 @@ export function createRaydiumReadOnlyQuoteLoader({
       page: '1'
     });
 
-    const pools = await fetchJson(
-      fetchImpl,
-      `${String(apiBaseUrl).replace(/\/$/, '')}/pools/info/mint?${query}`,
-      timeoutMs
-    );
+    const pools = await fetchJson(fetchImpl, `${String(apiBaseUrl).replace(/\/$/, '')}/pools/info/mint?${query}`, timeoutMs);
     const candidates = pools.filter(pool => pool && exactPair(pool, tokenMint, quoteMint));
     if (!candidates.length) throw new Error('raydium_no_exact_pair_pools');
 
@@ -123,8 +128,12 @@ export function createRaydiumReadOnlyQuoteLoader({
       const sellPriceImpactBps = requiredBps(quote.sell_price_impact_bps, 'raydium_onchain_sell_price_impact_bps_required');
       const observedAt = text(quote.observed_at, 'raydium_onchain_observed_at_required');
       if (!Number.isFinite(Date.parse(observedAt))) throw new Error('raydium_onchain_observed_at_invalid');
+      const observedSlot = Number(quote.observed_slot);
+      if (!Number.isSafeInteger(observedSlot) || observedSlot <= 0) throw new Error('raydium_onchain_observed_slot_required');
       const quoteSource = text(quote.quote_source, 'raydium_onchain_quote_source_required');
       if (!quoteSource.toUpperCase().includes('RAYDIUM')) throw new Error('raydium_onchain_quote_source_invalid');
+      const instructionContext = verifiedInstructionContext(quote);
+      if (Number(instructionContext.source_slot) !== observedSlot) throw new Error('raydium_onchain_instruction_slot_mismatch');
 
       rows.push(Object.freeze({
         dex_id: 'raydium',
@@ -141,7 +150,9 @@ export function createRaydiumReadOnlyQuoteLoader({
         quote_source: quoteSource,
         quote_verified: true,
         costs_verified: true,
-        observed_at: new Date(Date.parse(observedAt)).toISOString()
+        observed_at: new Date(Date.parse(observedAt)).toISOString(),
+        observed_slot: observedSlot,
+        instruction_context: instructionContext
       }));
     }
 
