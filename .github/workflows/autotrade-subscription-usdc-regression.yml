@@ -1,0 +1,22 @@
+name: Auto Trade Subscription USDC Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/autotrade-subscription.mjs'
+      - 'scripts/regression-autotrade-subscription-usdc.mjs'
+      - '.github/workflows/autotrade-subscription-usdc-regression.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: node --check services/api/src/autotrade-subscription.mjs && node --check scripts/regression-autotrade-subscription-usdc.mjs
+      - name: Run regression
+        run: node scripts/regression-autotrade-subscription-usdc.mjs
