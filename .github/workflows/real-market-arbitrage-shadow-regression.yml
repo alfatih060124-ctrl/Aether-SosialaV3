@@ -9,6 +9,7 @@ on:
       - 'services/api/src/orca-raydium-readonly-provider-adapter.mjs'
       - 'services/api/src/orca-raydium-shadow-runtime.mjs'
       - 'services/api/src/orca-raydium-shadow-qualification-runtime.mjs'
+      - 'services/api/src/orca-raydium-shadow-qualified-pretrade-runtime.mjs'
       - 'services/api/src/orca-raydium-shadow-evidence-adapter.mjs'
       - 'services/api/src/orca-raydium-shadow-risk-evidence-collector.mjs'
       - 'services/api/src/solana-pretrade-network-fee-estimator.mjs'
@@ -28,6 +29,7 @@ on:
       - 'scripts/regression-orca-raydium-readonly-provider-adapter.mjs'
       - 'scripts/regression-orca-raydium-shadow-runtime.mjs'
       - 'scripts/regression-orca-raydium-shadow-qualification-runtime.mjs'
+      - 'scripts/regression-orca-raydium-shadow-qualified-pretrade-runtime.mjs'
       - 'scripts/regression-orca-raydium-shadow-evidence-adapter.mjs'
       - 'scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs'
       - 'scripts/regression-solana-pretrade-network-fee-estimator.mjs'
@@ -56,6 +58,7 @@ jobs:
       - run: node --check services/api/src/orca-raydium-readonly-provider-adapter.mjs
       - run: node --check services/api/src/orca-raydium-shadow-runtime.mjs
       - run: node --check services/api/src/orca-raydium-shadow-qualification-runtime.mjs
+      - run: node --check services/api/src/orca-raydium-shadow-qualified-pretrade-runtime.mjs
       - run: node --check services/api/src/orca-raydium-shadow-evidence-adapter.mjs
       - run: node --check services/api/src/orca-raydium-shadow-risk-evidence-collector.mjs
       - run: node --check services/api/src/solana-pretrade-network-fee-estimator.mjs
@@ -74,6 +77,7 @@ jobs:
       - run: node --check scripts/regression-orca-raydium-readonly-provider-adapter.mjs
       - run: node --check scripts/regression-orca-raydium-shadow-runtime.mjs
       - run: node --check scripts/regression-orca-raydium-shadow-qualification-runtime.mjs
+      - run: node --check scripts/regression-orca-raydium-shadow-qualified-pretrade-runtime.mjs
       - run: node --check scripts/regression-orca-raydium-shadow-evidence-adapter.mjs
       - run: node --check scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs
       - run: node --check scripts/regression-solana-pretrade-network-fee-estimator.mjs
@@ -89,6 +93,7 @@ jobs:
       - run: node scripts/regression-orca-raydium-readonly-provider-adapter.mjs
       - run: node scripts/regression-orca-raydium-shadow-runtime.mjs
       - run: node scripts/regression-orca-raydium-shadow-qualification-runtime.mjs
+      - run: node scripts/regression-orca-raydium-shadow-qualified-pretrade-runtime.mjs
       - run: node scripts/regression-orca-raydium-shadow-evidence-adapter.mjs
       - run: node scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs
       - run: node scripts/regression-solana-pretrade-network-fee-estimator.mjs
