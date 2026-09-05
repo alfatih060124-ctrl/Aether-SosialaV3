@@ -1,4 +1,9 @@
-const finite = value => Number.isFinite(Number(value)) ? Number(value) : null;
+const finite = value => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
 const text = (value, code) => {
   const normalized = String(value || '').trim();
   if (!normalized) throw new Error(code);
@@ -57,11 +62,13 @@ function routeEvidence(opportunity = {}) {
 export function createOrcaRaydiumShadowRiskEvidenceCollector({
   loadMarketRiskSource,
   loadTokenRiskSource,
+  loadSellSimulationSource,
   now = () => Date.now(),
   maxEvidenceAgeMs = 15_000
 } = {}) {
   if (typeof loadMarketRiskSource !== 'function') throw new Error('shadow_market_risk_source_required');
   if (typeof loadTokenRiskSource !== 'function') throw new Error('shadow_token_risk_source_required');
+  if (typeof loadSellSimulationSource !== 'function') throw new Error('shadow_sell_simulation_source_required');
   const maxAge = requiredNumber(maxEvidenceAgeMs, 'shadow_risk_evidence_max_age_required', { min: 1 });
 
   return Object.freeze({
@@ -78,16 +85,19 @@ export function createOrcaRaydiumShadowRiskEvidenceCollector({
         read_only: true,
         strategy: 'TWO_LEG_ARBITRAGE'
       });
-      const [marketRaw, tokenRaw] = await Promise.all([
+      const [marketRaw, tokenRaw, sellSimulationRaw] = await Promise.all([
         loadMarketRiskSource(context),
-        loadTokenRiskSource(context)
+        loadTokenRiskSource(context),
+        loadSellSimulationSource(context)
       ]);
       const timestamp = Number(now());
       if (!Number.isFinite(timestamp)) throw new Error('shadow_risk_now_invalid');
       const market = freshVerifiedSource(marketRaw, { now: timestamp, maxAgeMs: maxAge, prefix: 'shadow_market_risk_source' });
       const token = freshVerifiedSource(tokenRaw, { now: timestamp, maxAgeMs: maxAge, prefix: 'shadow_token_risk_source' });
+      const sellSimulation = freshVerifiedSource(sellSimulationRaw, { now: timestamp, maxAgeMs: maxAge, prefix: 'shadow_sell_simulation_source' });
 
       if (token.raw.transferable !== true) throw new Error('shadow_token_transferability_not_verified');
+      if (sellSimulation.raw.sell_simulation_ok !== true) throw new Error('shadow_sell_simulation_not_verified');
       const riskFlags = Array.isArray(token.raw.risk_flags) ? token.raw.risk_flags.map(String).filter(Boolean) : [];
 
       const data = Object.freeze({
@@ -112,11 +122,16 @@ export function createOrcaRaydiumShadowRiskEvidenceCollector({
         verified: true,
         data,
         source: 'AETHER_ORCA_RAYDIUM_VERIFIED_RISK_COLLECTOR',
-        source_reference: `${market.sourceReference}|${token.sourceReference}`,
-        observed_at: new Date(Math.min(Date.parse(market.observedAt), Date.parse(token.observedAt))).toISOString(),
+        source_reference: `${market.sourceReference}|${token.sourceReference}|${sellSimulation.sourceReference}`,
+        observed_at: new Date(Math.min(
+          Date.parse(market.observedAt),
+          Date.parse(token.observedAt),
+          Date.parse(sellSimulation.observedAt)
+        )).toISOString(),
         provenance: Object.freeze({
           market: Object.freeze({ source: market.source, source_reference: market.sourceReference }),
-          token: Object.freeze({ source: token.source, source_reference: token.sourceReference })
+          token: Object.freeze({ source: token.source, source_reference: token.sourceReference }),
+          sell_simulation: Object.freeze({ source: sellSimulation.source, source_reference: sellSimulation.sourceReference })
         }),
         read_only: true,
         transaction_building_authorized: false,
@@ -134,7 +149,7 @@ export const ORCA_RAYDIUM_SHADOW_RISK_EVIDENCE_COLLECTOR = Object.freeze({
   route_risk_from_verified_quotes: true,
   verified_market_source_required: true,
   verified_token_source_required: true,
-  sell_path_from_verified_sell_route: true,
+  verified_sell_simulation_source_required: true,
   transaction_building_authorized: false,
   network_submission_authorized: false,
   live_execution_authorized: false
