@@ -4,8 +4,11 @@ on:
   pull_request:
     paths:
       - 'services/api/src/solana-token-risk-source.mjs'
+      - 'services/api/src/orca-raydium-market-risk-source.mjs'
       - 'services/api/src/orca-raydium-shadow-risk-evidence-collector.mjs'
+      - 'services/api/src/orca-raydium-verified-risk-qualification-runtime.mjs'
       - 'scripts/regression-solana-token-risk-source.mjs'
+      - 'scripts/regression-orca-raydium-market-risk-source.mjs'
       - 'scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs'
       - '.github/workflows/real-risk-enrichment-regression.yml'
   workflow_dispatch:
@@ -23,8 +26,12 @@ jobs:
         with:
           node-version: '20'
       - run: node --check services/api/src/solana-token-risk-source.mjs
+      - run: node --check services/api/src/orca-raydium-market-risk-source.mjs
       - run: node --check services/api/src/orca-raydium-shadow-risk-evidence-collector.mjs
+      - run: node --check services/api/src/orca-raydium-verified-risk-qualification-runtime.mjs
       - run: node --check scripts/regression-solana-token-risk-source.mjs
+      - run: node --check scripts/regression-orca-raydium-market-risk-source.mjs
       - run: node --check scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs
       - run: node scripts/regression-solana-token-risk-source.mjs
+      - run: node scripts/regression-orca-raydium-market-risk-source.mjs
       - run: node scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs
