@@ -74,16 +74,22 @@ async function loadTickArrays({ rpc, whirlpool, client, core, deployment }) {
   ).then(result => result[0])));
   const fetched = await client.fetchAllMaybeTickArray(rpc, addresses);
   if (!Array.isArray(fetched) || fetched.length !== starts.length) throw new Error('orca_rpc_tick_arrays_invalid');
-  return fetched.map((entry, index) => entry?.exists === true ? entry.data : emptyTickArray(starts[index], size));
+  const data = fetched.map((entry, index) => entry?.exists === true ? entry.data : emptyTickArray(starts[index], size));
+  return Object.freeze({
+    addresses: Object.freeze(addresses.map(value => String(value))),
+    data: Object.freeze(data)
+  });
 }
 
 async function loadOracle({ rpc, whirlpool, client, deployment }) {
-  const feeTierIndex = whirlpool.data.feeTierIndexSeed[0] + whirlpool.data.feeTierIndexSeed[1] * 256;
-  if (whirlpool.data.tickSpacing === feeTierIndex) return undefined;
   const oracleAddress = await client.getOracleAddress(whirlpool.address, deployment.programId).then(result => result[0]);
+  const feeTierIndex = whirlpool.data.feeTierIndexSeed[0] + whirlpool.data.feeTierIndexSeed[1] * 256;
+  if (whirlpool.data.tickSpacing === feeTierIndex) {
+    return Object.freeze({ address: String(oracleAddress), data: undefined });
+  }
   const oracle = await client.fetchOracle(rpc, oracleAddress);
   if (!oracle?.data) throw new Error('orca_rpc_oracle_required');
-  return oracle.data;
+  return Object.freeze({ address: String(oracleAddress), data: oracle.data });
 }
 
 function assertClassicMint(mintAccount) {
@@ -108,6 +114,18 @@ function impactBps(effectivePrice, spotPrice, side, code) {
     : (1 - (effectivePrice / spotPrice)) * 10_000;
   if (!Number.isFinite(impact)) throw new Error(code);
   return Math.max(0, impact);
+}
+
+function minOut(quote, code) {
+  const value = quote?.tokenMinOut;
+  if (value === null || value === undefined) throw new Error(code);
+  try {
+    const amount = BigInt(String(value));
+    if (amount <= 0n) throw new Error(code);
+    return amount.toString();
+  } catch {
+    throw new Error(code);
+  }
 }
 
 export function createOrcaWhirlpoolRpcQuotePool({
@@ -156,6 +174,8 @@ export function createOrcaWhirlpoolRpcQuotePool({
     if (!whirlpool?.data) throw new Error('orca_rpc_whirlpool_required');
     if (String(whirlpool.programAddress || '') !== String(deployment.programId)) throw new Error('orca_rpc_program_mismatch');
     if (!exactPair(whirlpool.data, tokenMint, quoteMint)) throw new Error('orca_rpc_pair_mismatch');
+    const tokenVaultA = text(whirlpool.data.tokenVaultA, 'orca_rpc_token_vault_a_required');
+    const tokenVaultB = text(whirlpool.data.tokenVaultB, 'orca_rpc_token_vault_b_required');
 
     const mintAccounts = await token2022.fetchAllMint(rpc, [address(tokenMint), address(quoteMint)]);
     if (!Array.isArray(mintAccounts) || mintAccounts.length !== 2 || !mintAccounts.every(account => account?.data)) {
@@ -194,8 +214,8 @@ export function createOrcaWhirlpoolRpcQuotePool({
       quoteIsA,
       configuredSlippage,
       whirlpool.data,
-      oracle,
-      tickArrays,
+      oracle.data,
+      tickArrays.data,
       timestamp
     );
     const boughtTokenUi = toUiAmount(buyQuote?.tokenEstOut, tokenDecimals);
@@ -209,14 +229,56 @@ export function createOrcaWhirlpoolRpcQuotePool({
       tokenIsA,
       configuredSlippage,
       whirlpool.data,
-      oracle,
-      tickArrays,
+      oracle.data,
+      tickArrays.data,
       timestamp
     );
     const soldTokenUi = toUiAmount(tokenInput, tokenDecimals);
     const quoteOutUi = toUiAmount(sellQuote?.tokenEstOut, quoteDecimals);
     if (!(soldTokenUi > 0) || !(quoteOutUi > 0)) throw new Error('orca_rpc_sell_quote_invalid');
     const sellPriceUsd = quoteOutUi / soldTokenUi;
+    const observedAt = new Date(blockTime * 1000).toISOString();
+    const tick0 = text(tickArrays.addresses[0], 'orca_rpc_tick_array_0_required');
+    const tick1 = text(tickArrays.addresses[1], 'orca_rpc_tick_array_1_required');
+    const tick2 = text(tickArrays.addresses[2], 'orca_rpc_tick_array_2_required');
+
+    const instructionContext = Object.freeze({
+      verified: true,
+      source: 'ORCA_WHIRLPOOLS_ONCHAIN_RPC',
+      source_slot: slot,
+      observed_at: observedAt,
+      program_id: String(deployment.programId),
+      token_program: SPL_TOKEN_PROGRAM_ID,
+      token_vault_a: tokenVaultA,
+      token_vault_b: tokenVaultB,
+      oracle: oracle.address,
+      buy: Object.freeze({
+        tick_array_0: tick0,
+        tick_array_1: tick1,
+        tick_array_2: tick2,
+        amount: quoteInput.toString(),
+        other_amount_threshold: minOut(buyQuote, 'orca_rpc_buy_min_out_required'),
+        sqrt_price_limit: '0',
+        amount_specified_is_input: true,
+        a_to_b: quoteIsA
+      }),
+      sell: Object.freeze({
+        tick_array_0: tick0,
+        tick_array_1: tick1,
+        tick_array_2: tick2,
+        amount: tokenInput.toString(),
+        other_amount_threshold: minOut(sellQuote, 'orca_rpc_sell_min_out_required'),
+        sqrt_price_limit: '0',
+        amount_specified_is_input: true,
+        a_to_b: tokenIsA
+      }),
+      read_only: true,
+      private_key_present: false,
+      signature_present: false,
+      signer_requested: false,
+      network_submission_authorized: false,
+      live_execution_authorized: false
+    });
 
     return Object.freeze({
       buy_price_usd: buyPriceUsd,
@@ -229,8 +291,9 @@ export function createOrcaWhirlpoolRpcQuotePool({
       quote_source: `ORCA_WHIRLPOOLS_ONCHAIN_RPC_SLOT_${slot}`,
       quote_verified: true,
       costs_verified: true,
-      observed_at: new Date(blockTime * 1000).toISOString(),
+      observed_at: observedAt,
       observed_slot: slot,
+      instruction_context: instructionContext,
       read_only: true,
       live_execution_authorized: false
     });
