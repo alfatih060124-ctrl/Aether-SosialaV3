@@ -1,0 +1,23 @@
+name: ORCA Whirlpool Readonly Provider Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/orca-whirlpool-readonly-provider.mjs'
+      - 'scripts/regression-orca-whirlpool-readonly-provider.mjs'
+      - '.github/workflows/orca-whirlpool-readonly-provider-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check services/api/src/orca-whirlpool-readonly-provider.mjs
+      - run: node --check scripts/regression-orca-whirlpool-readonly-provider.mjs
+      - run: node scripts/regression-orca-whirlpool-readonly-provider.mjs
