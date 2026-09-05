@@ -1,4 +1,5 @@
 const RAYDIUM_API_BASE_URL = 'https://api-v3.raydium.io';
+const RAYDIUM_ONCHAIN_SOURCE_PREFIX = 'RAYDIUM_ONCHAIN_RPC';
 
 const finite = value => {
   if (value === null || value === undefined) return null;
@@ -107,7 +108,7 @@ export function createRaydiumReadOnlyQuoteLoader({
         notional_usdc: notionalUsdc,
         read_only: true,
         strategy: 'TWO_LEG_ARBITRAGE',
-        source_hint: 'RAYDIUM_ONCHAIN_RPC'
+        source_hint: RAYDIUM_ONCHAIN_SOURCE_PREFIX
       }));
       if (!quote || typeof quote !== 'object') throw new Error('raydium_onchain_quote_required');
       if (quote.quote_verified !== true) throw new Error('raydium_onchain_quote_unverified');
@@ -124,7 +125,9 @@ export function createRaydiumReadOnlyQuoteLoader({
       const observedAt = text(quote.observed_at, 'raydium_onchain_observed_at_required');
       if (!Number.isFinite(Date.parse(observedAt))) throw new Error('raydium_onchain_observed_at_invalid');
       const quoteSource = text(quote.quote_source, 'raydium_onchain_quote_source_required');
-      if (!quoteSource.toUpperCase().includes('RAYDIUM')) throw new Error('raydium_onchain_quote_source_invalid');
+      if (!quoteSource.toUpperCase().startsWith(RAYDIUM_ONCHAIN_SOURCE_PREFIX)) {
+        throw new Error('raydium_onchain_quote_source_invalid');
+      }
 
       rows.push(Object.freeze({
         dex_id: 'raydium',
