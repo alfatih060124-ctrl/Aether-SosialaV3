@@ -6,6 +6,7 @@ import { createOrcaRaydiumShadowQualificationRuntime } from './orca-raydium-shad
 export function createOrcaRaydiumVerifiedRiskQualificationRuntime({
   scannerRuntime,
   loadNetworkFeeEvidence,
+  loadSellSimulationSource,
   rpcUrl,
   notionalUsdc,
   performanceFeeBps = 1000,
@@ -17,6 +18,8 @@ export function createOrcaRaydiumVerifiedRiskQualificationRuntime({
   tokenTimeoutMs = 4_000,
   maxSignaturePages = 8
 } = {}) {
+  if (typeof loadSellSimulationSource !== 'function') throw new Error('verified_risk_sell_simulation_source_required');
+
   const loadMarketRiskSource = createOrcaRaydiumMarketRiskSource({
     fetchImpl: marketFetchImpl,
     now,
@@ -32,6 +35,7 @@ export function createOrcaRaydiumVerifiedRiskQualificationRuntime({
   const riskCollector = createOrcaRaydiumShadowRiskEvidenceCollector({
     loadMarketRiskSource,
     loadTokenRiskSource,
+    loadSellSimulationSource,
     now,
     maxEvidenceAgeMs: maxRiskEvidenceAgeMs
   });
@@ -49,7 +53,8 @@ export function createOrcaRaydiumVerifiedRiskQualificationRuntime({
     mode: 'SHADOW',
     strategy: 'TWO_LEG_ARBITRAGE',
     dex_scope: Object.freeze(['ORCA', 'RAYDIUM']),
-    risk_source: 'VERIFIED_EXACT_ROUTE_MARKET_ANALYTICS_PLUS_SOLANA_RPC_TOKEN_RISK',
+    risk_source: 'VERIFIED_EXACT_ROUTE_MARKET_ANALYTICS_PLUS_SOLANA_RPC_TOKEN_RISK_PLUS_SELL_SIMULATION',
+    verified_sell_simulation_required: true,
     transaction_building_authorized: false,
     signer_requested: false,
     funds_moved: false,
@@ -65,6 +70,7 @@ export const ORCA_RAYDIUM_VERIFIED_RISK_QUALIFICATION_RUNTIME = Object.freeze({
   min_expected_net_edge_bps: 20,
   verified_market_risk_required: true,
   verified_token_risk_required: true,
+  verified_sell_simulation_required: true,
   verified_network_fee_required: true,
   transaction_building_authorized: false,
   network_submission_authorized: false,
