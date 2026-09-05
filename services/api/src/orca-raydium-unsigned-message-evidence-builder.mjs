@@ -6,6 +6,28 @@ const text = (value, code) => {
   return normalized;
 };
 
+function normalizeAccountMeta(raw) {
+  if (!raw || typeof raw !== 'object') throw new Error('unsigned_message_account_meta_required');
+  const pubkey = text(raw.pubkey, 'unsigned_message_account_pubkey_required');
+  if (typeof raw.isSigner !== 'boolean') throw new Error('unsigned_message_account_signer_flag_required');
+  if (typeof raw.isWritable !== 'boolean') throw new Error('unsigned_message_account_writable_flag_required');
+  return Object.freeze({ pubkey, isSigner: raw.isSigner, isWritable: raw.isWritable });
+}
+
+function normalizeAccountMetas(values, code) {
+  if (!Array.isArray(values) || !values.length) throw new Error(code);
+  const metas = values.map(normalizeAccountMeta);
+  const seen = new Map();
+  for (const meta of metas) {
+    const previous = seen.get(meta.pubkey);
+    if (previous && (previous.isSigner !== meta.isSigner || previous.isWritable !== meta.isWritable)) {
+      throw new Error('unsigned_message_account_privilege_conflict');
+    }
+    seen.set(meta.pubkey, meta);
+  }
+  return Object.freeze([...seen.values()]);
+}
+
 function normalizeLeg(raw, expectedDex, expectedSide) {
   if (!raw || typeof raw !== 'object') throw new Error('unsigned_message_leg_required');
   const dex = text(raw.dex, 'unsigned_message_leg_dex_required').toUpperCase();
@@ -13,27 +35,58 @@ function normalizeLeg(raw, expectedDex, expectedSide) {
   if (dex !== expectedDex) throw new Error('unsigned_message_leg_dex_invalid');
   if (side !== expectedSide) throw new Error('unsigned_message_leg_side_invalid');
   if (raw.verified !== true) throw new Error('unsigned_message_leg_unverified');
-  if (raw.transaction_building_authorized === true || raw.signer_requested === true || raw.network_submission_authorized === true) {
+  if (raw.transaction_building_authorized === true || raw.signer_requested === true || raw.network_submission_authorized === true || raw.private_key_present === true) {
     throw new Error('unsigned_message_leg_safety_boundary_violation');
   }
   const poolAddress = text(raw.pool_address, 'unsigned_message_leg_pool_required');
   const tokenMint = text(raw.token_mint, 'unsigned_message_leg_token_mint_required');
   const quoteMint = text(raw.quote_mint, 'unsigned_message_leg_quote_mint_required');
   const sourceReference = text(raw.source_reference, 'unsigned_message_leg_source_reference_required');
-  const accountKeys = Array.isArray(raw.account_keys) ? raw.account_keys.map(value => text(value, 'unsigned_message_account_key_invalid')) : [];
-  if (!accountKeys.length) throw new Error('unsigned_message_account_keys_required');
+  const accountMetas = normalizeAccountMetas(raw.account_metas, 'unsigned_message_account_metas_required');
   const instructions = Array.isArray(raw.instructions) ? raw.instructions : [];
   if (!instructions.length) throw new Error('unsigned_message_instructions_required');
   const normalizedInstructions = instructions.map((instruction, index) => {
     if (!instruction || typeof instruction !== 'object') throw new Error('unsigned_message_instruction_invalid');
+    const accounts = normalizeAccountMetas(instruction.accounts, 'unsigned_message_instruction_accounts_required');
+    const declared = new Map(accountMetas.map(meta => [meta.pubkey, meta]));
+    for (const meta of accounts) {
+      const legMeta = declared.get(meta.pubkey);
+      if (!legMeta) throw new Error('unsigned_message_instruction_account_undeclared');
+      if (legMeta.isSigner !== meta.isSigner || legMeta.isWritable !== meta.isWritable) {
+        throw new Error('unsigned_message_instruction_account_privilege_mismatch');
+      }
+    }
     return Object.freeze({
       index,
       program_id: text(instruction.program_id, 'unsigned_message_instruction_program_required'),
-      accounts: Array.isArray(instruction.accounts) ? instruction.accounts.map(value => text(value, 'unsigned_message_instruction_account_invalid')) : [],
+      accounts,
       data_base64: text(instruction.data_base64, 'unsigned_message_instruction_data_required')
     });
   });
-  return Object.freeze({ dex, side, pool_address: poolAddress, token_mint: tokenMint, quote_mint: quoteMint, source_reference: sourceReference, account_keys: Object.freeze(accountKeys), instructions: Object.freeze(normalizedInstructions) });
+  return Object.freeze({
+    dex,
+    side,
+    pool_address: poolAddress,
+    token_mint: tokenMint,
+    quote_mint: quoteMint,
+    source_reference: sourceReference,
+    account_metas: accountMetas,
+    instructions: Object.freeze(normalizedInstructions)
+  });
+}
+
+function mergeAccountMetas(...groups) {
+  const merged = new Map();
+  for (const group of groups) {
+    for (const meta of group) {
+      const previous = merged.get(meta.pubkey);
+      if (previous && (previous.isSigner !== meta.isSigner || previous.isWritable !== meta.isWritable)) {
+        throw new Error('unsigned_message_account_privilege_conflict');
+      }
+      merged.set(meta.pubkey, meta);
+    }
+  }
+  return Object.freeze([...merged.values()]);
 }
 
 function hashEvidence(payload) {
@@ -49,7 +102,9 @@ export function createOrcaRaydiumUnsignedMessageEvidenceBuilder({ buildBuyLeg, b
     async build(opportunity = {}) {
       if (opportunity?.strategy !== 'TWO_LEG_ARBITRAGE') throw new Error('unsigned_message_strategy_invalid');
       if (opportunity?.read_only !== true) throw new Error('unsigned_message_read_only_required');
-      if (opportunity?.live_execution_authorized === true) throw new Error('unsigned_message_live_boundary_violation');
+      if (opportunity?.live_execution_authorized === true || opportunity?.private_key_present === true || opportunity?.signature_present === true) {
+        throw new Error('unsigned_message_live_boundary_violation');
+      }
       const buyDex = text(opportunity.buy_dex, 'unsigned_message_buy_dex_required').toUpperCase();
       const sellDex = text(opportunity.sell_dex, 'unsigned_message_sell_dex_required').toUpperCase();
       if (!['ORCA', 'RAYDIUM'].includes(buyDex) || !['ORCA', 'RAYDIUM'].includes(sellDex) || buyDex === sellDex) {
@@ -69,9 +124,9 @@ export function createOrcaRaydiumUnsignedMessageEvidenceBuilder({ buildBuyLeg, b
       const slot = Number(blockhashRaw.slot);
       if (!Number.isSafeInteger(slot) || slot < 0) throw new Error('unsigned_message_blockhash_slot_required');
       const observedAt = new Date(now()).toISOString();
-      const accountKeys = [...new Set([...buy.account_keys, ...sell.account_keys])];
+      const accountMetas = mergeAccountMetas(buy.account_metas, sell.account_metas);
       const payload = {
-        version: 1,
+        version: 2,
         strategy: 'TWO_LEG_ARBITRAGE',
         buy_dex: buy.dex,
         sell_dex: sell.dex,
@@ -79,7 +134,7 @@ export function createOrcaRaydiumUnsignedMessageEvidenceBuilder({ buildBuyLeg, b
         quote_mint: buy.quote_mint,
         recent_blockhash: blockhash,
         source_slot: slot,
-        account_keys: accountKeys,
+        account_metas: accountMetas,
         instructions: [...buy.instructions, ...sell.instructions],
         leg_sources: [buy.source_reference, sell.source_reference]
       };
@@ -92,13 +147,15 @@ export function createOrcaRaydiumUnsignedMessageEvidenceBuilder({ buildBuyLeg, b
         observed_at: observedAt,
         source_slot: slot,
         recent_blockhash: blockhash,
-        account_keys: Object.freeze(accountKeys),
+        account_metas: accountMetas,
+        account_keys: Object.freeze(accountMetas.map(meta => meta.pubkey)),
         instructions: Object.freeze(payload.instructions),
         buy_leg: buy,
         sell_leg: sell,
         transaction_signed: false,
         signer_requested: false,
         private_key_present: false,
+        signature_present: false,
         transaction_building_authorized: false,
         network_submission_authorized: false,
         live_execution_authorized: false,
@@ -113,6 +170,7 @@ export const ORCA_RAYDIUM_UNSIGNED_MESSAGE_EVIDENCE_BUILDER = Object.freeze({
   mode: 'SHADOW',
   strategy: 'TWO_LEG_ARBITRAGE',
   unsigned_only: true,
+  account_meta_contract: 'pubkey+isSigner+isWritable',
   private_key_allowed: false,
   signing_authorized: false,
   network_submission_authorized: false,
