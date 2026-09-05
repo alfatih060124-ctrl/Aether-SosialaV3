@@ -40,25 +40,18 @@ export function createSolanaPretradeFeePipeline({
         strategy: 'TWO_LEG_ARBITRAGE'
       });
     },
-    getFeeForMessage: ({ message_base64, context }) => rpcEvidenceProvider.getFeeForMessage(Object.freeze({
+    getFeeForMessage: ({ message_base64, source_slot, context }) => rpcEvidenceProvider.getFeeForMessage(Object.freeze({
       message_base64,
-      source_slot: context?.source_slot,
+      source_slot,
       context
     })),
-    simulateUnsignedTransaction: ({ transaction_base64, context }) => rpcEvidenceProvider.simulateUnsignedTransaction(Object.freeze({
+    simulateUnsignedTransaction: ({ transaction_base64, source_slot, context }) => rpcEvidenceProvider.simulateUnsignedTransaction(Object.freeze({
       transaction_base64,
-      source_slot: context?.source_slot,
+      source_slot,
       context
     })),
-    loadPriorityFeeEvidence: context => rpcEvidenceProvider.loadPriorityFeeEvidence(Object.freeze({
-      ...context,
-      source_slot: context?.source_slot,
-      account_keys: context?.account_keys
-    })),
-    loadCurrentSolUsdEvidence: context => rpcEvidenceProvider.loadCurrentSolUsdEvidence(Object.freeze({
-      ...context,
-      source_slot: context?.source_slot
-    }))
+    loadPriorityFeeEvidence: context => rpcEvidenceProvider.loadPriorityFeeEvidence(Object.freeze({ ...context })),
+    loadCurrentSolUsdEvidence: context => rpcEvidenceProvider.loadCurrentSolUsdEvidence(Object.freeze({ ...context }))
   });
 
   return Object.freeze({
