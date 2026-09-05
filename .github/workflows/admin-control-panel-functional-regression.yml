@@ -1,0 +1,16 @@
+name: Admin Control Panel Functional Regression
+on:
+  pull_request:
+    paths:
+      - 'public/admin.html'
+      - 'scripts/regression-admin-control-panel-functional.mjs'
+      - '.github/workflows/admin-control-panel-functional-regression.yml'
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/regression-admin-control-panel-functional.mjs
