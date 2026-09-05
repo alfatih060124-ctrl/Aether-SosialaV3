@@ -67,11 +67,38 @@ const noPair = createOrcaWhirlpoolReadOnlyQuoteLoader({
 });
 await assert.rejects(noPair({ token_mint: token, quote_mint: quote, read_only: true, strategy: 'TWO_LEG_ARBITRAGE' }), /orca_no_exact_pair_pools/);
 
-const unverified = createOrcaWhirlpoolReadOnlyQuoteLoader({
-  quoteNotionalUsdc: 50,
-  fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ data: [{ address: 'p', tokenMintA: token, tokenMintB: quote }] }) }),
-  quotePool: async () => ({ price_usd: 1, fee_bps: 20, price_impact_bps: 2, quote_source: 'ORCA_RPC', quote_verified: false, costs_verified: true, observed_at: observedAt })
-});
-await assert.rejects(unverified({ token_mint: token, quote_mint: quote, read_only: true, strategy: 'TWO_LEG_ARBITRAGE' }), /orca_onchain_quote_unverified/);
+function onePoolFetch() {
+  return async () => ({ ok: true, status: 200, json: async () => ({ data: [{ address: 'p', tokenMintA: token, tokenMintB: quote }] }) });
+}
+
+async function expectQuoteFailure(quoteResult, pattern) {
+  const candidate = createOrcaWhirlpoolReadOnlyQuoteLoader({
+    quoteNotionalUsdc: 50,
+    fetchImpl: onePoolFetch(),
+    quotePool: async () => quoteResult
+  });
+  await assert.rejects(candidate({ token_mint: token, quote_mint: quote, read_only: true, strategy: 'TWO_LEG_ARBITRAGE' }), pattern);
+}
+
+await expectQuoteFailure(
+  { price_usd: 1, fee_bps: 20, price_impact_bps: 2, quote_source: 'ORCA_RPC', quote_verified: false, costs_verified: true, observed_at: observedAt },
+  /orca_onchain_quote_unverified/
+);
+await expectQuoteFailure(
+  { price_usd: 1, fee_bps: null, price_impact_bps: 2, quote_source: 'ORCA_RPC', quote_verified: true, costs_verified: true, observed_at: observedAt },
+  /orca_onchain_fee_bps_required/
+);
+await expectQuoteFailure(
+  { price_usd: 1, fee_bps: '', price_impact_bps: 2, quote_source: 'ORCA_RPC', quote_verified: true, costs_verified: true, observed_at: observedAt },
+  /orca_onchain_fee_bps_required/
+);
+await expectQuoteFailure(
+  { price_usd: 1, fee_bps: 20, price_impact_bps: null, quote_source: 'ORCA_RPC', quote_verified: true, costs_verified: true, observed_at: observedAt },
+  /orca_onchain_price_impact_bps_required/
+);
+await expectQuoteFailure(
+  { price_usd: 1, fee_bps: 20, price_impact_bps: '   ', quote_source: 'ORCA_RPC', quote_verified: true, costs_verified: true, observed_at: observedAt },
+  /orca_onchain_price_impact_bps_required/
+);
 
 console.log('orca whirlpool readonly provider regression: ok');
