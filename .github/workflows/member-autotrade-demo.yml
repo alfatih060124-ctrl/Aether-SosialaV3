@@ -4,29 +4,39 @@ on:
   pull_request:
     paths:
       - 'migrations/021_member_autotrade_demo_wallet.sql'
+      - 'migrations/024_member_autotrade_arbitrage_history.sql'
       - 'services/api/src/demo-autotrade-ledger.mjs'
       - 'services/api/src/member-autotrade-demo.mjs'
       - 'services/api/src/member-autotrade-route.mjs'
+      - 'services/api/src/member-autotrade-real-market-runtime.mjs'
+      - 'services/api/src/member-autotrade-real-market-runtime-factory.mjs'
+      - 'services/api/src/orca-raydium-shadow-network-fee-source.mjs'
       - 'api/index.mjs'
       - 'public/account-auto-strategy.js'
       - 'public/autotrade-demo.html'
       - 'vercel.json'
       - 'scripts/member-autotrade-demo-regression.mjs'
       - 'scripts/member-autotrade-demo-page-regression.mjs'
+      - 'scripts/regression-orca-raydium-shadow-network-fee-source.mjs'
       - '.github/workflows/member-autotrade-demo.yml'
   push:
     branches: [main]
     paths:
       - 'migrations/021_member_autotrade_demo_wallet.sql'
+      - 'migrations/024_member_autotrade_arbitrage_history.sql'
       - 'services/api/src/demo-autotrade-ledger.mjs'
       - 'services/api/src/member-autotrade-demo.mjs'
       - 'services/api/src/member-autotrade-route.mjs'
+      - 'services/api/src/member-autotrade-real-market-runtime.mjs'
+      - 'services/api/src/member-autotrade-real-market-runtime-factory.mjs'
+      - 'services/api/src/orca-raydium-shadow-network-fee-source.mjs'
       - 'api/index.mjs'
       - 'public/account-auto-strategy.js'
       - 'public/autotrade-demo.html'
       - 'vercel.json'
       - 'scripts/member-autotrade-demo-regression.mjs'
       - 'scripts/member-autotrade-demo-page-regression.mjs'
+      - 'scripts/regression-orca-raydium-shadow-network-fee-source.mjs'
       - '.github/workflows/member-autotrade-demo.yml'
 
 jobs:
@@ -37,15 +47,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Install API dependencies
+        run: npm install --prefix services/api --ignore-scripts --no-audit --no-fund
       - name: Syntax check
         run: |
           node --check services/api/src/demo-autotrade-ledger.mjs
           node --check services/api/src/member-autotrade-demo.mjs
           node --check services/api/src/member-autotrade-route.mjs
+          node --check services/api/src/member-autotrade-real-market-runtime.mjs
+          node --check services/api/src/member-autotrade-real-market-runtime-factory.mjs
+          node --check services/api/src/orca-raydium-shadow-network-fee-source.mjs
           node --check api/index.mjs
           node --check scripts/member-autotrade-demo-regression.mjs
           node --check scripts/member-autotrade-demo-page-regression.mjs
+          node --check scripts/regression-orca-raydium-shadow-network-fee-source.mjs
       - name: Run demo-wallet regression
         run: node scripts/member-autotrade-demo-regression.mjs
       - name: Run demo-page regression
         run: node scripts/member-autotrade-demo-page-regression.mjs
+      - name: Run network-fee regression
+        run: node scripts/regression-orca-raydium-shadow-network-fee-source.mjs
