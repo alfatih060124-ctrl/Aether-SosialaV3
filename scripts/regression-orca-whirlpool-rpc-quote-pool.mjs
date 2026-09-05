@@ -93,7 +93,8 @@ assert.ok(result.sell_price_impact_bps > 0);
 assert.equal(result.quote_verified, true);
 assert.equal(result.costs_verified, true);
 assert.equal(result.observed_slot, 123456);
-assert.match(result.quote_source, /ORCA_WHIRLPOOLS_ONCHAIN_RPC_SLOT_123456/);
+assert.match(result.quote_source, /^ORCA_WHIRLPOOLS_ONCHAIN_RPC_SLOT_123456$/);
+assert.equal(result.read_only, true);
 assert.equal(result.live_execution_authorized, false);
 
 await assert.rejects(
