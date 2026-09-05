@@ -113,12 +113,32 @@ async function ensureAccount(client, userId, initialBalanceUsdc) {
   return row;
 }
 
-export async function persistQualifiedPaperArbitrage(pool, session, result, { performanceFeeBps, initialBalanceUsdc = 100 } = {}) {
+export async function persistQualifiedPaperArbitrage(pool, session, result, { performanceFeeBps, initialBalanceUsdc = 100, idempotencyKey } = {}) {
   if (!pool || !session?.user_id) throw new Error('paper_arbitrage_authenticated_session_required');
+  const stableKey = text(idempotencyKey, 'paper_arbitrage_idempotency_key_required');
+  if (stableKey.length > 200) throw new Error('paper_arbitrage_idempotency_key_invalid');
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const account = await ensureAccount(client, session.user_id, initialBalanceUsdc);
+    const existing = (await client.query(`
+      SELECT * FROM member_paper_arbitrage_cycles
+      WHERE user_id=$1 AND idempotency_key=$2
+      LIMIT 1
+    `,[session.user_id,stableKey])).rows[0];
+    if (existing) {
+      await client.query('COMMIT');
+      return Object.freeze({
+        account,
+        cycle: existing,
+        accounting: null,
+        duplicate: true,
+        mode: 'SHADOW',
+        funds_moved: false,
+        live_execution_authorized: false
+      });
+    }
+
     const record = derivePaperArbitrageAccounting({ result, account, performanceFeeBps });
     const updated = (await client.query(`
       UPDATE member_paper_arbitrage_accounts SET
@@ -134,17 +154,17 @@ export async function persistQualifiedPaperArbitrage(pool, session, result, { pe
     `,[session.user_id,record.cash_after_usdc,record.market_net_pnl_usdc,record.performance_fee_usdc,record.member_net_profit_usdc,1,record.profitable_cycles_delta,record.losing_cycles_delta])).rows[0];
     const cycle = (await client.query(`
       INSERT INTO member_paper_arbitrage_cycles(
-        cycle_id,user_id,token_mint,quote_mint,buy_dex,sell_dex,buy_pool,sell_pool,notional_usdc,
+        cycle_id,user_id,idempotency_key,token_mint,quote_mint,buy_dex,sell_dex,buy_pool,sell_pool,notional_usdc,
         gross_profit_before_costs_usdc,market_execution_cost_usdc,market_net_pnl_usdc,performance_fee_usdc,
         member_net_profit_usdc,gross_edge_bps,net_edge_bps,network_fee_usdc,cost_breakdown,assessment,
         market_source,observed_at
-      ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::jsonb,$19::jsonb,$20,$21) RETURNING *
-    `,[randomUUID(),session.user_id,record.token_mint,record.quote_mint,record.buy_dex,record.sell_dex,record.buy_pool,record.sell_pool,
+      ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20::jsonb,$21,$22) RETURNING *
+    `,[randomUUID(),session.user_id,stableKey,record.token_mint,record.quote_mint,record.buy_dex,record.sell_dex,record.buy_pool,record.sell_pool,
       record.notional_usdc,record.gross_profit_before_costs_usdc,record.market_execution_cost_usdc,record.market_net_pnl_usdc,
       record.performance_fee_usdc,record.member_net_profit_usdc,record.gross_edge_bps,record.net_edge_bps,record.network_fee_usdc,
       JSON.stringify(record.cost_breakdown),JSON.stringify(record.assessment),record.market_source,record.observed_at])).rows[0];
     await client.query('COMMIT');
-    return Object.freeze({ account: updated, cycle, accounting: record, mode: 'SHADOW', funds_moved: false, live_execution_authorized: false });
+    return Object.freeze({ account: updated, cycle, accounting: record, duplicate: false, mode: 'SHADOW', funds_moved: false, live_execution_authorized: false });
   } catch (error) {
     try { await client.query('ROLLBACK'); } catch {}
     throw error;
@@ -160,16 +180,16 @@ export async function getPaperArbitragePerformance(pool, userId, { limit = 50 } 
     const safeLimit = Math.max(1, Math.min(200, Number(limit) || 50));
     const account = (await client.query(`SELECT * FROM member_paper_arbitrage_accounts WHERE user_id=$1`,[userId])).rows[0] || null;
     const history = (await client.query(`
-      SELECT cycle_id,token_mint,quote_mint,buy_dex,sell_dex,buy_pool,sell_pool,notional_usdc,
+      SELECT cycle_id,idempotency_key,token_mint,quote_mint,buy_dex,sell_dex,buy_pool,sell_pool,notional_usdc,
         gross_profit_before_costs_usdc,market_execution_cost_usdc,market_net_pnl_usdc,performance_fee_usdc,
         member_net_profit_usdc,gross_edge_bps,net_edge_bps,network_fee_usdc,market_source,observed_at,created_at
-      FROM member_paper_arbitrage_cycles WHERE user_id=$1 ORDER BY created_at DESC LIMIT $2
+      FROM member_paper_arbitrage_cycles WHERE user_id=$1 ORDER BY observed_at DESC,created_at DESC LIMIT $2
     `,[userId,safeLimit])).rows;
     const periods = (await client.query(`
       SELECT
-        COALESCE(SUM(member_net_profit_usdc) FILTER (WHERE created_at >= date_trunc('day',now())),0) AS today_net_pnl_usdc,
-        COALESCE(SUM(member_net_profit_usdc) FILTER (WHERE created_at >= now()-interval '7 days'),0) AS pnl_7d_usdc,
-        COALESCE(SUM(member_net_profit_usdc) FILTER (WHERE created_at >= now()-interval '30 days'),0) AS pnl_30d_usdc,
+        COALESCE(SUM(member_net_profit_usdc) FILTER (WHERE observed_at >= date_trunc('day',now())),0) AS today_net_pnl_usdc,
+        COALESCE(SUM(member_net_profit_usdc) FILTER (WHERE observed_at >= now()-interval '7 days'),0) AS pnl_7d_usdc,
+        COALESCE(SUM(member_net_profit_usdc) FILTER (WHERE observed_at >= now()-interval '30 days'),0) AS pnl_30d_usdc,
         COALESCE(SUM(member_net_profit_usdc),0) AS all_time_net_pnl_usdc,
         COUNT(*)::int AS total_cycles,
         COUNT(*) FILTER (WHERE member_net_profit_usdc > 0)::int AS profitable_cycles,
@@ -204,6 +224,8 @@ export const PAPER_ARBITRAGE_PERSISTENCE = Object.freeze({
   dedicated_ledger: true,
   legacy_training_positions_reused: false,
   persists_only_qualified_cycles: true,
+  idempotency_key_required: true,
+  performance_time_basis: 'OBSERVED_AT',
   performance_windows: Object.freeze(['TODAY','7D','30D','ALL_TIME']),
   transaction_count_cap: null,
   funds_moved: false,
