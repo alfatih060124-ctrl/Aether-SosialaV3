@@ -100,17 +100,25 @@ export function buildExecutionAuditEnvelope({ intent, result, started_at, comple
 }
 
 export class AuditedShadowDispatcher {
-  constructor({ dispatcher, clock = () => Date.now() } = {}) {
-    if (dispatcher && !(dispatcher instanceof ShadowDispatcher)) throw new Error('invalid_shadow_dispatcher');
-    this.dispatcher = dispatcher || new ShadowDispatcher();
-    this.clock = clock;
+  #dispatcher;
+  #clock;
+
+  constructor({ dispatcher, dispatcherOptions, clock = () => Date.now() } = {}) {
+    // The audited boundary must not execute caller-provided dispatcher code or hooks.
+    // Even detached callbacks can perform external side effects through closure state
+    // before returning a fail-closed-looking result, invalidating the audit claim.
+    if (dispatcher !== undefined) throw new Error('shadow_dispatcher_injection_forbidden');
+    if (dispatcherOptions !== undefined) throw new Error('shadow_dispatcher_hooks_forbidden');
+    if (typeof clock !== 'function') throw new Error('invalid_execution_audit_clock');
+    this.#dispatcher = new ShadowDispatcher();
+    this.#clock = (...args) => Reflect.apply(clock, undefined, args);
   }
 
   async dispatch(intent, context = {}) {
     assertCanonicalExecutionIntent(intent);
-    const startedAt = iso(this.clock(), 'execution_audit_started_at');
-    const result = await this.dispatcher.dispatch(intent, context);
-    const completedAt = iso(this.clock(), 'execution_audit_completed_at');
+    const startedAt = iso(this.#clock(), 'execution_audit_started_at');
+    const result = await this.#dispatcher.dispatch(intent, context);
+    const completedAt = iso(this.#clock(), 'execution_audit_completed_at');
     return {
       ...result,
       audit: buildExecutionAuditEnvelope({ intent, result, started_at: startedAt, completed_at: completedAt, dispatcher: CANONICAL_SHADOW_DISPATCHER })
