@@ -15,6 +15,8 @@ export function createConfiguredMemberAutoTradeRealMarketRuntime({
   if (!rpcUrl) throw new Error('solana_rpc_unconfigured');
   const notionalUsdc = Number(env?.AUTOTRADE_SHADOW_NOTIONAL_USDC || 10);
   if (!Number.isFinite(notionalUsdc) || notionalUsdc <= 0) throw new Error('autotrade_shadow_notional_invalid');
+  const maxCandidates = Number(env?.AUTOTRADE_SHADOW_MAX_CANDIDATES || 5);
+  if (!Number.isInteger(maxCandidates) || maxCandidates < 1 || maxCandidates > 100) throw new Error('autotrade_shadow_max_candidates_invalid');
 
   const scannerRuntime = createOrcaRaydiumShadowRuntime({
     rpcUrl,
@@ -42,7 +44,7 @@ export function createConfiguredMemberAutoTradeRealMarketRuntime({
     qualificationRuntime,
     quoteMint: USDC_MINT,
     discoveryView: 'trending',
-    maxCandidates: 20
+    maxCandidates
   });
 }
 
@@ -52,5 +54,7 @@ export const MEMBER_AUTOTRADE_REAL_MARKET_RUNTIME_FACTORY = Object.freeze({
   dex_scope: Object.freeze(['ORCA', 'RAYDIUM']),
   min_expected_net_edge_bps: 20,
   default_shadow_notional_usdc: 10,
+  default_candidates_per_scan: 5,
+  transaction_count_per_day_capped: false,
   live_execution_authorized: false
 });
