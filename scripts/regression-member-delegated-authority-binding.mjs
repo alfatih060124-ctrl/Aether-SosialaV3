@@ -44,8 +44,11 @@ for (const path of [
   assert.match(route, new RegExp(path.replaceAll('/', '\\/')));
   assert.match(vercel, new RegExp(path.replaceAll('/', '\\/')));
   assert.match(caddy, new RegExp(path.replaceAll('/', '\\/')));
-  assert.match(authorityUi, new RegExp(path.replaceAll('/', '\\/')));
 }
+assert.match(authorityUi, /API_BASE='\/api\/account\/delegated-authority'/);
+assert.match(authorityUi, /`\$\{API_BASE\}\/challenge`/);
+assert.match(authorityUi, /`\$\{API_BASE\}\/verify`/);
+assert.match(authorityUi, /`\$\{API_BASE\}\/revoke`/);
 assert.match(route, /verifySolanaMessageSignature/);
 assert.match(route, /ownership_verified:true/);
 assert.match(route, /transaction_submission_authorized:false/);
