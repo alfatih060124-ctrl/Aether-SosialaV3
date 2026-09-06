@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 const member = fs.readFileSync(new URL('../public/member.html', import.meta.url), 'utf8');
 const vercel = fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8');
+const caddy = fs.readFileSync(new URL('../deploy/Caddyfile', import.meta.url), 'utf8');
 const route = fs.readFileSync(new URL('../services/api/src/member-autotrade-route.mjs', import.meta.url), 'utf8');
 const proxy = fs.readFileSync(new URL('../api/member-performance.mjs', import.meta.url), 'utf8');
 
@@ -28,6 +29,7 @@ assert.match(route, /live_execution_authorized: false/);
 assert.match(proxy, /PRIMARY_API_ORIGIN = 'https:\/\/api\.aether\.boats'/);
 assert.match(proxy, /SESSION_COOKIE = 'aether_session'/);
 assert.match(proxy, /authorization: `Bearer \$\{token\}`/);
+assert.match(caddy, /\/api\/account\/paper-arbitrage\/performance/);
 assert.match(vercel, /api\/account\/paper-arbitrage\/performance/);
 for (const src of ['/account/?','/autotrade/?','/performance/?','/subscription/?','/account/profile/?']) {
   const escaped = src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
