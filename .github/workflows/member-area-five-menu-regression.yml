@@ -1,0 +1,27 @@
+name: Member Area Five Menu Regression
+
+on:
+  pull_request:
+    paths:
+      - 'public/member.html'
+      - 'api/member-performance.mjs'
+      - 'services/api/src/member-autotrade-route.mjs'
+      - 'services/api/src/orca-raydium-sell-simulation-boundary.mjs'
+      - 'vercel.json'
+      - 'scripts/regression-member-area-five-menu.mjs'
+      - 'scripts/regression-orca-raydium-sell-simulation-boundary.mjs'
+      - '.github/workflows/member-area-five-menu-regression.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check api/member-performance.mjs
+      - run: node --check services/api/src/member-autotrade-route.mjs
+      - run: node --check services/api/src/orca-raydium-sell-simulation-boundary.mjs
+      - run: node scripts/regression-member-area-five-menu.mjs
+      - run: node scripts/regression-orca-raydium-sell-simulation-boundary.mjs

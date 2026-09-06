@@ -2,11 +2,13 @@ import { persistAuthenticatedAutoTradeDecisionAtomically } from './autotrade-ato
 import { createTrustedAutoTradeRuntimeRiskResolver } from './trusted-autotrade-runtime-risk.mjs';
 import { handleMemberPositionsRoute } from './member-positions-route.mjs';
 import { getMemberAutoTradeDemoState, runMemberAutoTradeDemoStep } from './member-autotrade-demo.mjs';
+import { getPaperArbitragePerformance } from './paper-arbitrage-persistence.mjs';
 
 const MEMBER_ROUTE = '/api/account/autotrade/evaluate';
 const LEGACY_ROUTE = '/api/autotrade/evaluate';
 const DEMO_STATE_ROUTE = '/api/account/auto-strategy/demo';
 const DEMO_SIMULATE_ROUTE = '/api/account/auto-strategy/simulate';
+const PAPER_PERFORMANCE_ROUTE = '/api/account/paper-arbitrage/performance';
 
 function statusFor(error) {
   const code = String(error?.message || '');
@@ -42,6 +44,43 @@ export async function handleMemberAutoTradeRoute({
   createRiskResolver = createTrustedAutoTradeRuntimeRiskResolver
 }) {
   if (await handleMemberPositionsRoute({ req, res, route, pool, walletAuth, sessionFor, send })) return true;
+
+  if (route === PAPER_PERFORMANCE_ROUTE) {
+    if (req.method !== 'GET') {
+      send(res, 405, { error: 'method_not_allowed', mode: 'SHADOW', live_execution_authorized: false });
+      return true;
+    }
+    if (!pool || !walletAuth) {
+      send(res, 503, { error: 'database_unconfigured', mode: 'SHADOW', live_execution_authorized: false });
+      return true;
+    }
+    try {
+      const session = await sessionFor(req);
+      if (!session) {
+        send(res, 401, { error: 'session_required', mode: 'SHADOW', live_execution_authorized: false });
+        return true;
+      }
+      const performance = await getPaperArbitragePerformance(pool, session.user_id, { limit: 50 });
+      send(res, 200, {
+        ...performance,
+        route: PAPER_PERFORMANCE_ROUTE,
+        authentication: 'WALLET_SESSION',
+        mode: 'SHADOW',
+        strategy: 'TWO_LEG_ARBITRAGE',
+        funds_moved: false,
+        live_execution_authorized: false
+      });
+      return true;
+    } catch (error) {
+      send(res, statusFor(error), {
+        error: String(error?.message || 'paper_arbitrage_performance_failed'),
+        mode: 'SHADOW',
+        funds_moved: false,
+        live_execution_authorized: false
+      });
+      return true;
+    }
+  }
 
   if (route === DEMO_STATE_ROUTE || route === DEMO_SIMULATE_ROUTE) {
     const expectedMethod = route === DEMO_STATE_ROUTE ? 'GET' : 'POST';
@@ -171,3 +210,4 @@ export async function handleMemberAutoTradeRoute({
 export const MEMBER_AUTOTRADE_ROUTE = MEMBER_ROUTE;
 export const MEMBER_AUTOTRADE_DEMO_STATE_ROUTE = DEMO_STATE_ROUTE;
 export const MEMBER_AUTOTRADE_DEMO_SIMULATE_ROUTE = DEMO_SIMULATE_ROUTE;
+export const MEMBER_PAPER_ARBITRAGE_PERFORMANCE_ROUTE = PAPER_PERFORMANCE_ROUTE;
