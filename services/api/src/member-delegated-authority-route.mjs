@@ -14,6 +14,16 @@ export const MEMBER_AUTHORITY_REVOKE_ROUTE = '/api/account/delegated-authority/r
 
 const hash = value => crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');
 
+async function parseBody(req, providedParser) {
+  if (typeof providedParser === 'function') return providedParser(req);
+  let raw = '';
+  for await (const chunk of req) {
+    raw += chunk;
+    if (Buffer.byteLength(raw, 'utf8') > 32768) throw new Error('request_body_too_large');
+  }
+  return raw ? JSON.parse(raw) : {};
+}
+
 function project(row) {
   if (!row) return null;
   return {
@@ -58,7 +68,7 @@ export async function handleMemberDelegatedAuthorityRoute({ req, res, route, poo
     }
 
     if (req.method !== 'POST') { send(res,405,{error:'method_not_allowed',live_execution_authorized:false}); return true; }
-    const body = await jsonBody(req);
+    const body = await parseBody(req, jsonBody);
 
     if (route === MEMBER_AUTHORITY_CHALLENGE_ROUTE) {
       await expireStale(pool, session.user_id);
@@ -111,11 +121,12 @@ export async function handleMemberDelegatedAuthorityRoute({ req, res, route, poo
       return true;
     } catch (error) {
       try { await client.query('ROLLBACK'); } catch {}
+      if (error?.code === '23505') throw new Error('active_authority_exists');
       throw error;
     } finally { client.release(); }
   } catch (error) {
     const code = String(error?.message || 'delegated_authority_failed');
-    const status = code === 'authority_not_found' ? 404 : ['authority_not_pending_consent','authority_not_revocable'].includes(code) ? 409 : ['invalid_wallet_signature'].includes(code) ? 401 : code.endsWith('_required') || code.endsWith('_invalid') || code.includes('_mismatch') ? 400 : 500;
+    const status = code === 'authority_not_found' ? 404 : ['authority_not_pending_consent','authority_not_revocable','active_authority_exists'].includes(code) ? 409 : ['invalid_wallet_signature'].includes(code) ? 401 : code === 'request_body_too_large' ? 413 : code.endsWith('_required') || code.endsWith('_invalid') || code.includes('_mismatch') ? 400 : 500;
     send(res,status,{error:code,mode:'SHADOW',live_execution_authorized:false,transaction_submission_authorized:false,private_key_stored:false});
     return true;
   }
