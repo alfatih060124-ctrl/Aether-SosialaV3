@@ -23,8 +23,11 @@ if (page.includes('LIVE_ENABLED=true') || page.includes('live_execution_authoriz
 }
 
 const routes = Array.isArray(vercel.routes) ? vercel.routes : [];
-if (!routes.some(route => route?.src === '/autotrade-demo/?' && route?.dest === '/public/autotrade-demo.html')) {
-  fail('autotrade_demo_route_missing');
+if (!routes.some(route => route?.src === '/autotrade-demo/?' && route?.dest === '/public/member.html')) {
+  fail('legacy_autotrade_demo_must_route_to_member_shell');
+}
+if (routes.some(route => route?.src === '/autotrade-demo/?' && route?.dest === '/public/autotrade-demo.html')) {
+  fail('legacy_autotrade_demo_public_route_forbidden');
 }
 
-console.log('Member Auto Trade Demo page regression: PASS');
+console.log('Member Auto Trade Demo page regression: PASS (legacy file preserved, public route retired)');
