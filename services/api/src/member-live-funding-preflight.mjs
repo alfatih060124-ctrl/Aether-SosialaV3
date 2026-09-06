@@ -18,17 +18,47 @@ function positiveAtomic(value, code) {
 }
 
 function usdcRawFromPortfolio(portfolio) {
-  const row = Array.isArray(portfolio?.assets) ? portfolio.assets.find(asset => asset?.mint === USDC_MINT) : null;
-  if (!row) return { verified: true, amount_atomic: 0n, decimals: 6 };
-  const decimals = Number(row.decimals);
-  if (decimals !== 6) return { verified: false, amount_atomic: 0n, decimals };
+  const balance = portfolio?.balances?.usdc;
+  if (!balance) return { verified: true, amount_atomic: 0n, decimals: 6 };
+  const decimals = Number(balance.decimals);
+  if (decimals !== 6 || balance.raw_balance_verified !== true || balance.mint !== USDC_MINT) {
+    return { verified: false, amount_atomic: 0n, decimals };
+  }
   try {
-    const amount = BigInt(String(row.amount_raw));
+    const amount = BigInt(String(balance.amount_raw));
     if (amount < 0n) return { verified: false, amount_atomic: 0n, decimals };
     return { verified: true, amount_atomic: amount, decimals };
   } catch {
     return { verified: false, amount_atomic: 0n, decimals };
   }
+}
+
+async function loadAuthority(pool, session, current) {
+  const activeResult = await pool.query(`
+    SELECT authority_id, wallet_address, status, allowed_strategy, allowed_dex_pair,
+           min_net_edge_bps, max_notional_usdc_atomic, max_daily_loss_usdc_atomic, expires_at
+    FROM member_delegated_authorities
+    WHERE user_id=$1
+      AND wallet_address=$2
+      AND status='ACTIVE'
+      AND allowed_strategy='TWO_LEG_ARBITRAGE'
+      AND allowed_dex_pair='ORCA_RAYDIUM'
+      AND min_net_edge_bps >= 20
+      AND expires_at > $3
+    ORDER BY expires_at DESC, created_at DESC
+    LIMIT 1
+  `, [session.user_id, session.primary_wallet, current.toISOString()]);
+  if (activeResult.rows[0]) return activeResult.rows[0];
+
+  const latestResult = await pool.query(`
+    SELECT authority_id, wallet_address, status, allowed_strategy, allowed_dex_pair,
+           min_net_edge_bps, max_notional_usdc_atomic, max_daily_loss_usdc_atomic, expires_at
+    FROM member_delegated_authorities
+    WHERE user_id=$1
+    ORDER BY created_at DESC
+    LIMIT 1
+  `, [session.user_id]);
+  return latestResult.rows[0] || null;
 }
 
 export async function evaluateMemberLiveFundingPreflight(pool, session, {
@@ -53,15 +83,7 @@ export async function evaluateMemberLiveFundingPreflight(pool, session, {
   const subscriptionActive = Boolean(subscription && subscription.status === 'ACTIVE' && new Date(subscription.service_expires_at) > current);
   if (!subscriptionActive) blockers.push('SUBSCRIPTION_INACTIVE');
 
-  const authorityResult = await pool.query(`
-    SELECT authority_id, wallet_address, status, allowed_strategy, allowed_dex_pair,
-           min_net_edge_bps, max_notional_usdc_atomic, max_daily_loss_usdc_atomic, expires_at
-    FROM member_delegated_authorities
-    WHERE user_id=$1
-    ORDER BY created_at DESC
-    LIMIT 1
-  `, [session.user_id]);
-  const authority = authorityResult.rows[0] || null;
+  const authority = await loadAuthority(pool, session, current);
   if (!authority) blockers.push('DELEGATED_AUTHORITY_MISSING');
   else {
     if (authority.status !== 'ACTIVE') blockers.push('DELEGATED_AUTHORITY_INACTIVE');
