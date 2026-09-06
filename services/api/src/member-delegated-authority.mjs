@@ -106,7 +106,7 @@ export function getDelegatedAuthorityDecision(authority, { now = new Date(), req
   if (requested > maxNotional) return Object.freeze({ allowed: false, reason: 'AUTHORITY_NOTIONAL_LIMIT', live_execution_authorized: false });
   const dailyLoss = atomic(realized_daily_loss_usdc_atomic, 'realized_daily_loss_invalid', { allowZero: true });
   const maxDailyLoss = atomic(authority.max_daily_loss_usdc_atomic, 'authority_max_daily_loss_invalid', { allowZero: true });
-  if (dailyLoss >= maxDailyLoss && maxDailyLoss > 0n) return Object.freeze({ allowed: false, reason: 'AUTHORITY_DAILY_LOSS_LIMIT', live_execution_authorized: false });
+  if (dailyLoss > maxDailyLoss) return Object.freeze({ allowed: false, reason: 'AUTHORITY_DAILY_LOSS_LIMIT', live_execution_authorized: false });
   const edge = Number(expected_net_edge_bps);
   if (!Number.isFinite(edge) || edge < Number(authority.min_net_edge_bps || MIN_NET_EDGE_BPS)) return Object.freeze({ allowed: false, reason: 'AUTHORITY_NET_EDGE_FLOOR', live_execution_authorized: false });
   if (authority.allowed_strategy !== 'TWO_LEG_ARBITRAGE' || authority.allowed_dex_pair !== 'ORCA_RAYDIUM') return Object.freeze({ allowed: false, reason: 'AUTHORITY_SCOPE_MISMATCH', live_execution_authorized: false });
