@@ -40,6 +40,7 @@ assert.equal(MEMBER_AUTOTRADE_STATE_MACHINE.live_execution_authorized, false);
 const migration = fs.readFileSync(new URL('../migrations/027_member_autotrade_state_machine.sql', import.meta.url), 'utf8');
 const route = fs.readFileSync(new URL('../services/api/src/member-autotrade-state-route.mjs', import.meta.url), 'utf8');
 const dispatcher = fs.readFileSync(new URL('../services/api/src/member-positions-route.mjs', import.meta.url), 'utf8');
+const caddy = fs.readFileSync(new URL('../deploy/Caddyfile', import.meta.url), 'utf8');
 assert.match(migration, /RUNNING_SCANNING/);
 assert.match(migration, /EXECUTING/);
 assert.match(migration, /SETTLING/);
@@ -50,6 +51,9 @@ assert.match(route, /\/api\/account\/autotrade\/start/);
 assert.match(route, /\/api\/account\/autotrade\/stop/);
 assert.match(route, /execution_dispatched: false/);
 assert.match(dispatcher, /handleMemberAutoTradeStateRoute/);
+assert.match(caddy, /\/api\/account\/autotrade\/state/);
+assert.match(caddy, /\/api\/account\/autotrade\/start/);
+assert.match(caddy, /\/api\/account\/autotrade\/stop/);
 for (const source of [route, fs.readFileSync(new URL('../services/api/src/member-autotrade-state-machine.mjs', import.meta.url), 'utf8')]) {
   assert.doesNotMatch(source, /sendTransaction|secretKey|fromSecretKey|seed phrase/i);
 }
