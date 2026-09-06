@@ -29,6 +29,8 @@ assert.equal(verifySolanaMessageSignature({ walletAddress: wallet, message: inte
 const route = fs.readFileSync(new URL('../services/api/src/member-delegated-authority-route.mjs', import.meta.url), 'utf8');
 const dispatcher = fs.readFileSync(new URL('../services/api/src/member-positions-route.mjs', import.meta.url), 'utf8');
 const proxy = fs.readFileSync(new URL('../api/member-authority.mjs', import.meta.url), 'utf8');
+const member = fs.readFileSync(new URL('../public/member.html', import.meta.url), 'utf8');
+const authorityUi = fs.readFileSync(new URL('../public/member-authority-ui.js', import.meta.url), 'utf8');
 const vercel = fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8');
 const caddy = fs.readFileSync(new URL('../deploy/Caddyfile', import.meta.url), 'utf8');
 const manifest = fs.readFileSync(new URL('../deploy/vercel-direct-deploy-manifest.json', import.meta.url), 'utf8');
@@ -42,6 +44,7 @@ for (const path of [
   assert.match(route, new RegExp(path.replaceAll('/', '\\/')));
   assert.match(vercel, new RegExp(path.replaceAll('/', '\\/')));
   assert.match(caddy, new RegExp(path.replaceAll('/', '\\/')));
+  assert.match(authorityUi, new RegExp(path.replaceAll('/', '\\/')));
 }
 assert.match(route, /verifySolanaMessageSignature/);
 assert.match(route, /ownership_verified:true/);
@@ -50,8 +53,16 @@ assert.match(route, /private_key_stored: false/);
 assert.match(dispatcher, /handleMemberDelegatedAuthorityRoute/);
 assert.match(proxy, /SESSION_COOKIE = 'aether_session'/);
 assert.match(proxy, /authorization: `Bearer \$\{token\}`/);
+assert.match(member, /member-authority-ui\.js/);
+assert.match(member, /Delegated authority is a separate bounded wallet consent/);
+assert.match(authorityUi, /signMessage/);
+assert.match(authorityUi, /max_notional_usdc_atomic/);
+assert.match(authorityUi, /max_daily_loss_usdc_atomic/);
+assert.match(authorityUi, /ttl_days/);
+assert.match(authorityUi, /LIVE execution is still OFF/);
 assert.match(manifest, /api\/member-authority\.mjs/);
-for (const source of [route, proxy]) {
+assert.match(manifest, /public\/member-authority-ui\.js/);
+for (const source of [route, proxy, authorityUi]) {
   assert.doesNotMatch(source, /sendTransaction|process\.env\.[A-Z_]*(PRIVATE|SEED)|secretKey|fromSecretKey/i);
 }
 console.log('Member delegated authority binding regression: PASS');
