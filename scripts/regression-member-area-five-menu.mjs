@@ -31,9 +31,10 @@ assert.match(proxy, /SESSION_COOKIE = 'aether_session'/);
 assert.match(proxy, /authorization: `Bearer \$\{token\}`/);
 assert.match(caddy, /\/api\/account\/paper-arbitrage\/performance/);
 assert.match(vercel, /api\/account\/paper-arbitrage\/performance/);
-for (const src of ['/account/?','/autotrade/?','/performance/?','/subscription/?','/account/profile/?']) {
+for (const src of ['/account/?','/autotrade/?','/performance/?','/subscription/?','/account/profile/?','/autotrade-demo/?']) {
   const escaped = src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   assert.match(vercel, new RegExp(`"src": "${escaped}"[\\s\\S]*?"dest": "\\/public\\/member\\.html"`));
 }
+assert.doesNotMatch(vercel, /"src": "\/autotrade-demo\/\?"[\s\S]*?"dest": "\/public\/autotrade-demo\.html"/);
 
 console.log('Member area five-menu regression: PASS');
