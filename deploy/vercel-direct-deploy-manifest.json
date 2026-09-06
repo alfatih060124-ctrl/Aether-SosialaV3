@@ -13,6 +13,7 @@
   "files": [
     "vercel.json",
     "api/index.mjs",
+    "api/member-performance.mjs",
     "services/api/src/market-intelligence.mjs",
     "services/api/src/auto-trade-training.mjs",
     "services/api/src/signal-intelligence.mjs",
@@ -29,6 +30,7 @@
     "public/market-timeframes.js",
     "public/market.html",
     "public/marketplace.html",
+    "public/member.html",
     "public/og-aether.svg",
     "public/onboarding.html",
     "public/operator-autotrade.html",
