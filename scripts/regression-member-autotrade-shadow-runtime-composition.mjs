@@ -50,11 +50,27 @@ assert.equal(MEMBER_AUTOTRADE_REAL_MARKET_RUNTIME_FACTORY.transaction_count_per_
 assert.equal(MEMBER_AUTOTRADE_SHADOW_SCHEDULER.overlap_allowed, false);
 assert.equal(ORCA_RAYDIUM_SHADOW_NETWORK_FEE_SOURCE.live_execution_authorized, false);
 
+const primary = await fs.readFile(new URL('../services/api/src/server-primary.mjs', import.meta.url), 'utf8');
+const packageJson = JSON.parse(await fs.readFile(new URL('../services/api/package.json', import.meta.url), 'utf8'));
+const envExample = await fs.readFile(new URL('../.env.example', import.meta.url), 'utf8');
+const compose = await fs.readFile(new URL('../docker-compose.yml', import.meta.url), 'utf8');
+assert.equal(packageJson.scripts.start, 'node src/server-primary.mjs');
+assert.match(primary, /AUTOTRADE_SHADOW_SCHEDULER_ENABLED/);
+assert.match(primary, /executionMode !== 'SHADOW' \|\| liveEnabled/);
+assert.match(primary, /createConfiguredMemberAutoTradeRealMarketRuntime/);
+assert.match(primary, /createMemberAutoTradeShadowScheduler/);
+assert.match(envExample, /AUTOTRADE_SHADOW_SCHEDULER_ENABLED=false/);
+assert.match(envExample, /AUTOTRADE_SHADOW_NOTIONAL_USDC=10/);
+assert.match(compose, /AUTOTRADE_SHADOW_SCHEDULER_ENABLED: \$\{AUTOTRADE_SHADOW_SCHEDULER_ENABLED:-false\}/);
+assert.match(compose, /EXECUTION_MODE: SHADOW/);
+assert.match(compose, /LIVE_ENABLED: "false"/);
+
 for (const path of [
   '../services/api/src/member-autotrade-real-market-runtime.mjs',
   '../services/api/src/member-autotrade-real-market-runtime-factory.mjs',
   '../services/api/src/member-autotrade-shadow-scheduler.mjs',
-  '../services/api/src/orca-raydium-shadow-network-fee-source.mjs'
+  '../services/api/src/orca-raydium-shadow-network-fee-source.mjs',
+  '../services/api/src/server-primary.mjs'
 ]) {
   const source = await fs.readFile(new URL(path, import.meta.url), 'utf8');
   assert.doesNotMatch(source, /sendTransaction|secretKey|fromSecretKey|signTransaction|signAllTransactions/i);
