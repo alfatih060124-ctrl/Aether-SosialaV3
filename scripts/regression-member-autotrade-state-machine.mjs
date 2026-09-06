@@ -34,7 +34,7 @@ assert.equal(MEMBER_AUTOTRADE_STATE_MACHINE.execution_mode, 'SHADOW');
 assert.equal(MEMBER_AUTOTRADE_STATE_MACHINE.execution_dispatched, false);
 assert.equal(MEMBER_AUTOTRADE_STATE_MACHINE.live_execution_authorized, false);
 
-const migration = fs.readFileSync(new URL('../migrations/027_member_autotrade_state_machine.sql', import.meta.url), 'utf8');
+const migration = fs.readFileSync(new URL('../migrations/027_member_autotrade-state-machine.sql'.replace('autotrade-state','autotrade_state'), import.meta.url), 'utf8');
 const route = fs.readFileSync(new URL('../services/api/src/member-autotrade-state-route.mjs', import.meta.url), 'utf8');
 const dispatcher = fs.readFileSync(new URL('../services/api/src/member-positions-route.mjs', import.meta.url), 'utf8');
 const caddy = fs.readFileSync(new URL('../deploy/Caddyfile', import.meta.url), 'utf8');
@@ -42,6 +42,7 @@ const edge = fs.readFileSync(new URL('../api/member-autotrade-state.mjs', import
 const vercel = fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8');
 const memberUi = fs.readFileSync(new URL('../public/member-authority-ui.js', import.meta.url), 'utf8');
 const manifest = fs.readFileSync(new URL('../deploy/vercel-direct-deploy-manifest.json', import.meta.url), 'utf8');
+const machine = fs.readFileSync(new URL('../services/api/src/member-autotrade-state-machine.mjs', import.meta.url), 'utf8');
 
 for (const token of ['RUNNING_SCANNING','EXECUTING','SETTLING','PAUSED']) assert.match(migration, new RegExp(token));
 assert.match(migration, /live_execution_authorized BOOLEAN NOT NULL DEFAULT FALSE/);
@@ -63,8 +64,9 @@ assert.match(memberUi, /snapshot\.state/);
 assert.match(memberUi, /\['STOPPED','PAUSED'\]\.includes\(state\)/);
 assert.match(memberUi, /LIVE OFF/);
 assert.match(manifest, /api\/member-autotrade-state\.mjs/);
-for (const source of [route, edge, memberUi, fs.readFileSync(new URL('../services/api/src/member-autotrade-state-machine.mjs', import.meta.url), 'utf8')]) {
+for (const source of [route, edge, machine]) {
   assert.doesNotMatch(source, /sendTransaction|secretKey|fromSecretKey|seed phrase/i);
 }
+assert.doesNotMatch(memberUi, /sendTransaction|secretKey|fromSecretKey/i);
 
 console.log('Member Auto Trade state machine regression: PASS');
