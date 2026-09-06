@@ -1,0 +1,29 @@
+name: Solscan Indexer Evidence Regression
+
+on:
+  pull_request:
+    paths:
+      - 'packages/data-evidence/solscan-indexer-source.mjs'
+      - 'scripts/solscan-indexer-evidence-regression.mjs'
+      - '.github/workflows/solscan-indexer-evidence-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/data-evidence/solscan-indexer-source.mjs'
+      - 'scripts/solscan-indexer-evidence-regression.mjs'
+      - '.github/workflows/solscan-indexer-evidence-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run synthetic/test-only Solscan evidence regression
+        run: node scripts/solscan-indexer-evidence-regression.mjs
