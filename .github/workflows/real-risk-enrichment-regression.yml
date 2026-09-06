@@ -6,10 +6,12 @@ on:
       - 'services/api/src/solana-token-risk-source.mjs'
       - 'services/api/src/orca-raydium-market-risk-source.mjs'
       - 'services/api/src/orca-raydium-shadow-risk-evidence-collector.mjs'
+      - 'services/api/src/orca-raydium-verified-sell-simulation-source.mjs'
       - 'services/api/src/orca-raydium-verified-risk-qualification-runtime.mjs'
       - 'scripts/regression-solana-token-risk-source.mjs'
       - 'scripts/regression-orca-raydium-market-risk-source.mjs'
       - 'scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs'
+      - 'scripts/regression-orca-raydium-verified-sell-simulation-source.mjs'
       - 'scripts/regression-orca-raydium-verified-risk-qualification-runtime.mjs'
       - '.github/workflows/real-risk-enrichment-regression.yml'
   workflow_dispatch:
@@ -29,12 +31,15 @@ jobs:
       - run: node --check services/api/src/solana-token-risk-source.mjs
       - run: node --check services/api/src/orca-raydium-market-risk-source.mjs
       - run: node --check services/api/src/orca-raydium-shadow-risk-evidence-collector.mjs
+      - run: node --check services/api/src/orca-raydium-verified-sell-simulation-source.mjs
       - run: node --check services/api/src/orca-raydium-verified-risk-qualification-runtime.mjs
       - run: node --check scripts/regression-solana-token-risk-source.mjs
       - run: node --check scripts/regression-orca-raydium-market-risk-source.mjs
       - run: node --check scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs
+      - run: node --check scripts/regression-orca-raydium-verified-sell-simulation-source.mjs
       - run: node --check scripts/regression-orca-raydium-verified-risk-qualification-runtime.mjs
       - run: node scripts/regression-solana-token-risk-source.mjs
       - run: node scripts/regression-orca-raydium-market-risk-source.mjs
       - run: node scripts/regression-orca-raydium-shadow-risk-evidence-collector.mjs
+      - run: node scripts/regression-orca-raydium-verified-sell-simulation-source.mjs
       - run: node scripts/regression-orca-raydium-verified-risk-qualification-runtime.mjs
