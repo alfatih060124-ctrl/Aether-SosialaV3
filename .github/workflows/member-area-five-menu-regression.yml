@@ -4,8 +4,11 @@ on:
   pull_request:
     paths:
       - 'public/member.html'
+      - 'public/member-authority-ui.js'
       - 'api/member-performance.mjs'
+      - 'api/member-autotrade-state.mjs'
       - 'services/api/src/member-autotrade-route.mjs'
+      - 'services/api/src/member-autotrade-state-route.mjs'
       - 'services/api/src/orca-raydium-sell-simulation-boundary.mjs'
       - 'vercel.json'
       - 'scripts/regression-member-area-five-menu.mjs'
@@ -20,8 +23,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - run: node --check public/member-authority-ui.js
       - run: node --check api/member-performance.mjs
+      - run: node --check api/member-autotrade-state.mjs
       - run: node --check services/api/src/member-autotrade-route.mjs
+      - run: node --check services/api/src/member-autotrade-state-route.mjs
       - run: node --check services/api/src/orca-raydium-sell-simulation-boundary.mjs
       - run: node scripts/regression-member-area-five-menu.mjs
       - run: node scripts/regression-orca-raydium-sell-simulation-boundary.mjs
