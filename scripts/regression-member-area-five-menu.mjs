@@ -29,10 +29,9 @@ assert.match(proxy, /PRIMARY_API_ORIGIN = 'https:\/\/api\.aether\.boats'/);
 assert.match(proxy, /SESSION_COOKIE = 'aether_session'/);
 assert.match(proxy, /authorization: `Bearer \$\{token\}`/);
 assert.match(vercel, /api\/account\/paper-arbitrage\/performance/);
-assert.match(vercel, /"src": "\/account\/?"[\s\S]*"dest": "\/public\/member\.html"/);
-assert.match(vercel, /"src": "\/autotrade\/?"[\s\S]*"dest": "\/public\/member\.html"/);
-assert.match(vercel, /"src": "\/performance\/?"[\s\S]*"dest": "\/public\/member\.html"/);
-assert.match(vercel, /"src": "\/subscription\/?"[\s\S]*"dest": "\/public\/member\.html"/);
-assert.match(vercel, /"src": "\/account\/profile\/?"[\s\S]*"dest": "\/public\/member\.html"/);
+for (const src of ['/account/?','/autotrade/?','/performance/?','/subscription/?','/account/profile/?']) {
+  const escaped = src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  assert.match(vercel, new RegExp(`"src": "${escaped}"[\\s\\S]*?"dest": "\\/public\\/member\\.html"`));
+}
 
 console.log('Member area five-menu regression: PASS');
