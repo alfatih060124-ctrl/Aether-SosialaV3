@@ -2,6 +2,7 @@ import { createOrcaRaydiumMarketRiskSource } from './orca-raydium-market-risk-so
 import { createSolanaTokenRiskSource } from './solana-token-risk-source.mjs';
 import { createOrcaRaydiumShadowRiskEvidenceCollector } from './orca-raydium-shadow-risk-evidence-collector.mjs';
 import { createOrcaRaydiumShadowQualificationRuntime } from './orca-raydium-shadow-qualification-runtime.mjs';
+import { createOrcaRaydiumVerifiedSellSimulationSource } from './orca-raydium-verified-sell-simulation-source.mjs';
 
 export function createOrcaRaydiumVerifiedRiskQualificationRuntime({
   scannerRuntime,
@@ -18,7 +19,13 @@ export function createOrcaRaydiumVerifiedRiskQualificationRuntime({
   tokenTimeoutMs = 4_000,
   maxSignaturePages = 8
 } = {}) {
-  if (typeof loadSellSimulationSource !== 'function') throw new Error('verified_risk_sell_simulation_source_required');
+  const resolvedSellSimulationSource = typeof loadSellSimulationSource === 'function'
+    ? loadSellSimulationSource
+    : createOrcaRaydiumVerifiedSellSimulationSource({
+        scannerRuntime,
+        now,
+        maxAgeMs: maxRiskEvidenceAgeMs
+      });
 
   const loadMarketRiskSource = createOrcaRaydiumMarketRiskSource({
     fetchImpl: marketFetchImpl,
@@ -35,7 +42,7 @@ export function createOrcaRaydiumVerifiedRiskQualificationRuntime({
   const riskCollector = createOrcaRaydiumShadowRiskEvidenceCollector({
     loadMarketRiskSource,
     loadTokenRiskSource,
-    loadSellSimulationSource,
+    loadSellSimulationSource: resolvedSellSimulationSource,
     now,
     maxEvidenceAgeMs: maxRiskEvidenceAgeMs
   });
@@ -53,8 +60,9 @@ export function createOrcaRaydiumVerifiedRiskQualificationRuntime({
     mode: 'SHADOW',
     strategy: 'TWO_LEG_ARBITRAGE',
     dex_scope: Object.freeze(['ORCA', 'RAYDIUM']),
-    risk_source: 'VERIFIED_EXACT_ROUTE_MARKET_ANALYTICS_PLUS_SOLANA_RPC_TOKEN_RISK_PLUS_SELL_SIMULATION',
+    risk_source: 'VERIFIED_EXACT_ROUTE_MARKET_ANALYTICS_PLUS_SOLANA_RPC_TOKEN_RISK_PLUS_ONCHAIN_SELL_QUOTE_SIMULATION',
     verified_sell_simulation_required: true,
+    verified_sell_simulation_source_defaulted: typeof loadSellSimulationSource !== 'function',
     transaction_building_authorized: false,
     signer_requested: false,
     funds_moved: false,
@@ -71,6 +79,7 @@ export const ORCA_RAYDIUM_VERIFIED_RISK_QUALIFICATION_RUNTIME = Object.freeze({
   verified_market_risk_required: true,
   verified_token_risk_required: true,
   verified_sell_simulation_required: true,
+  verified_sell_simulation_source: 'ORCA_RAYDIUM_VERIFIED_ONCHAIN_SELL_QUOTE_SIMULATION',
   verified_network_fee_required: true,
   transaction_building_authorized: false,
   network_submission_authorized: false,
