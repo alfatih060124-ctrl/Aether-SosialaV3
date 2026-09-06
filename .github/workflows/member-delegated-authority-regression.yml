@@ -4,8 +4,16 @@ on:
   pull_request:
     paths:
       - 'services/api/src/member-delegated-authority.mjs'
+      - 'services/api/src/member-delegated-authority-route.mjs'
+      - 'services/api/src/member-positions-route.mjs'
+      - 'api/member-authority.mjs'
       - 'migrations/026_member_delegated_authority.sql'
+      - 'deploy/Caddyfile'
+      - 'deploy/vercel-direct-deploy-manifest.json'
+      - 'vercel.json'
+      - 'public/member.html'
       - 'scripts/regression-member-delegated-authority.mjs'
+      - 'scripts/regression-member-delegated-authority-binding.mjs'
       - '.github/workflows/member-delegated-authority-regression.yml'
   workflow_dispatch:
 
@@ -23,6 +31,12 @@ jobs:
       - name: Syntax check
         run: |
           node --check services/api/src/member-delegated-authority.mjs
+          node --check services/api/src/member-delegated-authority-route.mjs
+          node --check services/api/src/member-positions-route.mjs
+          node --check api/member-authority.mjs
           node --check scripts/regression-member-delegated-authority.mjs
-      - name: Run regression
-        run: node scripts/regression-member-delegated-authority.mjs
+          node --check scripts/regression-member-delegated-authority-binding.mjs
+      - name: Run regressions
+        run: |
+          node scripts/regression-member-delegated-authority.mjs
+          node scripts/regression-member-delegated-authority-binding.mjs
