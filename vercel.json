@@ -24,7 +24,7 @@
     { "src": "/performance/?", "dest": "/public/member.html" },
     { "src": "/subscription/?", "dest": "/public/member.html" },
     { "src": "/account/profile/?", "dest": "/public/member.html" },
-    { "src": "/autotrade-demo/?", "dest": "/public/autotrade-demo.html" },
+    { "src": "/autotrade-demo/?", "dest": "/public/member.html" },
     { "src": "/marketplace/?", "dest": "/public/marketplace.html" },
     { "src": "/market/?", "dest": "/public/market.html" },
     { "src": "/", "dest": "/public/index.html" },
