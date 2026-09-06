@@ -7,6 +7,7 @@ on:
       - 'services/api/src/member-autotrade-state-machine.mjs'
       - 'services/api/src/member-autotrade-state-route.mjs'
       - 'services/api/src/member-positions-route.mjs'
+      - 'deploy/Caddyfile'
       - 'scripts/regression-member-autotrade-state-machine.mjs'
       - '.github/workflows/member-autotrade-state-machine-regression.yml'
   workflow_dispatch:
