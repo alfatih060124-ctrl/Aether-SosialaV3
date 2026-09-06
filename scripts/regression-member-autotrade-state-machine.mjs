@@ -59,7 +59,8 @@ assert.match(edge, /execution_dispatched: false/);
 assert.match(memberUi, /AUTOTRADE_BASE='\/api\/account\/autotrade'/);
 assert.match(memberUi, /commandAutoTrade\('start'\)/);
 assert.match(memberUi, /commandAutoTrade\('stop'\)/);
-assert.match(memberUi, /RUNNING_SCANNING/);
+assert.match(memberUi, /snapshot\.state/);
+assert.match(memberUi, /\['STOPPED','PAUSED'\]\.includes\(state\)/);
 assert.match(memberUi, /LIVE OFF/);
 assert.match(manifest, /api\/member-autotrade-state\.mjs/);
 for (const source of [route, edge, memberUi, fs.readFileSync(new URL('../services/api/src/member-autotrade-state-machine.mjs', import.meta.url), 'utf8')]) {
