@@ -46,11 +46,12 @@ for (const path of [
 assert.match(route, /verifySolanaMessageSignature/);
 assert.match(route, /ownership_verified:true/);
 assert.match(route, /transaction_submission_authorized:false/);
+assert.match(route, /private_key_stored: false/);
 assert.match(dispatcher, /handleMemberDelegatedAuthorityRoute/);
 assert.match(proxy, /SESSION_COOKIE = 'aether_session'/);
 assert.match(proxy, /authorization: `Bearer \$\{token\}`/);
 assert.match(manifest, /api\/member-authority\.mjs/);
 for (const source of [route, proxy]) {
-  assert.doesNotMatch(source, /sendTransaction|private[_ ]?key|seed phrase/i);
+  assert.doesNotMatch(source, /sendTransaction|process\.env\.[A-Z_]*(PRIVATE|SEED)|secretKey|fromSecretKey/i);
 }
 console.log('Member delegated authority binding regression: PASS');
