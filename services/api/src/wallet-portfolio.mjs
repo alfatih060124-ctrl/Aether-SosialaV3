@@ -38,10 +38,21 @@ function tokenRows(result, program) {
 function aggregateTokens(rows) {
   const byMint = new Map();
   for (const row of rows) {
-    const current = byMint.get(row.mint) || { ...row, amount: 0, accounts: 0 };
+    let raw;
+    try { raw = BigInt(String(row.amount_raw)); } catch { continue; }
+    if (raw < 0n) continue;
+    const current = byMint.get(row.mint);
+    if (!current) {
+      byMint.set(row.mint, { ...row, amount: Number(row.amount || 0), amount_raw: raw.toString(), accounts: 1, raw_balance_verified: true });
+      continue;
+    }
+    if (Number(current.decimals) !== Number(row.decimals)) {
+      current.raw_balance_verified = false;
+    } else {
+      current.amount_raw = (BigInt(current.amount_raw) + raw).toString();
+    }
     current.amount += Number(row.amount || 0);
     current.accounts += 1;
-    byMint.set(row.mint, current);
   }
   return [...byMint.values()].filter(row => row.amount > 0).sort((a, b) => b.amount - a.amount);
 }
@@ -121,8 +132,8 @@ export function createWalletPortfolioService({ rpcUrl = process.env.SOLANA_RPC_U
       gas_currency: 'SOL',
       balances: {
         sol: { symbol: 'SOL', amount: lamports / LAMPORTS_PER_SOL, lamports: String(Math.trunc(lamports)), role: 'NETWORK_FEE_RESERVE' },
-        usdc: { symbol: 'USDC', amount: Number(usdc?.amount || 0), mint: USDC_MINT, role: 'PRIMARY_TRADING_CURRENCY' },
-        usdt: { symbol: 'USDT', amount: Number(usdt?.amount || 0), mint: USDT_MINT, role: 'OPTIONAL_STABLE_ASSET' },
+        usdc: { symbol: 'USDC', amount: Number(usdc?.amount || 0), amount_raw: usdc?.amount_raw ?? '0', decimals: usdc?.decimals ?? 6, raw_balance_verified: usdc ? usdc.raw_balance_verified === true : true, mint: USDC_MINT, role: 'PRIMARY_TRADING_CURRENCY' },
+        usdt: { symbol: 'USDT', amount: Number(usdt?.amount || 0), amount_raw: usdt?.amount_raw ?? '0', decimals: usdt?.decimals ?? 6, raw_balance_verified: usdt ? usdt.raw_balance_verified === true : true, mint: USDT_MINT, role: 'OPTIONAL_STABLE_ASSET' },
       },
       assets,
       available_for_copy_usdc: null,
