@@ -10,6 +10,7 @@
     { "src": "api/member-performance.mjs", "use": "@vercel/node" },
     { "src": "api/member-subscription.mjs", "use": "@vercel/node" },
     { "src": "api/member-authority.mjs", "use": "@vercel/node" },
+    { "src": "api/member-autotrade-state.mjs", "use": "@vercel/node" },
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
@@ -22,6 +23,9 @@
     { "src": "/api/account/delegated-authority/challenge/?", "dest": "/api/member-authority.mjs?action=challenge" },
     { "src": "/api/account/delegated-authority/verify/?", "dest": "/api/member-authority.mjs?action=verify" },
     { "src": "/api/account/delegated-authority/revoke/?", "dest": "/api/member-authority.mjs?action=revoke" },
+    { "src": "/api/account/autotrade/state/?", "dest": "/api/member-autotrade-state.mjs?action=state" },
+    { "src": "/api/account/autotrade/start/?", "dest": "/api/member-autotrade-state.mjs?action=start" },
+    { "src": "/api/account/autotrade/stop/?", "dest": "/api/member-autotrade-state.mjs?action=stop" },
     { "src": "/api/(.*)", "dest": "/api/index.mjs" },
     { "src": "/aether-mark.svg", "dest": "/public/aether-mark.svg" },
     { "src": "/favicon.svg", "dest": "/public/favicon.svg" },
