@@ -1,0 +1,22 @@
+name: Evidence Batch Manifest Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/evidence-batch-manifest.mjs'
+      - 'services/api/src/evidence-batch-manifest.regression.mjs'
+      - '.github/workflows/evidence-batch-manifest-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run synthetic/test-only evidence batch manifest regression
+        run: node services/api/src/evidence-batch-manifest.regression.mjs
