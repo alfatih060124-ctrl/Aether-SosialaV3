@@ -34,7 +34,7 @@ assert.equal(MEMBER_AUTOTRADE_STATE_MACHINE.execution_mode, 'SHADOW');
 assert.equal(MEMBER_AUTOTRADE_STATE_MACHINE.execution_dispatched, false);
 assert.equal(MEMBER_AUTOTRADE_STATE_MACHINE.live_execution_authorized, false);
 
-const migration = fs.readFileSync(new URL('../migrations/027_member_autotrade-state-machine.sql'.replace('autotrade-state','autotrade_state'), import.meta.url), 'utf8');
+const migration = fs.readFileSync(new URL('../migrations/027_member_autotrade_state_machine.sql', import.meta.url), 'utf8');
 const route = fs.readFileSync(new URL('../services/api/src/member-autotrade-state-route.mjs', import.meta.url), 'utf8');
 const dispatcher = fs.readFileSync(new URL('../services/api/src/member-positions-route.mjs', import.meta.url), 'utf8');
 const caddy = fs.readFileSync(new URL('../deploy/Caddyfile', import.meta.url), 'utf8');
