@@ -8,6 +8,10 @@ on:
       - 'services/api/src/member-autotrade-state-route.mjs'
       - 'services/api/src/member-positions-route.mjs'
       - 'deploy/Caddyfile'
+      - 'api/member-autotrade-state.mjs'
+      - 'public/member-authority-ui.js'
+      - 'vercel.json'
+      - 'deploy/vercel-direct-deploy-manifest.json'
       - 'scripts/regression-member-autotrade-state-machine.mjs'
       - '.github/workflows/member-autotrade-state-machine-regression.yml'
   workflow_dispatch:
@@ -28,6 +32,8 @@ jobs:
           node --check services/api/src/member-autotrade-state-machine.mjs
           node --check services/api/src/member-autotrade-state-route.mjs
           node --check services/api/src/member-positions-route.mjs
+          node --check api/member-autotrade-state.mjs
+          node --check public/member-authority-ui.js
           node --check scripts/regression-member-autotrade-state-machine.mjs
       - name: Run regression
         run: node scripts/regression-member-autotrade-state-machine.mjs
