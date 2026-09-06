@@ -1,6 +1,7 @@
 (()=>{
   const ACCOUNT_ID='account';
   const API_BASE='/api/account/delegated-authority';
+  const AUTOTRADE_BASE='/api/account/autotrade';
   const enc=new TextEncoder();
 
   const byId=id=>document.getElementById(id);
@@ -61,6 +62,7 @@
     byId('authorityCreate').addEventListener('click',createAndSign);
     byId('authorityRevoke').addEventListener('click',revoke);
     load();
+    mountAutoTradeControls();
   }
 
   function render(authority){
@@ -102,6 +104,41 @@
     const button=byId('authorityRevoke'),authorityId=button.dataset.authorityId;if(!authorityId)return;button.disabled=true;
     try{const result=await request(`${API_BASE}/revoke`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({authority_id:authorityId})});render(result.authority);byId('authorityMessage').textContent='Delegated authority revoked. Logout is separate from revocation.'}
     catch(e){byId('authorityMessage').textContent=`Revoke failed · ${e.message}`;button.disabled=false}
+  }
+
+  function autoButtons(){
+    const section=byId('autotrade');
+    return {start:byId('start'),stop:section?.querySelector('.actions .btn.secondary')||null};
+  }
+
+  function renderAutoTradeState(snapshot){
+    if(!snapshot)return;
+    const {start,stop}=autoButtons();
+    const state=String(snapshot.state||'STOPPED');
+    const engine=byId('engineState');if(engine)engine.textContent=state;
+    const status=byId('autoState');
+    if(status){status.className='status';status.textContent=`${state}${snapshot.stop_requested?' · stop requested':''} · SHADOW control state only · LIVE OFF`;}
+    if(start)start.disabled=!['STOPPED','PAUSED'].includes(state);
+    if(stop)stop.disabled=state==='STOPPED';
+  }
+
+  async function loadAutoTradeState(){
+    try{const d=await request(`${AUTOTRADE_BASE}/state`);renderAutoTradeState(d.state)}
+    catch(e){const status=byId('autoState');if(status){status.className='status warn';status.textContent=`Auto Trade control unavailable · ${e.message}`};const {start,stop}=autoButtons();if(start)start.disabled=true;if(stop)stop.disabled=true}
+  }
+
+  async function commandAutoTrade(action){
+    const {start,stop}=autoButtons();if(start)start.disabled=true;if(stop)stop.disabled=true;
+    try{const d=await request(`${AUTOTRADE_BASE}/${action}`,{method:'POST'});renderAutoTradeState(d.state)}
+    catch(e){const status=byId('autoState');if(status){status.className='status warn';status.textContent=`Auto Trade ${action} rejected · ${e.message}`};await loadAutoTradeState().catch(()=>{})}
+  }
+
+  function mountAutoTradeControls(){
+    const {start,stop}=autoButtons();if(!start||!stop||start.dataset.stateBound==='true')return;
+    start.dataset.stateBound='true';stop.dataset.stateBound='true';
+    start.addEventListener('click',()=>commandAutoTrade('start'));
+    stop.addEventListener('click',()=>commandAutoTrade('stop'));
+    loadAutoTradeState();
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
