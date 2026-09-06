@@ -1,0 +1,29 @@
+name: Two-Leg LIVE Execution Boundary Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/two-leg-live-execution-boundary.mjs'
+      - 'services/api/src/live-execution-gate.mjs'
+      - 'scripts/regression-two-leg-live-execution-boundary.mjs'
+      - '.github/workflows/two-leg-live-execution-boundary-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: |
+          node --check services/api/src/two-leg-live-execution-boundary.mjs
+          node --check scripts/regression-two-leg-live-execution-boundary.mjs
+      - name: Run regression
+        run: node scripts/regression-two-leg-live-execution-boundary.mjs
