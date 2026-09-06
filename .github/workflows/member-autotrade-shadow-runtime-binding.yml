@@ -6,7 +6,12 @@ on:
       - 'services/api/src/member-autotrade-shadow-runtime-binding.mjs'
       - 'services/api/src/member-autotrade-state-machine.mjs'
       - 'services/api/src/paper-arbitrage-persistence.mjs'
+      - 'services/api/src/member-autotrade-real-market-runtime.mjs'
+      - 'services/api/src/member-autotrade-real-market-runtime-factory.mjs'
+      - 'services/api/src/member-autotrade-shadow-scheduler.mjs'
+      - 'services/api/src/orca-raydium-shadow-network-fee-source.mjs'
       - 'scripts/regression-member-autotrade-shadow-runtime-binding.mjs'
+      - 'scripts/regression-member-autotrade-shadow-runtime-composition.mjs'
       - '.github/workflows/member-autotrade-shadow-runtime-binding.yml'
   workflow_dispatch:
 
@@ -25,6 +30,13 @@ jobs:
         run: |
           node --check services/api/src/member-autotrade-shadow-runtime-binding.mjs
           node --check services/api/src/member-autotrade-state-machine.mjs
+          node --check services/api/src/member-autotrade-real-market-runtime.mjs
+          node --check services/api/src/member-autotrade-real-market-runtime-factory.mjs
+          node --check services/api/src/member-autotrade-shadow-scheduler.mjs
+          node --check services/api/src/orca-raydium-shadow-network-fee-source.mjs
           node --check scripts/regression-member-autotrade-shadow-runtime-binding.mjs
+          node --check scripts/regression-member-autotrade-shadow-runtime-composition.mjs
       - name: Run regression
-        run: node scripts/regression-member-autotrade-shadow-runtime-binding.mjs
+        run: |
+          node scripts/regression-member-autotrade-shadow-runtime-binding.mjs
+          node scripts/regression-member-autotrade-shadow-runtime-composition.mjs
