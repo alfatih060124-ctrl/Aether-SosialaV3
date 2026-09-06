@@ -1,0 +1,30 @@
+name: Reconciliation Batch Completeness Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/reconciliation-batch-completeness.mjs'
+      - 'scripts/reconciliation-batch-completeness-regression.mjs'
+      - '.github/workflows/reconciliation-batch-completeness-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/api/src/reconciliation-batch-completeness.mjs'
+      - 'scripts/reconciliation-batch-completeness-regression.mjs'
+      - '.github/workflows/reconciliation-batch-completeness-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: node --check services/api/src/reconciliation-batch-completeness.mjs && node --check scripts/reconciliation-batch-completeness-regression.mjs
+      - name: Run regression
+        run: node scripts/reconciliation-batch-completeness-regression.mjs
