@@ -28,6 +28,30 @@ CREATE TABLE IF NOT EXISTS member_delegated_authorities (
 CREATE INDEX IF NOT EXISTS member_delegated_authorities_user_idx
   ON member_delegated_authorities(user_id, created_at DESC);
 
+CREATE OR REPLACE FUNCTION expire_member_delegated_authorities_before_write()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.status = 'ACTIVE' THEN
+    UPDATE member_delegated_authorities
+    SET status = 'EXPIRED', updated_at = now()
+    WHERE user_id = NEW.user_id
+      AND status = 'ACTIVE'
+      AND expires_at <= now()
+      AND authority_id <> NEW.authority_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS member_delegated_authorities_expire_before_write
+  ON member_delegated_authorities;
+CREATE TRIGGER member_delegated_authorities_expire_before_write
+BEFORE INSERT OR UPDATE OF status ON member_delegated_authorities
+FOR EACH ROW
+EXECUTE FUNCTION expire_member_delegated_authorities_before_write();
+
 CREATE UNIQUE INDEX IF NOT EXISTS member_delegated_authorities_one_active_idx
   ON member_delegated_authorities(user_id)
   WHERE status = 'ACTIVE';
