@@ -1,0 +1,32 @@
+name: Member LIVE Funding Preflight Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/member-live-funding-preflight.mjs'
+      - 'services/api/src/member-live-funding-preflight-route.mjs'
+      - 'services/api/src/member-positions-route.mjs'
+      - 'deploy/Caddyfile'
+      - 'scripts/regression-member-live-funding-preflight.mjs'
+      - '.github/workflows/member-live-funding-preflight-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: |
+          node --check services/api/src/member-live-funding-preflight.mjs
+          node --check services/api/src/member-live-funding-preflight-route.mjs
+          node --check services/api/src/member-positions-route.mjs
+          node --check scripts/regression-member-live-funding-preflight.mjs
+      - name: Run regression
+        run: node scripts/regression-member-live-funding-preflight.mjs
