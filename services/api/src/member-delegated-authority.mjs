@@ -25,6 +25,10 @@ function date(value, code) {
   return parsed;
 }
 
+function sha256(value) {
+  return crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');
+}
+
 export function buildDelegatedAuthorityConsentMessage({ authority_id, wallet_address, max_notional_usdc_atomic, max_daily_loss_usdc_atomic, expires_at }) {
   return [
     'AETHER AUTOTRADE DELEGATED AUTHORITY CONSENT',
@@ -74,15 +78,44 @@ export function createDelegatedAuthorityIntent({
     private_key_stored: false,
     signer_material_stored: false
   };
+  const consentMessage = buildDelegatedAuthorityConsentMessage(intent);
   return Object.freeze({
     ...intent,
-    consent_message: buildDelegatedAuthorityConsentMessage(intent)
+    consent_message: consentMessage,
+    consent_message_sha256: sha256(consentMessage)
   });
 }
 
-export function activateDelegatedAuthority(intent, { challenge_id, ownership_verified, verified_at = new Date() } = {}) {
+export function activateDelegatedAuthority(intent, {
+  challenge_id,
+  ownership_verified,
+  verified_wallet_address,
+  verified_authority_id,
+  verified_message,
+  verified_message_sha256,
+  verified_at = new Date()
+} = {}) {
   if (!intent || intent.status !== 'PENDING_CONSENT') throw new Error('authority_not_pending_consent');
   if (ownership_verified !== true) throw new Error('authority_wallet_consent_required');
+
+  const expectedMessage = buildDelegatedAuthorityConsentMessage(intent);
+  const expectedHash = sha256(expectedMessage);
+  if (intent.consent_message !== expectedMessage || intent.consent_message_sha256 !== expectedHash) {
+    throw new Error('authority_consent_payload_mutated');
+  }
+  if (text(verified_wallet_address, 'authority_verified_wallet_required') !== intent.wallet_address) {
+    throw new Error('authority_verified_wallet_mismatch');
+  }
+  if (text(verified_authority_id, 'authority_verified_id_required') !== intent.authority_id) {
+    throw new Error('authority_verified_id_mismatch');
+  }
+  if (text(verified_message, 'authority_verified_message_required') !== expectedMessage) {
+    throw new Error('authority_verified_message_mismatch');
+  }
+  if (text(verified_message_sha256, 'authority_verified_message_hash_required') !== expectedHash) {
+    throw new Error('authority_verified_message_hash_mismatch');
+  }
+
   const verified = date(verified_at, 'verified_at_invalid');
   if (verified >= new Date(intent.expires_at)) throw new Error('authority_expired');
   return Object.freeze({
@@ -106,7 +139,9 @@ export function getDelegatedAuthorityDecision(authority, { now = new Date(), req
   if (requested > maxNotional) return Object.freeze({ allowed: false, reason: 'AUTHORITY_NOTIONAL_LIMIT', live_execution_authorized: false });
   const dailyLoss = atomic(realized_daily_loss_usdc_atomic, 'realized_daily_loss_invalid', { allowZero: true });
   const maxDailyLoss = atomic(authority.max_daily_loss_usdc_atomic, 'authority_max_daily_loss_invalid', { allowZero: true });
-  if (dailyLoss > maxDailyLoss) return Object.freeze({ allowed: false, reason: 'AUTHORITY_DAILY_LOSS_LIMIT', live_execution_authorized: false });
+  if ((maxDailyLoss === 0n && dailyLoss > 0n) || (maxDailyLoss > 0n && dailyLoss >= maxDailyLoss)) {
+    return Object.freeze({ allowed: false, reason: 'AUTHORITY_DAILY_LOSS_LIMIT', live_execution_authorized: false });
+  }
   const edge = Number(expected_net_edge_bps);
   if (!Number.isFinite(edge) || edge < Number(authority.min_net_edge_bps || MIN_NET_EDGE_BPS)) return Object.freeze({ allowed: false, reason: 'AUTHORITY_NET_EDGE_FLOOR', live_execution_authorized: false });
   if (authority.allowed_strategy !== 'TWO_LEG_ARBITRAGE' || authority.allowed_dex_pair !== 'ORCA_RAYDIUM') return Object.freeze({ allowed: false, reason: 'AUTHORITY_SCOPE_MISMATCH', live_execution_authorized: false });
@@ -133,6 +168,7 @@ export const MEMBER_DELEGATED_AUTHORITY_CONTRACT = Object.freeze({
   min_net_edge_bps: MIN_NET_EDGE_BPS,
   max_ttl_ms: MAX_AUTHORITY_TTL_MS,
   revocable: true,
+  exact_consent_payload_required: true,
   private_key_allowed: false,
   seed_phrase_allowed: false,
   signer_material_stored: false,
