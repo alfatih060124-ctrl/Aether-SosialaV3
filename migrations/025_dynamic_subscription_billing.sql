@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS subscription_orders (
   final_price_usdc_atomic bigint NOT NULL CHECK (final_price_usdc_atomic > 0),
   payment_network text NOT NULL DEFAULT 'SOLANA' CHECK (payment_network = 'SOLANA'),
   payment_asset text NOT NULL DEFAULT 'USDC' CHECK (payment_asset = 'USDC'),
+  payment_recipient_wallet text NOT NULL,
+  payment_mint text NOT NULL,
   status text NOT NULL DEFAULT 'PENDING_PAYMENT' CHECK (status IN ('PENDING_PAYMENT','PAYMENT_VERIFIED','EXPIRED','CANCELLED')),
   quoted_at timestamptz NOT NULL,
   quote_expires_at timestamptz NOT NULL,
