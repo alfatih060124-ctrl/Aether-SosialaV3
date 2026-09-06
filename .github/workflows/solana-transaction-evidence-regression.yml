@@ -1,0 +1,30 @@
+name: Solana Transaction Evidence Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-transaction-evidence-source.mjs'
+      - 'scripts/solana-transaction-evidence-regression.mjs'
+      - '.github/workflows/solana-transaction-evidence-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/api/src/solana-transaction-evidence-source.mjs'
+      - 'scripts/solana-transaction-evidence-regression.mjs'
+      - '.github/workflows/solana-transaction-evidence-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: node --check services/api/src/solana-transaction-evidence-source.mjs && node --check scripts/solana-transaction-evidence-regression.mjs
+      - name: Run regression
+        run: node scripts/solana-transaction-evidence-regression.mjs
