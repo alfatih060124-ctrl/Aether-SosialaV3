@@ -33,6 +33,7 @@
     "public/market.html",
     "public/marketplace.html",
     "public/member.html",
+    "public/member-authority-ui.js",
     "public/og-aether.svg",
     "public/onboarding.html",
     "public/operator-autotrade.html",
