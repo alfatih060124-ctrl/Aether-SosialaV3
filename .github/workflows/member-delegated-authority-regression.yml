@@ -1,0 +1,28 @@
+name: Member Delegated Authority Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/member-delegated-authority.mjs'
+      - 'migrations/026_member_delegated_authority.sql'
+      - 'scripts/regression-member-delegated-authority.mjs'
+      - '.github/workflows/member-delegated-authority-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: |
+          node --check services/api/src/member-delegated-authority.mjs
+          node --check scripts/regression-member-delegated-authority.mjs
+      - name: Run regression
+        run: node scripts/regression-member-delegated-authority.mjs
