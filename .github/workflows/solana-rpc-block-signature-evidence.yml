@@ -1,0 +1,21 @@
+name: Solana RPC Block Signature Evidence Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-rpc-block-signature-evidence.mjs'
+      - 'scripts/solana-rpc-block-signature-evidence-regression.mjs'
+      - '.github/workflows/solana-rpc-block-signature-evidence.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: node --check services/api/src/solana-rpc-block-signature-evidence.mjs && node --check scripts/solana-rpc-block-signature-evidence-regression.mjs
+      - name: Run regression
+        run: node scripts/solana-rpc-block-signature-evidence-regression.mjs
