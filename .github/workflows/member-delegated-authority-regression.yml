@@ -1,0 +1,44 @@
+name: Member Delegated Authority Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/member-delegated-authority.mjs'
+      - 'services/api/src/member-delegated-authority-route.mjs'
+      - 'services/api/src/member-positions-route.mjs'
+      - 'api/member-authority.mjs'
+      - 'migrations/026_member_delegated_authority.sql'
+      - 'deploy/Caddyfile'
+      - 'deploy/vercel-direct-deploy-manifest.json'
+      - 'vercel.json'
+      - 'public/member.html'
+      - 'public/member-authority-ui.js'
+      - 'scripts/regression-member-delegated-authority.mjs'
+      - 'scripts/regression-member-delegated-authority-binding.mjs'
+      - '.github/workflows/member-delegated-authority-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: |
+          node --check services/api/src/member-delegated-authority.mjs
+          node --check services/api/src/member-delegated-authority-route.mjs
+          node --check services/api/src/member-positions-route.mjs
+          node --check api/member-authority.mjs
+          node --check public/member-authority-ui.js
+          node --check scripts/regression-member-delegated-authority.mjs
+          node --check scripts/regression-member-delegated-authority-binding.mjs
+      - name: Run regressions
+        run: |
+          node scripts/regression-member-delegated-authority.mjs
+          node scripts/regression-member-delegated-authority-binding.mjs
