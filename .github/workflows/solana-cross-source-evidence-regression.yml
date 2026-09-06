@@ -1,0 +1,24 @@
+name: Solana Cross Source Evidence Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-cross-source-evidence.mjs'
+      - 'scripts/solana-cross-source-evidence-regression.mjs'
+      - '.github/workflows/solana-cross-source-evidence-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run deterministic cross-source evidence regression
+        run: node scripts/solana-cross-source-evidence-regression.mjs
