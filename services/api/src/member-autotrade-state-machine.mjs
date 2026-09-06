@@ -39,6 +39,11 @@ export function applyMemberAutoTradeCommand(snapshot, command, { now = new Date(
     next.state = 'PAUSED';
     next.stop_requested = false;
     next.paused_at = at;
+  } else if (action === 'FAIL') {
+    if (!['RUNNING_SCANNING','EXECUTING','SETTLING'].includes(current)) throw new Error('autotrade_fail_state_conflict');
+    next.state = 'PAUSED';
+    next.stop_requested = false;
+    next.paused_at = at;
   } else if (action === 'BEGIN_EXECUTION') {
     if (current !== 'RUNNING_SCANNING' || next.stop_requested) throw new Error('autotrade_execution_state_conflict');
     next.state = 'EXECUTING';
@@ -130,7 +135,7 @@ export async function commandMemberAutoTradeState(pool, session, command, { now 
 export const MEMBER_AUTOTRADE_STATE_MACHINE = Object.freeze({
   states: STATES,
   member_commands: Object.freeze(['START','STOP']),
-  internal_commands: Object.freeze(['PAUSE','BEGIN_EXECUTION','BEGIN_SETTLING','SETTLED']),
+  internal_commands: Object.freeze(['PAUSE','FAIL','BEGIN_EXECUTION','BEGIN_SETTLING','SETTLED']),
   execution_mode: 'SHADOW',
   execution_dispatched: false,
   live_execution_authorized: false,
