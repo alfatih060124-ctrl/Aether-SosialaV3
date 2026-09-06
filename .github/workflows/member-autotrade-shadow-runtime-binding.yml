@@ -1,0 +1,30 @@
+name: Member Auto Trade SHADOW Runtime Binding
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/member-autotrade-shadow-runtime-binding.mjs'
+      - 'services/api/src/member-autotrade-state-machine.mjs'
+      - 'services/api/src/paper-arbitrage-persistence.mjs'
+      - 'scripts/regression-member-autotrade-shadow-runtime-binding.mjs'
+      - '.github/workflows/member-autotrade-shadow-runtime-binding.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check
+        run: |
+          node --check services/api/src/member-autotrade-shadow-runtime-binding.mjs
+          node --check services/api/src/member-autotrade-state-machine.mjs
+          node --check scripts/regression-member-autotrade-shadow-runtime-binding.mjs
+      - name: Run regression
+        run: node scripts/regression-member-autotrade-shadow-runtime-binding.mjs
