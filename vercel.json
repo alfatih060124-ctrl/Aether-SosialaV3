@@ -8,11 +8,15 @@
     { "src": "api/index.mjs", "use": "@vercel/node" },
     { "src": "api/chart.mjs", "use": "@vercel/node" },
     { "src": "api/member-performance.mjs", "use": "@vercel/node" },
+    { "src": "api/member-subscription.mjs", "use": "@vercel/node" },
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/market/chart/?", "dest": "/api/chart.mjs" },
     { "src": "/api/account/paper-arbitrage/performance/?", "dest": "/api/member-performance.mjs" },
+    { "src": "/api/account/subscription/?", "dest": "/api/member-subscription.mjs?action=status" },
+    { "src": "/api/account/subscription/quote/?", "dest": "/api/member-subscription.mjs?action=quote" },
+    { "src": "/api/account/subscription/verify/?", "dest": "/api/member-subscription.mjs?action=verify" },
     { "src": "/api/(.*)", "dest": "/api/index.mjs" },
     { "src": "/aether-mark.svg", "dest": "/public/aether-mark.svg" },
     { "src": "/favicon.svg", "dest": "/public/favicon.svg" },
