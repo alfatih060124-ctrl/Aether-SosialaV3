@@ -6,8 +6,10 @@ on:
       - 'public/member.html'
       - 'api/member-performance.mjs'
       - 'services/api/src/member-autotrade-route.mjs'
+      - 'services/api/src/orca-raydium-sell-simulation-boundary.mjs'
       - 'vercel.json'
       - 'scripts/regression-member-area-five-menu.mjs'
+      - 'scripts/regression-orca-raydium-sell-simulation-boundary.mjs'
       - '.github/workflows/member-area-five-menu-regression.yml'
 
 jobs:
@@ -20,4 +22,6 @@ jobs:
           node-version: '20'
       - run: node --check api/member-performance.mjs
       - run: node --check services/api/src/member-autotrade-route.mjs
+      - run: node --check services/api/src/orca-raydium-sell-simulation-boundary.mjs
       - run: node scripts/regression-member-area-five-menu.mjs
+      - run: node scripts/regression-orca-raydium-sell-simulation-boundary.mjs
