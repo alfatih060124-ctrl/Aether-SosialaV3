@@ -16,6 +16,7 @@
     "api/member-performance.mjs",
     "api/member-subscription.mjs",
     "api/member-authority.mjs",
+    "api/member-autotrade-state.mjs",
     "services/api/src/market-intelligence.mjs",
     "services/api/src/auto-trade-training.mjs",
     "services/api/src/signal-intelligence.mjs",
