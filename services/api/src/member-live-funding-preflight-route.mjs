@@ -1,4 +1,5 @@
 import { evaluateMemberLiveFundingPreflight } from './member-live-funding-preflight.mjs';
+import { createWalletPortfolioService } from './wallet-portfolio.mjs';
 
 export const MEMBER_LIVE_FUNDING_PREFLIGHT_ROUTE = '/api/account/live-preflight';
 
@@ -18,7 +19,8 @@ export async function handleMemberLiveFundingPreflightRoute({ req, res, route, p
     return true;
   }
   try {
-    const preflight = await evaluateMemberLiveFundingPreflight(pool, session, { portfolioService: walletPortfolio });
+    const portfolioService = walletPortfolio || createWalletPortfolioService();
+    const preflight = await evaluateMemberLiveFundingPreflight(pool, session, { portfolioService });
     send(res, 200, {
       ...preflight,
       route: MEMBER_LIVE_FUNDING_PREFLIGHT_ROUTE,
