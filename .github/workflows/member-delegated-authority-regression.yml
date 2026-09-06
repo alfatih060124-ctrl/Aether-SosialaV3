@@ -12,6 +12,7 @@ on:
       - 'deploy/vercel-direct-deploy-manifest.json'
       - 'vercel.json'
       - 'public/member.html'
+      - 'public/member-authority-ui.js'
       - 'scripts/regression-member-delegated-authority.mjs'
       - 'scripts/regression-member-delegated-authority-binding.mjs'
       - '.github/workflows/member-delegated-authority-regression.yml'
@@ -34,6 +35,7 @@ jobs:
           node --check services/api/src/member-delegated-authority-route.mjs
           node --check services/api/src/member-positions-route.mjs
           node --check api/member-authority.mjs
+          node --check public/member-authority-ui.js
           node --check scripts/regression-member-delegated-authority.mjs
           node --check scripts/regression-member-delegated-authority-binding.mjs
       - name: Run regressions
