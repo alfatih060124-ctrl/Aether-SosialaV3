@@ -3,6 +3,10 @@ name: Member Auto Trade SHADOW Runtime Binding
 on:
   pull_request:
     paths:
+      - '.env.example'
+      - 'docker-compose.yml'
+      - 'services/api/package.json'
+      - 'services/api/src/server-primary.mjs'
       - 'services/api/src/member-autotrade-shadow-runtime-binding.mjs'
       - 'services/api/src/member-autotrade-state-machine.mjs'
       - 'services/api/src/paper-arbitrage-persistence.mjs'
@@ -28,6 +32,7 @@ jobs:
           node-version: '20'
       - name: Syntax check
         run: |
+          node --check services/api/src/server-primary.mjs
           node --check services/api/src/member-autotrade-shadow-runtime-binding.mjs
           node --check services/api/src/member-autotrade-state-machine.mjs
           node --check services/api/src/member-autotrade-real-market-runtime.mjs
