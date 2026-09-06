@@ -44,6 +44,24 @@ assert.equal(quote.final_price_usdc_atomic, '35000000');
 assert.equal(quote.status, 'PENDING_PAYMENT');
 assert.equal(DYNAMIC_SUBSCRIPTION_CONTRACT.client_price_override_allowed, false);
 
+assert.throws(() => createSubscriptionQuote({
+  quote_id: 'quote-future-promo',
+  user_id: 'user-1',
+  member_wallet: quote.member_wallet,
+  price,
+  quoted_at: '2026-08-31T23:59:59.000Z',
+  expires_at: '2026-09-01T00:14:59.000Z'
+}), /subscription_price_not_effective/);
+
+assert.throws(() => createSubscriptionQuote({
+  quote_id: 'quote-expired-promo',
+  user_id: 'user-1',
+  member_wallet: quote.member_wallet,
+  price,
+  quoted_at: '2026-09-30T00:00:00.000Z',
+  expires_at: '2026-09-30T00:15:00.000Z'
+}), /subscription_price_not_effective/);
+
 const signature = 'Sig111111111111111111111111111111111111111111111111111111111111111';
 const memberWallet = quote.member_wallet;
 const treasuryWallet = 'Treasury11111111111111111111111111111111111';
@@ -57,7 +75,7 @@ const rpcReplies = {
   getSignatureStatuses: { value: [{ err: null, confirmationStatus: 'finalized' }] },
   getTransaction: {
     slot: 123456,
-    blockTime: 1788681600,
+    blockTime: Math.floor(now.getTime() / 1000) + 60,
     transaction: { signatures: [signature] },
     meta: {
       err: null,
@@ -84,7 +102,9 @@ const verifier = createSolanaUsdcSubscriptionPaymentVerifier({
 const evidence = await verifier.verify({
   signature,
   member_wallet: memberWallet,
-  expected_amount_usdc_atomic: quote.final_price_usdc_atomic
+  expected_amount_usdc_atomic: quote.final_price_usdc_atomic,
+  quoted_at: quote.quoted_at,
+  expires_at: quote.expires_at
 });
 assert.equal(evidence.verified, true);
 assert.equal(evidence.finalized, true);
@@ -92,11 +112,44 @@ assert.equal(evidence.amount_usdc_atomic, '35000000');
 assert.equal(evidence.transaction_submission_authorized, false);
 assert.equal(evidence.signing_authorized, false);
 assert.equal(evidence.live_execution_authorized, false);
+assert.equal(evidence.quoted_at, quote.quoted_at);
+assert.equal(evidence.expires_at, quote.expires_at);
 assert.equal(SOLANA_USDC_SUBSCRIPTION_PAYMENT_VERIFIER.replay_protection_requires_unique_persistence, true);
+assert.equal(SOLANA_USDC_SUBSCRIPTION_PAYMENT_VERIFIER.quote_window_binding_required, true);
 
 await assert.rejects(
-  verifier.verify({ signature, member_wallet: memberWallet, expected_amount_usdc_atomic: '34000000' }),
+  verifier.verify({
+    signature,
+    member_wallet: memberWallet,
+    expected_amount_usdc_atomic: '34000000',
+    quoted_at: quote.quoted_at,
+    expires_at: quote.expires_at
+  }),
   /subscription_payment_sender_amount_mismatch/
+);
+
+rpcReplies.getTransaction.blockTime = Math.floor(now.getTime() / 1000) - 1;
+await assert.rejects(
+  verifier.verify({
+    signature,
+    member_wallet: memberWallet,
+    expected_amount_usdc_atomic: quote.final_price_usdc_atomic,
+    quoted_at: quote.quoted_at,
+    expires_at: quote.expires_at
+  }),
+  /subscription_payment_outside_quote_window/
+);
+
+rpcReplies.getTransaction.blockTime = Math.floor(new Date(quote.expires_at).getTime() / 1000);
+await assert.rejects(
+  verifier.verify({
+    signature,
+    member_wallet: memberWallet,
+    expected_amount_usdc_atomic: quote.final_price_usdc_atomic,
+    quoted_at: quote.quoted_at,
+    expires_at: quote.expires_at
+  }),
+  /subscription_payment_outside_quote_window/
 );
 
 assert.throws(() => normalizeDynamicSubscriptionPrice({
@@ -109,5 +162,6 @@ console.log(JSON.stringify({
   schema: 'aether.dynamic_subscription_payment.regression.v1',
   durations: DYNAMIC_SUBSCRIPTION_CONTRACT.durations_days,
   finalized_required: SOLANA_USDC_SUBSCRIPTION_PAYMENT_VERIFIER.finalized_required,
+  quote_window_binding_required: SOLANA_USDC_SUBSCRIPTION_PAYMENT_VERIFIER.quote_window_binding_required,
   live_execution_authorized: false
 }));
