@@ -82,11 +82,13 @@ export function selectEffectiveSubscriptionPrice(prices, durationDays, now = new
 
 export function createSubscriptionQuote({ quote_id, user_id, member_wallet, price, quoted_at, expires_at }) {
   const normalized = normalizeDynamicSubscriptionPrice(price);
-  if (!normalized.active) throw new Error('subscription_price_inactive');
   const quoted = new Date(text(quoted_at, 'subscription_quoted_at_required'));
   const expires = new Date(text(expires_at, 'subscription_expires_at_required'));
   if (!Number.isFinite(quoted.getTime()) || !Number.isFinite(expires.getTime()) || expires <= quoted) {
     throw new Error('subscription_quote_window_invalid');
+  }
+  if (!isDynamicSubscriptionPriceEffective(normalized, quoted)) {
+    throw new Error(normalized.active ? 'subscription_price_not_effective' : 'subscription_price_inactive');
   }
   return Object.freeze({
     quote_id: text(quote_id, 'subscription_quote_id_required'),
