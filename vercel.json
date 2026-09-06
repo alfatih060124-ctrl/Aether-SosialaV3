@@ -9,6 +9,7 @@
     { "src": "api/chart.mjs", "use": "@vercel/node" },
     { "src": "api/member-performance.mjs", "use": "@vercel/node" },
     { "src": "api/member-subscription.mjs", "use": "@vercel/node" },
+    { "src": "api/member-authority.mjs", "use": "@vercel/node" },
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
@@ -17,6 +18,10 @@
     { "src": "/api/account/subscription/?", "dest": "/api/member-subscription.mjs?action=status" },
     { "src": "/api/account/subscription/quote/?", "dest": "/api/member-subscription.mjs?action=quote" },
     { "src": "/api/account/subscription/verify/?", "dest": "/api/member-subscription.mjs?action=verify" },
+    { "src": "/api/account/delegated-authority/?", "dest": "/api/member-authority.mjs?action=status" },
+    { "src": "/api/account/delegated-authority/challenge/?", "dest": "/api/member-authority.mjs?action=challenge" },
+    { "src": "/api/account/delegated-authority/verify/?", "dest": "/api/member-authority.mjs?action=verify" },
+    { "src": "/api/account/delegated-authority/revoke/?", "dest": "/api/member-authority.mjs?action=revoke" },
     { "src": "/api/(.*)", "dest": "/api/index.mjs" },
     { "src": "/aether-mark.svg", "dest": "/public/aether-mark.svg" },
     { "src": "/favicon.svg", "dest": "/public/favicon.svg" },
