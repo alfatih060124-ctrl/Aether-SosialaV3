@@ -2,7 +2,7 @@
   "name": "@aether/api",
   "private": true,
   "type": "module",
-  "scripts": {"start": "node src/server.mjs"},
+  "scripts": {"start": "node src/server-primary.mjs"},
   "engines": {"node": ">=20"},
   "dependencies": {
     "@orca-so/whirlpools-client": "7.0.0",
