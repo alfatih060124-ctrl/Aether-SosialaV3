@@ -58,6 +58,12 @@ function isoTime(value, name) {
   return { ms, iso: new Date(ms).toISOString() };
 }
 
+function assertObservationChronology(observedMs, blockTimeUnix) {
+  if (blockTimeUnix === null) return;
+  const blockTimeMs = BigInt(blockTimeUnix) * 1000n;
+  if (blockTimeMs > BigInt(observedMs)) throw new Error('solana_fee_observed_before_block_time');
+}
+
 function normalizeRpcProvenance(provenance) {
   if (!provenance || typeof provenance !== 'object' || Array.isArray(provenance)) {
     throw new Error('invalid_solana_fee_provenance');
@@ -101,6 +107,7 @@ export function verifySolanaNetworkFeeObservation(observation) {
     : safeInt(observation.block_time_unix, 'solana_fee_block_time_unix');
   const networkFeeLamports = safeInt(observation.network_fee_lamports, 'network_fee_lamports');
   const observed = isoTime(observation.observed_at, 'solana_fee_observed_at');
+  assertObservationChronology(observed.ms, blockTimeUnix);
   const provenance = normalizeRpcProvenance(observation.provenance);
   if (observation.promoter_ready !== false || observation.reconciliation_ready !== false || observation.evidence_ready !== false) {
     throw new Error('solana_fee_boundary_violation');
@@ -156,6 +163,7 @@ export async function collectSolanaNetworkFeeObservation({
     : safeInt(transaction.blockTime, 'solana_fee_block_time_unix');
   const observedAt = clock();
   const observed = isoTime(observedAt instanceof Date ? observedAt.toISOString() : observedAt, 'solana_fee_observed_at');
+  assertObservationChronology(observed.ms, blockTimeUnix);
 
   const sourceHash = hash(observationHashPayload({
     source_reference: sourceReference,
