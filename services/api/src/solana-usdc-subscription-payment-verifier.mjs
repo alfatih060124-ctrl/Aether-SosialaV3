@@ -20,6 +20,13 @@ function amount(value, code) {
   }
 }
 
+function instant(value, code) {
+  const date = new Date(text(value, code));
+  const ms = date.getTime();
+  if (!Number.isFinite(ms)) throw new Error(code);
+  return ms;
+}
+
 function balanceMap(rows, mint) {
   const map = new Map();
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -68,11 +75,14 @@ export function createSolanaUsdcSubscriptionPaymentVerifier({
   }
 
   return Object.freeze({
-    async verify({ signature, member_wallet, expected_amount_usdc_atomic } = {}) {
+    async verify({ signature, member_wallet, expected_amount_usdc_atomic, quoted_at, expires_at } = {}) {
       const txSignature = text(signature, 'subscription_payment_signature_required');
       const memberWallet = text(member_wallet, 'subscription_member_wallet_required');
       const expected = amount(expected_amount_usdc_atomic, 'subscription_expected_amount_invalid');
       if (expected <= 0n) throw new Error('subscription_expected_amount_invalid');
+      const quotedMs = instant(quoted_at, 'subscription_payment_quoted_at_invalid');
+      const expiresMs = instant(expires_at, 'subscription_payment_expires_at_invalid');
+      if (expiresMs <= quotedMs) throw new Error('subscription_payment_quote_window_invalid');
 
       const statuses = await rpc('getSignatureStatuses', [[txSignature], { searchTransactionHistory: true }]);
       const status = statuses?.value?.[0];
@@ -102,7 +112,10 @@ export function createSolanaUsdcSubscriptionPaymentVerifier({
       if (senderDelta !== -expected) throw new Error('subscription_payment_sender_amount_mismatch');
       if (treasuryDelta !== expected) throw new Error('subscription_payment_treasury_amount_mismatch');
       if (!Number.isSafeInteger(Number(tx.slot)) || Number(tx.slot) < 1) throw new Error('subscription_payment_slot_invalid');
-      if (!Number.isFinite(Number(tx.blockTime)) || Number(tx.blockTime) <= 0) throw new Error('subscription_payment_block_time_invalid');
+      const blockTime = Number(tx.blockTime);
+      if (!Number.isFinite(blockTime) || blockTime <= 0) throw new Error('subscription_payment_block_time_invalid');
+      const blockMs = blockTime * 1000;
+      if (blockMs < quotedMs || blockMs >= expiresMs) throw new Error('subscription_payment_outside_quote_window');
 
       return Object.freeze({
         verified: true,
@@ -114,7 +127,9 @@ export function createSolanaUsdcSubscriptionPaymentVerifier({
         mint: usdcMint,
         amount_usdc_atomic: expected.toString(),
         slot: Number(tx.slot),
-        block_time: Number(tx.blockTime),
+        block_time: blockTime,
+        quoted_at: new Date(quotedMs).toISOString(),
+        expires_at: new Date(expiresMs).toISOString(),
         source: 'SOLANA_FINALIZED_RPC',
         source_reference: `SOLANA_TX:${txSignature}:${tx.slot}`,
         transaction_submission_authorized: false,
@@ -130,6 +145,7 @@ export const SOLANA_USDC_SUBSCRIPTION_PAYMENT_VERIFIER = Object.freeze({
   rpc_methods: Object.freeze(['getSignatureStatuses', 'getTransaction']),
   finalized_required: true,
   exact_amount_required: true,
+  quote_window_binding_required: true,
   member_sender_required: true,
   treasury_recipient_required: true,
   configured_usdc_mint_required: true,
