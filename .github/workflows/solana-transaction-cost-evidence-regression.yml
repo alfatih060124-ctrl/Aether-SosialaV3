@@ -1,0 +1,28 @@
+name: Solana Transaction Cost Evidence Regression
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-transaction-cost-evidence.mjs'
+      - 'scripts/regression-solana-transaction-cost-evidence.mjs'
+      - '.github/workflows/solana-transaction-cost-evidence-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/api/src/solana-transaction-cost-evidence.mjs'
+      - 'scripts/regression-solana-transaction-cost-evidence.mjs'
+      - '.github/workflows/solana-transaction-cost-evidence-regression.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check collector
+        run: node --check services/api/src/solana-transaction-cost-evidence.mjs
+      - name: Syntax check regression
+        run: node --check scripts/regression-solana-transaction-cost-evidence.mjs
+      - name: Run synthetic regression
+        run: node scripts/regression-solana-transaction-cost-evidence.mjs
