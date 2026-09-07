@@ -1,3 +1,4 @@
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 const PROVIDER_ORIGIN = 'https://api.geckoterminal.com';
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -5,6 +6,42 @@ const CACHE_TTL_MS = 30_000;
 const DISCOVERY_CACHE_TTL_MS = 60_000;
 const STALE_FALLBACK_MS = 5 * 60_000;
 const DISCOVERY_VIEWS = new Set(['trending', 'new', 'gainers', 'volume']);
+const DISCOVERY_DISK_CACHE_DIR = String(process.env.AETHER_MARKET_DISCOVERY_CACHE_DIR || '/tmp/aether-market-discovery').trim() || '/tmp/aether-market-discovery';
+const DISCOVERY_CACHE_SCHEMA_VERSION = 1;
+
+function discoveryDiskCachePath(source) {
+  if (!['trending', 'new', 'top'].includes(source)) throw new Error('invalid_market_discovery_source');
+  return `${DISCOVERY_DISK_CACHE_DIR.replace(/\/+$/, '')}/${source}.json`;
+}
+
+function readDiscoveryDiskCache(source) {
+  try {
+    const record = JSON.parse(readFileSync(discoveryDiskCachePath(source), 'utf8'));
+    if (record?.schema_version !== DISCOVERY_CACHE_SCHEMA_VERSION || record?.source !== source) return null;
+    if (!record?.value || !Array.isArray(record.value.rows)) return null;
+    if (!Number.isFinite(record.expires_at) || !Number.isFinite(record.stale_until)) return null;
+    return record;
+  } catch {
+    return null;
+  }
+}
+
+function writeDiscoveryDiskCache(source, record) {
+  try {
+    mkdirSync(DISCOVERY_DISK_CACHE_DIR, { recursive: true, mode: 0o700 });
+    const target = discoveryDiskCachePath(source);
+    const temp = `${target}.${process.pid}.${Date.now()}.tmp`;
+    writeFileSync(temp, JSON.stringify({
+      schema_version: DISCOVERY_CACHE_SCHEMA_VERSION,
+      source,
+      ...record
+    }), { encoding: 'utf8', mode: 0o600 });
+    renameSync(temp, target);
+  } catch {
+    // Cache persistence is an optimization only; provider failures still fail closed.
+  }
+}
+
 
 function decodedBase58ByteLength(value) {
   let decoded = 0n;
@@ -291,17 +328,23 @@ export function createMarketIntelligenceService({ fetchImpl = globalThis.fetch, 
 
   async function loadDiscoverySource(source) {
     const timestamp = now();
-    const existing = discoveryCache.get(source);
+    let existing = discoveryCache.get(source);
+    if (!existing) {
+      existing = readDiscoveryDiskCache(source);
+      if (existing) discoveryCache.set(source, existing);
+    }
     if (existing && timestamp < existing.expires_at) {
       return { ...existing.value, stale: false, cache_label: 'Cached ≤60s' };
     }
     try {
       const value = await fetchDiscoverySource(source);
-      discoveryCache.set(source, {
+      const record = {
         value,
         expires_at: timestamp + DISCOVERY_CACHE_TTL_MS,
         stale_until: timestamp + DISCOVERY_CACHE_TTL_MS + STALE_FALLBACK_MS
-      });
+      };
+      discoveryCache.set(source, record);
+      writeDiscoveryDiskCache(source, record);
       return { ...value, stale: false, cache_label: 'Fetched ≤60s' };
     } catch (error) {
       if (existing && timestamp < existing.stale_until) {
