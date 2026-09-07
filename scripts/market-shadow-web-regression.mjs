@@ -29,6 +29,12 @@ assert.doesNotMatch(html, /Start Auto Demo/);
 const dockerfile = fs.readFileSync('Dockerfile', 'utf8');
 assert.match(dockerfile, /COPY scripts \.\/scripts/);
 
+const compose = fs.readFileSync('docker-compose.yml', 'utf8');
+assert.match(compose, /SOLANA_RPC_URL: \$\{SOLANA_RPC_URL:\?set SOLANA_RPC_URL\}/);
+assert.match(compose, /JUPITER_API_KEY: \$\{JUPITER_API_KEY:\?set JUPITER_API_KEY\}/);
+assert.match(compose, /EXECUTION_MODE: SHADOW/);
+assert.match(compose, /LIVE_ENABLED: "false"/);
+
 const vercel = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
 assert(vercel.routes.some(item => item.src === '/api/account/auto-strategy/market-shadow/?' && item.dest === '/api/market-shadow.mjs'));
 
