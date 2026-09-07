@@ -77,41 +77,49 @@ await assert.rejects(
   runTwoLegAtomicPreflight({
     decision,
     plan,
-    simulateUnsignedTransaction: async () => ({
-      ok: false,
-      err: { InstructionError: [1, 'Custom'] },
-      slot: 123,
-      units_consumed: 100000,
-      observed_at: '2026-09-07T04:29:59.000Z',
-      sig_verify: false,
-      network_submission_performed: false,
-      fund_movement_performed: false
-    }),
+    simulateUnsignedTransaction: async () => {
+      simulateCalls += 1;
+      return {
+        ok: false,
+        err: { InstructionError: [1, 'Custom'] },
+        slot: 123,
+        units_consumed: 100000,
+        observed_at: '2026-09-07T04:29:59.000Z',
+        sig_verify: false,
+        network_submission_performed: false,
+        fund_movement_performed: false
+      };
+    },
     auditWrite: async () => {},
     now
   }),
   /two_leg_preflight_simulation_failed/
 );
+assert.equal(simulateCalls, 1);
 
 await assert.rejects(
   runTwoLegAtomicPreflight({
     decision,
     plan,
-    simulateUnsignedTransaction: async () => ({
-      ok: true,
-      err: null,
-      slot: 123,
-      units_consumed: 100000,
-      observed_at: '2026-09-07T04:00:00.000Z',
-      sig_verify: false,
-      network_submission_performed: false,
-      fund_movement_performed: false
-    }),
+    simulateUnsignedTransaction: async () => {
+      simulateCalls += 1;
+      return {
+        ok: true,
+        err: null,
+        slot: 123,
+        units_consumed: 100000,
+        observed_at: '2026-09-07T04:00:00.000Z',
+        sig_verify: false,
+        network_submission_performed: false,
+        fund_movement_performed: false
+      };
+    },
     auditWrite: async () => {},
     now
   }),
   /two_leg_preflight_simulation_stale/
 );
+assert.equal(simulateCalls, 2);
 
 const events = [];
 const result = await runTwoLegAtomicPreflight({
@@ -144,6 +152,6 @@ assert.equal(result.network_submission_authorized, false);
 assert.equal(result.fund_movement_authorized, false);
 assert.equal(result.live_execution_authorized, false);
 assert.equal(events.at(-1)?.event_type, 'TWO_LEG_ATOMIC_PREFLIGHT_VERIFIED');
-assert.equal(simulateCalls, 2);
+assert.equal(simulateCalls, 3);
 
 console.log('two-leg atomic preflight regression: PASS');
