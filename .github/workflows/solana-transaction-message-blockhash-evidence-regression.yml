@@ -1,0 +1,25 @@
+name: Solana Transaction Message Blockhash Evidence Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-transaction-message-blockhash-evidence.mjs'
+      - 'scripts/regression-solana-transaction-message-blockhash-evidence.mjs'
+      - '.github/workflows/solana-transaction-message-blockhash-evidence-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check collector
+        run: node --check services/api/src/solana-transaction-message-blockhash-evidence.mjs
+      - name: Run synthetic regression
+        run: node scripts/regression-solana-transaction-message-blockhash-evidence.mjs
