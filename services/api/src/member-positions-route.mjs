@@ -1,8 +1,10 @@
 import { createFollowerPositionAccountingService } from './follower-position-accounting.mjs';
+import { handleMemberAutoTradeStateRoute } from './member-autotrade-state-route.mjs';
 
 export const MEMBER_POSITIONS_ROUTE = '/api/account/positions';
 
 export async function handleMemberPositionsRoute({ req, res, route, pool, walletAuth, sessionFor, send }) {
+  if (await handleMemberAutoTradeStateRoute({ req, res, route, pool, walletAuth, sessionFor, send })) return true;
   if (route !== MEMBER_POSITIONS_ROUTE) return false;
   if (req.method !== 'GET') {
     send(res, 405, { error: 'method_not_allowed', mode: 'SHADOW', simulated: true, live_execution_authorized: false });
