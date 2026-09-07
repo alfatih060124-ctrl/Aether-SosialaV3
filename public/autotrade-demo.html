@@ -25,7 +25,7 @@
 <section class="card">
 <div class="eyebrow">Auto Trade Control</div>
 <div id="autoState" class="decision">Loading persistent member Auto Trade state…</div>
-<div class="actions"><button id="autoStart" class="btn" type="button">Start Auto Demo</button><button id="autoStop" class="btn danger" type="button">Stop Auto Demo</button></div>
+<div class="actions"><button id="autoStart" class="btn" type="button">Start Auto Trade</button><button id="autoStop" class="btn danger" type="button">Stop Auto Trade</button></div>
 </section>
 <section class="card">
 <div class="eyebrow">Engine Controls</div>
@@ -39,7 +39,7 @@
 <div id="decision" class="decision">No real-market scan has been started from this runtime yet.</div>
 </section>
 <section class="card"><div class="eyebrow">Measured / Rejected Candidates</div><div id="history" class="history"><div class="row">Waiting for a completed scan.</div></div></section>
-<p class="note">Auto Demo persists only START/STOP control state. While this page is open, RUNNING_SCANNING continuously starts new Primary VM SHADOW scans after the previous scan finishes. There is no daily transaction-count cap. The runtime may build unsigned transactions only to measure fees and simulation evidence, but it never signs or submits a transaction and LIVE authorization remains false.</p>
+<p class="note">Auto Trade persists only START/STOP control state. While this page is open, RUNNING_SCANNING continuously starts new Primary VM SHADOW scans after the previous scan finishes. There is no daily transaction-count cap. The runtime may build unsigned transactions only to measure fees and simulation evidence, but it never signs or submits a transaction and LIVE authorization remains false.</p>
 </div></main>
 <script>
 const $=id=>document.getElementById(id);let pollTimer=null,autoTimer=null,autoSnapshot=null,lastAutoRestartKey=null;
