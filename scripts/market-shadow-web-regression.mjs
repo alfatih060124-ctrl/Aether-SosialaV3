@@ -22,7 +22,9 @@ assert.match(edge, /aether_session/);
 
 const html = fs.readFileSync('public/autotrade-demo.html', 'utf8');
 assert.match(html, /Real-Market Shadow Runtime/);
-assert.match(html, /Start Real-Market Scan/);
+assert.match(html, /Run One Scan/);
+assert.match(html, /Start Auto Trade/);
+assert.match(html, /Stop Auto Trade/);
 assert.doesNotMatch(html, /Training scenario/);
 assert.doesNotMatch(html, /Start Auto Demo/);
 
