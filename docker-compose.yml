@@ -30,12 +30,16 @@ services:
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:?set SOLANA_RPC_URL}
       JUPITER_API_KEY: ${JUPITER_API_KEY:?set JUPITER_API_KEY}
       AETHER_SHADOW_SIMULATION_PUBLIC_KEY: ${AETHER_SHADOW_SIMULATION_PUBLIC_KEY:?set AETHER_SHADOW_SIMULATION_PUBLIC_KEY}
+      AETHER_JUPITER_INTER_QUOTE_DELAY_MS: ${AETHER_JUPITER_INTER_QUOTE_DELAY_MS:-400}
+      AETHER_MARKET_DISCOVERY_CACHE_DIR: /var/cache/aether-market-discovery
       EXECUTION_MODE: SHADOW
       LIVE_ENABLED: "false"
       FIXTURE_GATE_PASSED: "false"
       OPERATOR_APPROVED: "false"
     ports:
       - "127.0.0.1:8080:8080"
+    volumes:
+      - market_discovery_cache:/var/cache/aether-market-discovery
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,3 +48,4 @@ services:
 
 volumes:
   postgres_data:
+  market_discovery_cache:
