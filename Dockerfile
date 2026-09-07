@@ -5,6 +5,7 @@ RUN cd services/api && npm install --omit=dev
 COPY services/api/src ./services/api/src
 COPY packages ./packages
 COPY migrations ./migrations
+COPY scripts ./scripts
 COPY web ./web
 ENV NODE_ENV=production
 ENV PORT=8080
