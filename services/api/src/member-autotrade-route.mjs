@@ -2,11 +2,13 @@ import { persistAuthenticatedAutoTradeDecisionAtomically } from './autotrade-ato
 import { createTrustedAutoTradeRuntimeRiskResolver } from './trusted-autotrade-runtime-risk.mjs';
 import { handleMemberPositionsRoute } from './member-positions-route.mjs';
 import { getMemberAutoTradeDemoState, runMemberAutoTradeDemoStep } from './member-autotrade-demo.mjs';
+import { getMarketShadowRuntimeState, startMarketShadowRuntimeScan } from './market-shadow-runtime.mjs';
 
 const MEMBER_ROUTE = '/api/account/autotrade/evaluate';
 const LEGACY_ROUTE = '/api/autotrade/evaluate';
 const DEMO_STATE_ROUTE = '/api/account/auto-strategy/demo';
 const DEMO_SIMULATE_ROUTE = '/api/account/auto-strategy/simulate';
+const MARKET_SHADOW_ROUTE = '/api/account/auto-strategy/market-shadow';
 
 function statusFor(error) {
   const code = String(error?.message || '');
@@ -42,6 +44,54 @@ export async function handleMemberAutoTradeRoute({
   createRiskResolver = createTrustedAutoTradeRuntimeRiskResolver
 }) {
   if (await handleMemberPositionsRoute({ req, res, route, pool, walletAuth, sessionFor, send })) return true;
+
+  if (route === MARKET_SHADOW_ROUTE) {
+    if (!['GET', 'POST'].includes(req.method)) {
+      send(res, 405, { error: 'method_not_allowed', mode: 'SHADOW', live_execution_authorized: false });
+      return true;
+    }
+    if (!pool || !walletAuth) {
+      send(res, 503, { error: 'database_unconfigured', mode: 'SHADOW', live_execution_authorized: false });
+      return true;
+    }
+    if (liveEnabled || executionMode !== 'SHADOW') {
+      send(res, 423, { error: 'autotrade_live_blocked', reason: 'real_market_shadow_only', live_execution_authorized: false });
+      return true;
+    }
+    try {
+      const session = await sessionFor(req);
+      if (!session) {
+        send(res, 401, { error: 'session_required', mode: 'SHADOW', live_execution_authorized: false });
+        return true;
+      }
+      const scan = req.method === 'POST' ? startMarketShadowRuntimeScan() : getMarketShadowRuntimeState();
+      send(res, req.method === 'POST' ? 202 : 200, {
+        scan,
+        simulator_runtime: 'PRIMARY_VM_REAL_MARKET_SHADOW',
+        authenticated_user_id: session.user_id,
+        market_data_only: true,
+        min_expected_net_edge_bps: 20,
+        execution_dispatched: false,
+        funds_moved: false,
+        transaction_signed: false,
+        network_submission_authorized: false,
+        live_execution_authorized: false,
+        mode: 'SHADOW'
+      });
+      return true;
+    } catch (error) {
+      send(res, statusFor(error), {
+        error: String(error?.message || 'market_shadow_runtime_failed'),
+        mode: 'SHADOW',
+        execution_dispatched: false,
+        funds_moved: false,
+        transaction_signed: false,
+        network_submission_authorized: false,
+        live_execution_authorized: false
+      });
+      return true;
+    }
+  }
 
   if (route === DEMO_STATE_ROUTE || route === DEMO_SIMULATE_ROUTE) {
     const expectedMethod = route === DEMO_STATE_ROUTE ? 'GET' : 'POST';
@@ -171,3 +221,4 @@ export async function handleMemberAutoTradeRoute({
 export const MEMBER_AUTOTRADE_ROUTE = MEMBER_ROUTE;
 export const MEMBER_AUTOTRADE_DEMO_STATE_ROUTE = DEMO_STATE_ROUTE;
 export const MEMBER_AUTOTRADE_DEMO_SIMULATE_ROUTE = DEMO_SIMULATE_ROUTE;
+export const MEMBER_AUTOTRADE_MARKET_SHADOW_ROUTE = MARKET_SHADOW_ROUTE;
