@@ -1,0 +1,23 @@
+name: Solana Transaction Reward Evidence Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-transaction-reward-evidence.mjs'
+      - 'scripts/regression-solana-transaction-reward-evidence.mjs'
+      - '.github/workflows/solana-transaction-reward-evidence-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run SYNTHETIC TEST-ONLY reward evidence regression
+        run: node scripts/regression-solana-transaction-reward-evidence.mjs
