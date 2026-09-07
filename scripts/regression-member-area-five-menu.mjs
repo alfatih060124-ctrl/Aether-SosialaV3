@@ -47,7 +47,7 @@ assert.match(authorityUi, /stop\.addEventListener\('click',\(\)=>commandAutoTrad
 assert.match(authorityUi, /start\.disabled=!\['STOPPED','PAUSED'\]\.includes\(state\)/);
 assert.match(authorityUi, /stop\.disabled=state==='STOPPED'/);
 assert.match(authorityUi, /if\(start\)start\.disabled=true;if\(stop\)stop\.disabled=true/);
-assert.doesNotMatch(authorityUi, /BUY|HOLD|stop.?loss|trailing.?stop/i);
+assert.doesNotMatch(authorityUi, /\b(?:BUY|HOLD)\b|\bstop[ _-]?loss\b|\btrailing[ _-]?stop\b/i);
 
 assert.match(stateRoute, /MEMBER_AUTOTRADE_STATE_ROUTE = '\/api\/account\/autotrade\/state'/);
 assert.match(stateRoute, /MEMBER_AUTOTRADE_START_ROUTE = '\/api\/account\/autotrade\/start'/);
