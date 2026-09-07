@@ -1,6 +1,10 @@
+import crypto from 'node:crypto';
+
 const STRATEGY = 'TWO_LEG_ARBITRAGE';
 const DEX_PAIR = 'ORCA_RAYDIUM';
 const MIN_NET_EDGE_BPS = 20;
+const DEFAULT_MAX_PREFLIGHT_AGE_MS = 15_000;
+const HARD_MAX_PREFLIGHT_AGE_MS = 60_000;
 
 function text(value, code) {
   const normalized = String(value || '').trim();
@@ -15,6 +19,24 @@ function toUsdcAtomic(value, code) {
   const atomic = BigInt(whole) * 1_000_000n + BigInt((fraction + '000000').slice(0, 6));
   if (atomic <= 0n) throw new Error(code);
   return atomic;
+}
+
+function maxPreflightAgeMs(env = process.env) {
+  const configured = Number(env.LIVE_MAX_PREFLIGHT_AGE_MS || DEFAULT_MAX_PREFLIGHT_AGE_MS);
+  if (!Number.isFinite(configured) || configured <= 0) return DEFAULT_MAX_PREFLIGHT_AGE_MS;
+  return Math.min(configured, HARD_MAX_PREFLIGHT_AGE_MS);
+}
+
+function decodeBase64Strict(value, code) {
+  const encoded = text(value, code);
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || encoded.length % 4 !== 0) throw new Error(code);
+  const bytes = Buffer.from(encoded, 'base64');
+  if (!bytes.length || bytes.toString('base64') !== encoded) throw new Error(code);
+  return Object.freeze({ encoded, bytes });
+}
+
+function sha256Bytes(bytes) {
+  return crypto.createHash('sha256').update(bytes).digest('hex');
 }
 
 function requireDecision(decision) {
@@ -43,7 +65,7 @@ function requireDecision(decision) {
   });
 }
 
-function requirePreflight(preflight, decision) {
+function requirePreflight(preflight, decision, { now, env }) {
   if (!preflight || typeof preflight !== 'object') throw new Error('two_leg_signer_preflight_required');
   if (preflight.schema !== 'aether.two_leg_atomic_preflight.v1' || preflight.strategy !== STRATEGY || preflight.dex_pair !== DEX_PAIR) {
     throw new Error('two_leg_signer_preflight_scope_invalid');
@@ -55,9 +77,15 @@ function requirePreflight(preflight, decision) {
     throw new Error('two_leg_signer_preflight_safety_boundary_violation');
   }
   const transactionHash = text(preflight.transaction_hash, 'two_leg_signer_transaction_hash_required');
+  if (!/^[a-f0-9]{64}$/i.test(transactionHash)) throw new Error('two_leg_signer_transaction_hash_invalid');
+  const observedAt = text(preflight.observed_at, 'two_leg_signer_preflight_observed_at_required');
+  const observedMs = Date.parse(observedAt);
+  if (!Number.isFinite(observedMs)) throw new Error('two_leg_signer_preflight_observed_at_invalid');
+  const age = now - observedMs;
+  if (age < -1000 || age > maxPreflightAgeMs(env)) throw new Error('two_leg_signer_preflight_stale');
   if (preflight.token_mint && preflight.token_mint !== decision.token_mint) throw new Error('two_leg_signer_preflight_token_mint_mismatch');
   if (preflight.quote_mint && preflight.quote_mint !== decision.quote_mint) throw new Error('two_leg_signer_preflight_quote_mint_mismatch');
-  return Object.freeze({ ...preflight, transaction_hash: transactionHash });
+  return Object.freeze({ ...preflight, transaction_hash: transactionHash.toLowerCase(), observed_at: observedAt });
 }
 
 function requireAuthority(authority, decision, now) {
@@ -99,16 +127,19 @@ export async function authorizeTwoLegSignerRequest({
   gateState,
   unsignedTransactionBase64,
   auditWrite,
+  env = process.env,
   now = Date.now()
 } = {}) {
   if (typeof auditWrite !== 'function') throw new Error('two_leg_signer_audit_writer_required');
   let phase = 'VALIDATION';
   try {
     const checkedDecision = requireDecision(decision);
-    const checkedPreflight = requirePreflight(preflight, checkedDecision);
+    const checkedPreflight = requirePreflight(preflight, checkedDecision, { now, env });
     const checkedAuthority = requireAuthority(authority, checkedDecision, now);
     requireSignerGate(gateState);
-    const unsignedTransaction = text(unsignedTransactionBase64, 'two_leg_signer_unsigned_transaction_required');
+    const unsignedTransaction = decodeBase64Strict(unsignedTransactionBase64, 'two_leg_signer_unsigned_transaction_invalid');
+    const computedHash = sha256Bytes(unsignedTransaction.bytes);
+    if (computedHash !== checkedPreflight.transaction_hash) throw new Error('two_leg_signer_transaction_hash_mismatch');
 
     phase = 'SIGNER_REQUEST_AUTHORIZATION';
     const request = Object.freeze({
@@ -118,7 +149,8 @@ export async function authorizeTwoLegSignerRequest({
       atomic: true,
       leg_count: 2,
       transaction_hash: checkedPreflight.transaction_hash,
-      unsigned_transaction_base64: unsignedTransaction,
+      unsigned_transaction_base64: unsignedTransaction.encoded,
+      preflight_observed_at: checkedPreflight.observed_at,
       authority_id: checkedAuthority.authority_id,
       wallet_address: checkedAuthority.wallet_address,
       token_mint: checkedDecision.token_mint,
@@ -162,7 +194,10 @@ export const TWO_LEG_SIGNER_BOUNDARY = Object.freeze({
   strategy: STRATEGY,
   dex_pair: DEX_PAIR,
   min_expected_net_edge_bps: MIN_NET_EDGE_BPS,
+  max_preflight_age_ms: HARD_MAX_PREFLIGHT_AGE_MS,
   requires_verified_atomic_preflight: true,
+  requires_fresh_preflight: true,
+  requires_transaction_hash_binding: true,
   requires_active_bounded_authority: true,
   requires_live_readiness_and_admin_approval: true,
   requires_signer_unlocked: true,
