@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { authorizeTwoLegSignerRequest, TWO_LEG_SIGNER_BOUNDARY } from '../services/api/src/two-leg-signer-boundary.mjs';
 
 const now = Date.parse('2026-09-07T06:45:00.000Z');
+const unsignedTransactionBase64 = Buffer.from('unsigned').toString('base64');
+const transactionHash = crypto.createHash('sha256').update(Buffer.from('unsigned')).digest('hex');
 const decision = Object.freeze({
   strategy: 'TWO_LEG_ARBITRAGE',
   dex_pair: 'ORCA_RAYDIUM',
@@ -25,7 +28,8 @@ const preflight = Object.freeze({
   leg_count: 2,
   preflight_verified: true,
   simulation_ok: true,
-  transaction_hash: 'txhash',
+  observed_at: '2026-09-07T06:44:59.500Z',
+  transaction_hash: transactionHash,
   transaction_signing_authorized: false,
   network_submission_authorized: false,
   fund_movement_authorized: false,
@@ -56,6 +60,8 @@ const gateState = Object.freeze({
 });
 
 assert.equal(TWO_LEG_SIGNER_BOUNDARY.fail_closed, true);
+assert.equal(TWO_LEG_SIGNER_BOUNDARY.requires_fresh_preflight, true);
+assert.equal(TWO_LEG_SIGNER_BOUNDARY.requires_transaction_hash_binding, true);
 assert.equal(TWO_LEG_SIGNER_BOUNDARY.transaction_signing_performed, false);
 assert.equal(TWO_LEG_SIGNER_BOUNDARY.network_submission_authorized, false);
 assert.equal(TWO_LEG_SIGNER_BOUNDARY.fund_movement_authorized, false);
@@ -64,7 +70,7 @@ const blocked = [];
 await assert.rejects(
   authorizeTwoLegSignerRequest({
     decision: { ...decision, expected_net_edge_bps: 19 }, preflight, authority, gateState,
-    unsignedTransactionBase64: 'dW5zaWduZWQ=', auditWrite: async event => blocked.push(event), now
+    unsignedTransactionBase64, auditWrite: async event => blocked.push(event), now
   }),
   /two_leg_signer_net_edge_below_floor/
 );
@@ -73,15 +79,31 @@ assert.equal(blocked.at(-1)?.event_type, 'TWO_LEG_SIGNER_REQUEST_BLOCKED');
 await assert.rejects(
   authorizeTwoLegSignerRequest({
     decision, preflight, authority: { ...authority, max_notional_usdc_atomic: '49000000' }, gateState,
-    unsignedTransactionBase64: 'dW5zaWduZWQ=', auditWrite: async () => {}, now
+    unsignedTransactionBase64, auditWrite: async () => {}, now
   }),
   /two_leg_signer_authority_notional_limit/
 );
 
 await assert.rejects(
   authorizeTwoLegSignerRequest({
+    decision, preflight: { ...preflight, observed_at: '2026-09-07T06:40:00.000Z' }, authority, gateState,
+    unsignedTransactionBase64, auditWrite: async () => {}, now
+  }),
+  /two_leg_signer_preflight_stale/
+);
+
+await assert.rejects(
+  authorizeTwoLegSignerRequest({
+    decision, preflight, authority, gateState,
+    unsignedTransactionBase64: Buffer.from('different-unsigned').toString('base64'), auditWrite: async () => {}, now
+  }),
+  /two_leg_signer_transaction_hash_mismatch/
+);
+
+await assert.rejects(
+  authorizeTwoLegSignerRequest({
     decision, preflight, authority, gateState: { ...gateState, signer_unlocked: false },
-    unsignedTransactionBase64: 'dW5zaWduZWQ=', auditWrite: async () => {}, now
+    unsignedTransactionBase64, auditWrite: async () => {}, now
   }),
   /two_leg_signer_locked/
 );
@@ -89,7 +111,7 @@ await assert.rejects(
 await assert.rejects(
   authorizeTwoLegSignerRequest({
     decision, preflight, authority, gateState: { ...gateState, emergency_kill_switch: true },
-    unsignedTransactionBase64: 'dW5zaWduZWQ=', auditWrite: async () => {}, now
+    unsignedTransactionBase64, auditWrite: async () => {}, now
   }),
   /two_leg_signer_emergency_kill_switch_active/
 );
@@ -97,7 +119,7 @@ await assert.rejects(
 const events = [];
 const result = await authorizeTwoLegSignerRequest({
   decision, preflight, authority, gateState,
-  unsignedTransactionBase64: 'dW5zaWduZWQ=', auditWrite: async event => events.push(event), now
+  unsignedTransactionBase64, auditWrite: async event => events.push(event), now
 });
 assert.equal(result.signer_request_authorized, true);
 assert.equal(result.transaction_signing_performed, false);
@@ -107,7 +129,8 @@ assert.equal(result.network_submission_authorized, false);
 assert.equal(result.network_submission_performed, false);
 assert.equal(result.fund_movement_authorized, false);
 assert.equal(result.live_execution_authorized, false);
-assert.equal(result.transaction_hash, 'txhash');
+assert.equal(result.transaction_hash, transactionHash);
+assert.equal(result.preflight_observed_at, preflight.observed_at);
 assert.equal(events.at(-1)?.event_type, 'TWO_LEG_SIGNER_REQUEST_AUTHORIZED');
 
 console.log('two-leg signer boundary regression: PASS');
