@@ -5,9 +5,11 @@ on:
     paths:
       - 'services/api/src/two-leg-live-execution-boundary.mjs'
       - 'services/api/src/two-leg-atomic-unsigned-transaction-builder.mjs'
+      - 'services/api/src/two-leg-atomic-preflight.mjs'
       - 'services/api/src/live-execution-gate.mjs'
       - 'scripts/regression-two-leg-live-execution-boundary.mjs'
       - 'scripts/regression-two-leg-atomic-unsigned-transaction-builder.mjs'
+      - 'scripts/regression-two-leg-atomic-preflight.mjs'
       - '.github/workflows/two-leg-live-execution-boundary-regression.yml'
   workflow_dispatch:
 
@@ -30,9 +32,12 @@ jobs:
         run: |
           node --check services/api/src/two-leg-live-execution-boundary.mjs
           node --check services/api/src/two-leg-atomic-unsigned-transaction-builder.mjs
+          node --check services/api/src/two-leg-atomic-preflight.mjs
           node --check scripts/regression-two-leg-live-execution-boundary.mjs
           node --check scripts/regression-two-leg-atomic-unsigned-transaction-builder.mjs
+          node --check scripts/regression-two-leg-atomic-preflight.mjs
       - name: Run regression
         run: |
           node scripts/regression-two-leg-live-execution-boundary.mjs
           node scripts/regression-two-leg-atomic-unsigned-transaction-builder.mjs
+          node scripts/regression-two-leg-atomic-preflight.mjs
