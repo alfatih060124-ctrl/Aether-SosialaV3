@@ -1,0 +1,28 @@
+name: Step 17 Member Auto Trade SHADOW Control
+
+on:
+  push:
+    branches:
+      - feat/step17-member-autotrade-shadow-control
+  pull_request:
+    paths:
+      - 'migrations/027_member_autotrade_state_machine.sql'
+      - 'services/api/src/member-autotrade-state-machine.mjs'
+      - 'services/api/src/member-autotrade-state-route.mjs'
+      - 'services/api/src/member-positions-route.mjs'
+      - 'api/member-autotrade-state.mjs'
+      - 'public/autotrade-demo.html'
+      - 'deploy/Caddyfile'
+      - 'vercel.json'
+      - 'scripts/step17-member-autotrade-shadow-control-regression.mjs'
+      - '.github/workflows/step17-member-autotrade-shadow-control-regression.yml'
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/step17-member-autotrade-shadow-control-regression.mjs
