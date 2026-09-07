@@ -27,12 +27,19 @@ const minVolume24hUsd = Math.max(0, Number(process.env.SIGNAL_MIN_VOLUME_24H_USD
 const maxTop10HolderPct = Math.max(0, Number(process.env.SIGNAL_MAX_TOP10_HOLDER_PCT || 35));
 const maxPriceImpactBps = Math.max(0, Number(process.env.SIGNAL_MAX_PRICE_IMPACT_BPS || 100));
 const quoteUsdcRaw = String(process.env.AETHER_JUPITER_QUOTE_USDC_RAW || '100000000').trim();
-const interRequestDelayMs = Number(process.env.AETHER_JUPITER_INTER_QUOTE_DELAY_MS || (apiKey ? 1100 : 2200));
+const interRequestDelayRaw = Number(process.env.AETHER_JUPITER_INTER_QUOTE_DELAY_MS || (apiKey ? 1100 : 2200));
+const interRequestDelayMs = Number.isFinite(interRequestDelayRaw) ? Math.max(0, interRequestDelayRaw) : (apiKey ? 1100 : 2200);
 const minNetEdgeBps = Math.max(20, Number(process.env.SIGNAL_MIN_EXPECTED_NET_EDGE_BPS || 20));
 const dexPairAttemptsRaw = Number(process.env.AETHER_CROSS_VENUE_DEX_PAIR_ATTEMPTS || 6);
 const maxDexPairAttempts = Number.isSafeInteger(dexPairAttemptsRaw) ? Math.min(12, Math.max(1, dexPairAttemptsRaw)) : 6;
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+let nextJupiterRequestAt = 0;
+async function paceJupiterRequest() {
+  const waitMs = Math.max(0, nextJupiterRequestAt - Date.now());
+  if (waitMs > 0) await sleep(waitMs);
+  nextJupiterRequestAt = Date.now() + interRequestDelayMs;
+}
 function finite(value) { const n = Number(value); return Number.isFinite(n) ? n : null; }
 
 function candidateDiscoveryScore(row) {
@@ -107,6 +114,7 @@ async function rpc(method, params, timeoutMs = 10000) {
 }
 
 async function jupiterQuote({ inputMint, outputMint, amount, dex = null, onlyDirectRoutes = false }) {
+  await paceJupiterRequest();
   const url = new URL('/swap/v1/quote', JUPITER_ORIGIN);
   url.searchParams.set('inputMint', normalizeSolanaMint(inputMint));
   url.searchParams.set('outputMint', normalizeSolanaMint(outputMint));
@@ -127,6 +135,7 @@ function observedMaxPriceImpactBps(buy, sell) {
 }
 
 async function programLabels() {
+  await paceJupiterRequest();
   const url = new URL('/swap/v1/program-id-to-label', JUPITER_ORIGIN);
   const body = await getJson(url);
   return body;
@@ -158,9 +167,7 @@ const unsigned = createJupiterUnsignedSimulationService({ timeoutMs: 12000 });
 
 try {
   const solUsd = await solUsdReference();
-  await sleep(interRequestDelayMs);
   const labelsByProgram = await programLabels();
-  await sleep(interRequestDelayMs);
 
   const candidateMap = new Map();
   const discoveryErrors = [];
@@ -251,7 +258,6 @@ try {
     const preflightAttempts = [];
 
     for (const dex of buyDexes) {
-      await sleep(interRequestDelayMs);
       try {
         const quote = await jupiterQuote({
           inputMint: USDC_MINT,
@@ -270,7 +276,6 @@ try {
     const sellReferenceAmount = String(broad?.sell?.in_amount || broad?.buy?.out_amount || '').trim();
     if (sellReferenceAmount) {
       for (const dex of sellDexes) {
-        await sleep(interRequestDelayMs);
         try {
           const quote = await jupiterQuote({
             inputMint: row.primary_mint,
@@ -316,7 +321,6 @@ try {
           dex: candidate.buy_dex,
           onlyDirectRoutes: true
         });
-        await sleep(interRequestDelayMs);
         const candidateSell = await jupiterQuote({
           inputMint: row.primary_mint,
           outputMint: USDC_MINT,
