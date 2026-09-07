@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - 'services/api/src/two-leg-live-execution-boundary.mjs'
+      - 'services/api/src/two-leg-atomic-unsigned-transaction-builder.mjs'
       - 'services/api/src/live-execution-gate.mjs'
       - 'scripts/regression-two-leg-live-execution-boundary.mjs'
+      - 'scripts/regression-two-leg-atomic-unsigned-transaction-builder.mjs'
       - '.github/workflows/two-leg-live-execution-boundary-regression.yml'
   workflow_dispatch:
 
@@ -21,9 +23,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Install API dependencies
+        working-directory: services/api
+        run: npm install --ignore-scripts --no-audit --no-fund
       - name: Syntax check
         run: |
           node --check services/api/src/two-leg-live-execution-boundary.mjs
+          node --check services/api/src/two-leg-atomic-unsigned-transaction-builder.mjs
           node --check scripts/regression-two-leg-live-execution-boundary.mjs
+          node --check scripts/regression-two-leg-atomic-unsigned-transaction-builder.mjs
       - name: Run regression
-        run: node scripts/regression-two-leg-live-execution-boundary.mjs
+        run: |
+          node scripts/regression-two-leg-live-execution-boundary.mjs
+          node scripts/regression-two-leg-atomic-unsigned-transaction-builder.mjs
