@@ -45,12 +45,14 @@ assert.match(dispatcher, /handleMemberAutoTradeStateRoute/);
 assert.match(edge, /PRIMARY_API_ORIGIN = 'https:\/\/api\.aether\.boats'/);
 assert.match(edge, /authorization: `Bearer \$\{token\}`/);
 assert.match(ui, /AUTOTRADE_BASE='\/api\/account\/autotrade'/);
-assert.match(ui, /Start Auto Demo/);
-assert.match(ui, /Stop Auto Demo/);
+assert.match(ui, /Start Auto Trade/);
+assert.match(ui, /Stop Auto Trade/);
+assert.match(ui, /Run One Scan/);
 assert.match(ui, /RUNNING_SCANNING/);
 assert.match(ui, /setInterval\(\(\)=>autoCycle\(false\),5000\)/);
 assert.match(ui, /There is no daily transaction-count cap/);
 assert.match(ui, /LIVE OFF/);
+assert.doesNotMatch(ui, /Start Auto Demo|Stop Auto Demo/);
 
 for (const source of [route, edge, dispatcher, ui]) {
   assert.doesNotMatch(source, /sendTransaction|secretKey|fromSecretKey|seed phrase/i);
