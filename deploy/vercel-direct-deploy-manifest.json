@@ -36,6 +36,7 @@
     "api/member-subscription.mjs",
     "public/member.html",
     "api/member-authority.mjs",
+    "api/member-autotrade-state.mjs",
     "public/member-authority-ui.js"
   ]
 }
