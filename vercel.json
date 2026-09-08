@@ -22,6 +22,10 @@
       "use": "@vercel/node"
     },
     {
+      "src": "api/member-subscription.mjs",
+      "use": "@vercel/node"
+    },
+    {
       "src": "public/**",
       "use": "@vercel/static"
     }
@@ -46,6 +50,18 @@
     {
       "src": "/api/account/autotrade/stop/?",
       "dest": "/api/member-autotrade-state.mjs?action=stop"
+    },
+    {
+      "src": "/api/account/subscription/?",
+      "dest": "/api/member-subscription.mjs?action=status"
+    },
+    {
+      "src": "/api/account/subscription/quote/?",
+      "dest": "/api/member-subscription.mjs?action=quote"
+    },
+    {
+      "src": "/api/account/subscription/verify/?",
+      "dest": "/api/member-subscription.mjs?action=verify"
     },
     {
       "src": "/api/(.*)",

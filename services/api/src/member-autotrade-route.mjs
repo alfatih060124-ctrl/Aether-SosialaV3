@@ -3,12 +3,20 @@ import { createTrustedAutoTradeRuntimeRiskResolver } from './trusted-autotrade-r
 import { handleMemberPositionsRoute } from './member-positions-route.mjs';
 import { getMemberAutoTradeDemoState, runMemberAutoTradeDemoStep } from './member-autotrade-demo.mjs';
 import { getMarketShadowRuntimeState, startMarketShadowRuntimeScan } from './market-shadow-runtime.mjs';
+import {
+  getMemberSubscriptionOverview,
+  createMemberSubscriptionQuote,
+  verifyMemberSubscriptionPayment
+} from './member-subscription-billing.mjs';
 
 const MEMBER_ROUTE = '/api/account/autotrade/evaluate';
 const LEGACY_ROUTE = '/api/autotrade/evaluate';
 const DEMO_STATE_ROUTE = '/api/account/auto-strategy/demo';
 const DEMO_SIMULATE_ROUTE = '/api/account/auto-strategy/simulate';
 const MARKET_SHADOW_ROUTE = '/api/account/auto-strategy/market-shadow';
+const SUBSCRIPTION_ROUTE = '/api/account/subscription';
+const SUBSCRIPTION_QUOTE_ROUTE = '/api/account/subscription/quote';
+const SUBSCRIPTION_VERIFY_ROUTE = '/api/account/subscription/verify';
 const auditedTerminalMarketShadowScans = new Set();
 
 function rememberTerminalMarketShadowAudit(scanId) {
@@ -52,16 +60,16 @@ async function appendMarketShadowAudit(repos, eventType, session, scan) {
 function statusFor(error) {
   const code = String(error?.message || '');
   if (['session_required', 'session_invalid', 'authenticated_session_required'].includes(code)) return 401;
-  if (['copy_mandate_not_found', 'signal_assessment_not_found'].includes(code)) return 404;
+  if (['copy_mandate_not_found', 'signal_assessment_not_found', 'subscription_order_not_found'].includes(code)) return 404;
   if (['autotrade_live_blocked', 'copy_mandate_shadow_only', 'live_execution_forbidden'].includes(code)) return 423;
   if ([
     'copy_mandate_follower_mismatch', 'copy_mandate_not_active', 'copy_mandate_disabled',
     'trader_not_copyable', 'trader_not_shadow', 'copy_mandate_scope_violation'
   ].includes(code)) return 403;
-  if (code === 'autotrade_usdc_balance_required') return 409;
-  if (code === 'solana_rpc_unconfigured') return 503;
-  if (['solana_rpc_http_error', 'solana_rpc_error', 'solana_rpc_timeout'].includes(code)) return 502;
-  if (code.startsWith('invalid_') || code.endsWith('_required') || code.includes('_mismatch')) return 400;
+  if (['autotrade_usdc_balance_required','subscription_quote_expired','subscription_order_not_pending','subscription_payment_signature_already_used','subscription_treasury_configuration_changed','subscription_usdc_mint_configuration_changed'].includes(code)) return 409;
+  if (['solana_rpc_unconfigured','subscription_rpc_url_required','subscription_treasury_wallet_required','subscription_usdc_mint_required'].includes(code)) return 503;
+  if (['solana_rpc_http_error','solana_rpc_error','solana_rpc_timeout','subscription_rpc_timeout'].includes(code) || code.startsWith('subscription_rpc_')) return 502;
+  if (code.startsWith('invalid_') || code.endsWith('_required') || code.includes('_mismatch') || code.includes('_invalid') || code.includes('_unsupported') || code.includes('_unavailable')) return 400;
   return 500;
 }
 
@@ -83,6 +91,47 @@ export async function handleMemberAutoTradeRoute({
   createRiskResolver = createTrustedAutoTradeRuntimeRiskResolver
 }) {
   if (await handleMemberPositionsRoute({ req, res, route, pool, walletAuth, sessionFor, send })) return true;
+
+
+  if ([SUBSCRIPTION_ROUTE, SUBSCRIPTION_QUOTE_ROUTE, SUBSCRIPTION_VERIFY_ROUTE].includes(route)) {
+    const expectedMethod = route === SUBSCRIPTION_ROUTE ? 'GET' : 'POST';
+    if (req.method !== expectedMethod) {
+      send(res, 405, { error: 'method_not_allowed', mode: 'SHADOW', live_execution_authorized: false });
+      return true;
+    }
+    if (!pool || !walletAuth) {
+      send(res, 503, { error: 'database_unconfigured', mode: 'SHADOW', live_execution_authorized: false });
+      return true;
+    }
+    try {
+      const session = await sessionFor(req);
+      if (!session) {
+        send(res, 401, { error: 'session_required', mode: 'SHADOW', live_execution_authorized: false });
+        return true;
+      }
+      if (route === SUBSCRIPTION_ROUTE) {
+        const overview = await getMemberSubscriptionOverview(pool, session.user_id);
+        send(res, 200, { ...overview, route: SUBSCRIPTION_ROUTE, authentication: 'WALLET_SESSION', mode: 'SHADOW', live_execution_authorized: false });
+        return true;
+      }
+      const body = await jsonBody(req);
+      if (route === SUBSCRIPTION_QUOTE_ROUTE) {
+        const quote = await createMemberSubscriptionQuote(pool, session, { duration_days: body?.duration_days });
+        send(res, 201, { quote, route: SUBSCRIPTION_QUOTE_ROUTE, authentication: 'WALLET_SESSION', mode: 'SHADOW', live_execution_authorized: false });
+        return true;
+      }
+      const result = await verifyMemberSubscriptionPayment(pool, session, { order_id: body?.order_id, signature: body?.signature });
+      send(res, 200, { ...result, route: SUBSCRIPTION_VERIFY_ROUTE, authentication: 'WALLET_SESSION', mode: 'SHADOW', live_execution_authorized: false });
+      return true;
+    } catch (error) {
+      send(res, statusFor(error), {
+        error: String(error?.message || 'member_subscription_failed'),
+        mode: 'SHADOW', funds_moved_by_aether: false, transaction_submission_authorized: false,
+        signing_authorized: false, live_execution_authorized: false
+      });
+      return true;
+    }
+  }
 
   if (route === MARKET_SHADOW_ROUTE) {
     if (!['GET', 'POST'].includes(req.method)) {
@@ -279,3 +328,6 @@ export const MEMBER_AUTOTRADE_ROUTE = MEMBER_ROUTE;
 export const MEMBER_AUTOTRADE_DEMO_STATE_ROUTE = DEMO_STATE_ROUTE;
 export const MEMBER_AUTOTRADE_DEMO_SIMULATE_ROUTE = DEMO_SIMULATE_ROUTE;
 export const MEMBER_AUTOTRADE_MARKET_SHADOW_ROUTE = MARKET_SHADOW_ROUTE;
+export const MEMBER_SUBSCRIPTION_ROUTE = SUBSCRIPTION_ROUTE;
+export const MEMBER_SUBSCRIPTION_QUOTE_ROUTE = SUBSCRIPTION_QUOTE_ROUTE;
+export const MEMBER_SUBSCRIPTION_VERIFY_ROUTE = SUBSCRIPTION_VERIFY_ROUTE;

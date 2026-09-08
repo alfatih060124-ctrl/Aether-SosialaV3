@@ -1,0 +1,30 @@
+name: Step 21 Subscription Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/dynamic-subscription.mjs'
+      - 'services/api/src/member-subscription-billing.mjs'
+      - 'services/api/src/solana-usdc-subscription-payment-verifier.mjs'
+      - 'services/api/src/member-autotrade-route.mjs'
+      - 'api/member-subscription.mjs'
+      - 'migrations/025_dynamic_subscription_billing.sql'
+      - 'public/member.html'
+      - 'vercel.json'
+      - 'deploy/Caddyfile'
+      - 'deploy/vercel-direct-deploy-manifest.json'
+      - 'scripts/regression-dynamic-subscription-payment.mjs'
+      - 'scripts/step21-subscription-regression.mjs'
+      - '.github/workflows/step21-subscription-regression.yml'
+  workflow_dispatch:
+
+jobs:
+  subscription:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/regression-dynamic-subscription-payment.mjs
+      - run: node scripts/step21-subscription-regression.mjs

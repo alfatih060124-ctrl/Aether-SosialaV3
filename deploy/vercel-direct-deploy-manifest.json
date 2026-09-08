@@ -32,6 +32,8 @@
     "public/og-aether.svg",
     "public/onboarding.html",
     "public/operator-autotrade.html",
-    "public/shadow.html"
+    "public/shadow.html",
+    "api/member-subscription.mjs",
+    "public/member.html"
   ]
 }
