@@ -5,29 +5,111 @@
     "deploymentEnabled": false
   },
   "builds": [
-    { "src": "api/index.mjs", "use": "@vercel/node" },
-    { "src": "api/chart.mjs", "use": "@vercel/node" },
-    { "src": "api/market-shadow.mjs", "use": "@vercel/node" },
-    { "src": "api/member-autotrade-state.mjs", "use": "@vercel/node" },
-    { "src": "public/**", "use": "@vercel/static" }
+    {
+      "src": "api/index.mjs",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/chart.mjs",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/market-shadow.mjs",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/member-autotrade-state.mjs",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
   ],
   "routes": [
-    { "src": "/api/market/chart/?", "dest": "/api/chart.mjs" },
-    { "src": "/api/account/auto-strategy/market-shadow/?", "dest": "/api/market-shadow.mjs" },
-    { "src": "/api/account/autotrade/state/?", "dest": "/api/member-autotrade-state.mjs?action=state" },
-    { "src": "/api/account/autotrade/start/?", "dest": "/api/member-autotrade-state.mjs?action=start" },
-    { "src": "/api/account/autotrade/stop/?", "dest": "/api/member-autotrade-state.mjs?action=stop" },
-    { "src": "/api/(.*)", "dest": "/api/index.mjs" },
-    { "src": "/aether-mark.svg", "dest": "/public/aether-mark.svg" },
-    { "src": "/favicon.svg", "dest": "/public/favicon.svg" },
-    { "src": "/og-aether.svg", "dest": "/public/og-aether.svg" },
-    { "src": "/dashboard/?", "dest": "/public/dashboard.html" },
-    { "src": "/onboarding/?", "dest": "/public/onboarding.html" },
-    { "src": "/account/?", "dest": "/public/account.html" },
-    { "src": "/autotrade-demo/?", "dest": "/public/autotrade-demo.html" },
-    { "src": "/marketplace/?", "dest": "/public/marketplace.html" },
-    { "src": "/market/?", "dest": "/public/market.html" },
-    { "src": "/", "dest": "/public/index.html" },
-    { "src": "/(.*)", "dest": "/public/index.html" }
+    {
+      "src": "/api/market/chart/?",
+      "dest": "/api/chart.mjs"
+    },
+    {
+      "src": "/api/account/auto-strategy/market-shadow/?",
+      "dest": "/api/market-shadow.mjs"
+    },
+    {
+      "src": "/api/account/autotrade/state/?",
+      "dest": "/api/member-autotrade-state.mjs?action=state"
+    },
+    {
+      "src": "/api/account/autotrade/start/?",
+      "dest": "/api/member-autotrade-state.mjs?action=start"
+    },
+    {
+      "src": "/api/account/autotrade/stop/?",
+      "dest": "/api/member-autotrade-state.mjs?action=stop"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.mjs"
+    },
+    {
+      "src": "/aether-mark.svg",
+      "dest": "/public/aether-mark.svg"
+    },
+    {
+      "src": "/favicon.svg",
+      "dest": "/public/favicon.svg"
+    },
+    {
+      "src": "/og-aether.svg",
+      "dest": "/public/og-aether.svg"
+    },
+    {
+      "src": "/dashboard/?",
+      "dest": "/public/dashboard.html"
+    },
+    {
+      "src": "/onboarding/?",
+      "dest": "/public/onboarding.html"
+    },
+    {
+      "src": "/account/?",
+      "dest": "/public/member.html"
+    },
+    {
+      "src": "/autotrade/?",
+      "dest": "/public/member.html"
+    },
+    {
+      "src": "/performance/?",
+      "dest": "/public/member.html"
+    },
+    {
+      "src": "/subscription/?",
+      "dest": "/public/member.html"
+    },
+    {
+      "src": "/account/profile/?",
+      "dest": "/public/member.html"
+    },
+    {
+      "src": "/autotrade-demo/?",
+      "dest": "/public/autotrade-demo.html"
+    },
+    {
+      "src": "/marketplace/?",
+      "dest": "/public/marketplace.html"
+    },
+    {
+      "src": "/market/?",
+      "dest": "/public/market.html"
+    },
+    {
+      "src": "/",
+      "dest": "/public/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/index.html"
+    }
   ]
 }
