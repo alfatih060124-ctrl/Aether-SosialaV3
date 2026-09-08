@@ -26,6 +26,10 @@
       "use": "@vercel/node"
     },
     {
+      "src": "api/member-authority.mjs",
+      "use": "@vercel/node"
+    },
+    {
       "src": "public/**",
       "use": "@vercel/static"
     }
@@ -62,6 +66,22 @@
     {
       "src": "/api/account/subscription/verify/?",
       "dest": "/api/member-subscription.mjs?action=verify"
+    },
+    {
+      "src": "/api/account/delegated-authority/?",
+      "dest": "/api/member-authority.mjs?action=status"
+    },
+    {
+      "src": "/api/account/delegated-authority/challenge/?",
+      "dest": "/api/member-authority.mjs?action=challenge"
+    },
+    {
+      "src": "/api/account/delegated-authority/verify/?",
+      "dest": "/api/member-authority.mjs?action=verify"
+    },
+    {
+      "src": "/api/account/delegated-authority/revoke/?",
+      "dest": "/api/member-authority.mjs?action=revoke"
     },
     {
       "src": "/api/(.*)",

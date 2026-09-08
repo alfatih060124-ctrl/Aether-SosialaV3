@@ -34,6 +34,8 @@
     "public/operator-autotrade.html",
     "public/shadow.html",
     "api/member-subscription.mjs",
-    "public/member.html"
+    "public/member.html",
+    "api/member-authority.mjs",
+    "public/member-authority-ui.js"
   ]
 }

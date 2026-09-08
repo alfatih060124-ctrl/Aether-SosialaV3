@@ -90,7 +90,7 @@ export async function handleMemberAutoTradeRoute({
   persistDecision = persistAuthenticatedAutoTradeDecisionAtomically,
   createRiskResolver = createTrustedAutoTradeRuntimeRiskResolver
 }) {
-  if (await handleMemberPositionsRoute({ req, res, route, pool, walletAuth, sessionFor, send })) return true;
+  if (await handleMemberPositionsRoute({ req, res, route, pool, walletAuth, sessionFor, jsonBody, send })) return true;
 
 
   if ([SUBSCRIPTION_ROUTE, SUBSCRIPTION_QUOTE_ROUTE, SUBSCRIPTION_VERIFY_ROUTE].includes(route)) {
