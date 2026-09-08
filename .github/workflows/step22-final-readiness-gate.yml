@@ -1,0 +1,32 @@
+name: Step 22 Final Readiness Gate
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'services/**'
+      - 'api/**'
+      - 'public/**'
+      - 'web/**'
+      - 'deploy/**'
+      - 'docs/STEP22_*.md'
+      - '.github/workflows/step22-final-readiness-gate.yml'
+  workflow_dispatch:
+
+jobs:
+  final-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXECUTION_MODE: SHADOW
+      LIVE_ENABLED: 'false'
+      FIXTURE_GATE_PASSED: 'false'
+      OPERATOR_APPROVED: 'false'
+      SIGNAL_MIN_EXPECTED_NET_EDGE_BPS: '20'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Step 22 final readiness gate
+        run: node scripts/step22-final-readiness-gate.mjs
