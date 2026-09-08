@@ -1,0 +1,23 @@
+name: Step 20 SHADOW Validation Gate
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/**'
+      - 'packages/**'
+      - 'migrations/**'
+      - 'public/**'
+      - 'scripts/**'
+      - '.github/workflows/step20-shadow-validation-gate.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-shadow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run Step 20 validation matrix
+        run: node scripts/step20-shadow-validation-gate.mjs
