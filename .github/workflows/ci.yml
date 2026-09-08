@@ -67,6 +67,7 @@ jobs:
           node --check scripts/execution-boundary-regression.mjs
           node --check scripts/market-intelligence-regression.mjs
           node --check scripts/market-edge-regression.mjs
+          node --check scripts/market-shadow-observability-regression.mjs
           node --check scripts/admin-evidence-ui-regression.mjs
           node --check scripts/marketplace-fixture-quarantine-regression.mjs
           node --check scripts/api-contract-regression.mjs
@@ -125,6 +126,8 @@ jobs:
         run: node scripts/market-intelligence-regression.mjs
       - name: Market edge regression
         run: node scripts/market-edge-regression.mjs
+      - name: Market shadow observability regression
+        run: node scripts/market-shadow-observability-regression.mjs
       - name: Admin automatic evidence UI regression
         run: node scripts/admin-evidence-ui-regression.mjs
       - name: Marketplace fixture quarantine regression

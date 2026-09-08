@@ -9,6 +9,14 @@ const SCAN_TIMEOUT_MS = 5 * 60 * 1000;
 
 let child = null;
 let state = idleState();
+const runtimeMetrics = {
+  scans_started: 0,
+  scans_completed: 0,
+  scans_failed: 0,
+  last_scan_duration_ms: null,
+  last_terminal_status: null,
+  last_terminal_at: null
+};
 
 function idleState() {
   return {
@@ -84,16 +92,50 @@ function summarize(result) {
   };
 }
 
+function elapsedMs(startedAt, endedAt = new Date().toISOString()) {
+  const start = Date.parse(String(startedAt || ''));
+  const end = Date.parse(String(endedAt || ''));
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  return Math.max(0, end - start);
+}
+
+function observabilitySnapshot() {
+  return {
+    runtime_session: true,
+    scan_target_ms: 30_000,
+    scans_started: runtimeMetrics.scans_started,
+    scans_completed: runtimeMetrics.scans_completed,
+    scans_failed: runtimeMetrics.scans_failed,
+    current_scan_duration_ms: state.status === 'RUNNING' ? elapsedMs(state.started_at) : null,
+    last_scan_duration_ms: runtimeMetrics.last_scan_duration_ms,
+    last_terminal_status: runtimeMetrics.last_terminal_status,
+    last_terminal_at: runtimeMetrics.last_terminal_at,
+    mode: 'SHADOW',
+    min_expected_net_edge_bps: 20,
+    live_execution_authorized: false
+  };
+}
+
 function snapshot() {
-  return JSON.parse(JSON.stringify(state));
+  return {
+    ...JSON.parse(JSON.stringify(state)),
+    observability: observabilitySnapshot()
+  };
 }
 
 function finishError(scanId, error) {
-  if (state.scan_id !== scanId) return;
+  if (state.scan_id !== scanId || state.status === 'ERROR' || state.status === 'COMPLETE') return;
+  const completedAt = new Date().toISOString();
+  const durationMs = elapsedMs(state.started_at, completedAt);
+  runtimeMetrics.scans_failed += 1;
+  runtimeMetrics.last_scan_duration_ms = durationMs;
+  runtimeMetrics.last_terminal_status = 'ERROR';
+  runtimeMetrics.last_terminal_at = completedAt;
   state = {
     ...state,
     status: 'ERROR',
-    completed_at: new Date().toISOString(),
+    completed_at: completedAt,
+    duration_ms: durationMs,
     summary: null,
     error: String(error?.message || error || 'market_shadow_scan_failed'),
     execution_dispatched: false,
@@ -111,11 +153,13 @@ export function startMarketShadowRuntimeScan() {
   if (child) return snapshot();
 
   const scanId = randomUUID();
+  runtimeMetrics.scans_started += 1;
   state = {
     status: 'RUNNING',
     scan_id: scanId,
     started_at: new Date().toISOString(),
     completed_at: null,
+    duration_ms: null,
     mode: 'SHADOW',
     min_expected_net_edge_bps: 20,
     execution_dispatched: false,
@@ -176,10 +220,17 @@ export function startMarketShadowRuntimeScan() {
       const result = JSON.parse(stdout.slice(start, end + 1));
       assertShadowInvariant(result);
       if (code !== 0 || result.status !== 'ok') throw new Error(result?.error || `market_shadow_probe_exit_${code}`);
+      const completedAt = new Date().toISOString();
+      const durationMs = elapsedMs(state.started_at, completedAt);
+      runtimeMetrics.scans_completed += 1;
+      runtimeMetrics.last_scan_duration_ms = durationMs;
+      runtimeMetrics.last_terminal_status = 'COMPLETE';
+      runtimeMetrics.last_terminal_at = completedAt;
       state = {
         ...state,
         status: 'COMPLETE',
-        completed_at: new Date().toISOString(),
+        completed_at: completedAt,
+        duration_ms: durationMs,
         summary: summarize(result),
         error: null,
         execution_dispatched: false,
