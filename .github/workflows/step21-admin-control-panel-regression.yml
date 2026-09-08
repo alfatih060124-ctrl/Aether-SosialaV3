@@ -1,0 +1,22 @@
+name: Step 21 Admin Control Panel Regression
+
+on:
+  pull_request:
+    paths:
+      - 'public/admin.html'
+      - 'scripts/step21-admin-control-panel-regression.mjs'
+      - '.github/workflows/step21-admin-control-panel-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  admin-control-panel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/step21-admin-control-panel-regression.mjs
