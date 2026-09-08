@@ -39,13 +39,29 @@ function compactResult(row) {
   return {
     symbol: row?.symbol || null,
     token_mint: row?.token_mint || null,
+    quote_mint: row?.quote_mint || null,
+    buy_pool_address: row?.buy_pool_address || null,
+    sell_pool_address: row?.sell_pool_address || null,
+    notional_usdc: finite(row?.notional_usdc),
+    gross_profit_before_costs_usdc: finite(row?.gross_profit_before_costs_usdc),
+    network_fee_usdc: finite(row?.network_fee_usdc),
+    market_net_pnl_usdc: finite(row?.market_net_pnl_usdc),
+    market_execution_cost_usdc: finite(row?.market_execution_cost_usdc),
+    costs_verified: row?.costs_verified === true,
+    observed_at: row?.observed_at || null,
     status: row?.status || null,
     buy_dex: row?.buy_dex || null,
     sell_dex: row?.sell_dex || null,
     gross_executable_spread_bps: finite(row?.gross_executable_spread_bps),
     expected_net_edge_bps: finite(row?.expected_net_edge_bps),
     estimated_price_impact_bps: finite(row?.estimated_price_impact_bps),
-    net_edge_gate_passed: row?.net_edge_gate_passed === true
+    net_edge_gate_passed: row?.net_edge_gate_passed === true,
+    exact_transaction_fee_ready: row?.exact_transaction_fee_ready === true,
+    mode: row?.mode || 'SHADOW',
+    execution_dispatched: row?.execution_dispatched === true,
+    transaction_signed: row?.transaction_signed === true,
+    network_submission_authorized: row?.network_submission_authorized === true,
+    live_execution_authorized: row?.live_execution_authorized === true
   };
 }
 

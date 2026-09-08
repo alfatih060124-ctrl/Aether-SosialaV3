@@ -173,6 +173,84 @@ export async function persistQualifiedPaperArbitrage(pool, session, result, { pe
   }
 }
 
+export async function persistQualifiedPaperArbitrageProbe(pool, session, candidate, { performanceFeeBps, initialBalanceUsdc = 100, idempotencyKey } = {}) {
+  if (!pool || !session?.user_id) throw new Error('paper_arbitrage_authenticated_session_required');
+  const stableKey = text(idempotencyKey, 'paper_arbitrage_idempotency_key_required');
+  if (stableKey.length > 200) throw new Error('paper_arbitrage_idempotency_key_invalid');
+  if (!candidate || typeof candidate !== 'object') throw new Error('paper_arbitrage_probe_candidate_required');
+  if (candidate.mode !== 'SHADOW' || candidate.execution_dispatched !== false || candidate.transaction_signed !== false || candidate.network_submission_authorized !== false || candidate.live_execution_authorized !== false) {
+    throw new Error('paper_arbitrage_probe_shadow_invariant_failed');
+  }
+  if (candidate.net_edge_gate_passed !== true || candidate.costs_verified !== true || candidate.exact_transaction_fee_ready !== true) {
+    throw new Error('paper_arbitrage_probe_verification_required');
+  }
+  const netEdge = finite(candidate.expected_net_edge_bps, 'paper_arbitrage_probe_net_edge_required');
+  if (netEdge < 20) throw new Error('paper_arbitrage_probe_net_edge_below_floor');
+  const grossEdge = finite(candidate.gross_executable_spread_bps, 'paper_arbitrage_probe_gross_edge_required');
+  const notional = finite(candidate.notional_usdc, 'paper_arbitrage_probe_notional_required');
+  const grossProfit = finite(candidate.gross_profit_before_costs_usdc, 'paper_arbitrage_probe_gross_profit_required');
+  const executionCost = finite(candidate.market_execution_cost_usdc, 'paper_arbitrage_probe_execution_cost_required');
+  const marketNetPnl = finite(candidate.market_net_pnl_usdc, 'paper_arbitrage_probe_market_net_pnl_required');
+  const networkFee = finite(candidate.network_fee_usdc, 'paper_arbitrage_probe_network_fee_required');
+  if (!(notional > 0) || executionCost < 0 || networkFee < 0) throw new Error('paper_arbitrage_probe_values_invalid');
+  const buyDex = text(candidate.buy_dex, 'paper_arbitrage_probe_buy_dex_required').toLowerCase();
+  const sellDex = text(candidate.sell_dex, 'paper_arbitrage_probe_sell_dex_required').toLowerCase();
+  if (!['orca','raydium'].includes(buyDex) || !['orca','raydium'].includes(sellDex) || buyDex === sellDex) throw new Error('paper_arbitrage_probe_cross_dex_required');
+  const feeBps = finite(performanceFeeBps, 'paper_arbitrage_performance_fee_bps_required');
+  if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 10000) throw new Error('paper_arbitrage_performance_fee_bps_invalid');
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const account = await ensureAccount(client, session.user_id, initialBalanceUsdc);
+    const existing = (await client.query(`SELECT * FROM member_paper_arbitrage_cycles WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1`, [session.user_id, stableKey])).rows[0];
+    if (existing) {
+      await client.query('COMMIT');
+      return Object.freeze({ account, cycle: existing, duplicate: true, mode: 'SHADOW', funds_moved: false, live_execution_authorized: false });
+    }
+    const cashBefore = finite(account.cash_balance_usdc, 'paper_arbitrage_account_cash_required');
+    if (notional > cashBefore) throw new Error('paper_arbitrage_notional_unavailable');
+    const performanceFee = marketNetPnl > 0 ? marketNetPnl * feeBps / 10000 : 0;
+    const memberNetProfit = marketNetPnl - performanceFee;
+    const cashAfter = cashBefore + memberNetProfit;
+    if (cashAfter < 0) throw new Error('paper_arbitrage_account_negative_cash');
+    const updated = (await client.query(`
+      UPDATE member_paper_arbitrage_accounts SET
+        cash_balance_usdc=$2,realized_market_pnl_usdc=realized_market_pnl_usdc+$3,
+        performance_fees_usdc=performance_fees_usdc+$4,member_net_pnl_usdc=member_net_pnl_usdc+$5,
+        cycles_closed=cycles_closed+1,profitable_cycles=profitable_cycles+$6,losing_cycles=losing_cycles+$7,updated_at=now()
+      WHERE user_id=$1 RETURNING *
+    `,[session.user_id,round8(cashAfter),round8(marketNetPnl),round8(performanceFee),round8(memberNetProfit),memberNetProfit>0?1:0,memberNetProfit<0?1:0])).rows[0];
+    const costBreakdown = Object.freeze({
+      source: 'REAL_MARKET_SHADOW_NET_EDGE_PROBE',
+      costs_verified: true,
+      network_fee_usdc: round8(networkFee),
+      market_execution_cost_usdc: round8(executionCost),
+      exact_transaction_fee_ready: true
+    });
+    const assessment = Object.freeze({
+      verdict: 'QUALIFIED',
+      quality_score: null,
+      reason_codes: Object.freeze(['NET_EDGE_GATE_PASSED','REAL_MARKET_SHADOW','ORCA_RAYDIUM'])
+    });
+    const cycle = (await client.query(`
+      INSERT INTO member_paper_arbitrage_cycles(
+        cycle_id,user_id,idempotency_key,token_mint,quote_mint,buy_dex,sell_dex,buy_pool,sell_pool,notional_usdc,
+        gross_profit_before_costs_usdc,market_execution_cost_usdc,market_net_pnl_usdc,performance_fee_usdc,
+        member_net_profit_usdc,gross_edge_bps,net_edge_bps,network_fee_usdc,cost_breakdown,assessment,market_source,observed_at
+      ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20::jsonb,$21,$22) RETURNING *
+    `,[randomUUID(),session.user_id,stableKey,text(candidate.token_mint,'paper_arbitrage_probe_token_mint_required'),text(candidate.quote_mint,'paper_arbitrage_probe_quote_mint_required'),buyDex,sellDex,
+      text(candidate.buy_pool_address,'paper_arbitrage_probe_buy_pool_required'),text(candidate.sell_pool_address,'paper_arbitrage_probe_sell_pool_required'),round8(notional),round8(grossProfit),round8(executionCost),round8(marketNetPnl),round8(performanceFee),round8(memberNetProfit),grossEdge,netEdge,round8(networkFee),JSON.stringify(costBreakdown),JSON.stringify(assessment),'REAL_MARKET_SHADOW_NET_EDGE_PROBE',text(candidate.observed_at,'paper_arbitrage_probe_observed_at_required')])).rows[0];
+    await client.query('COMMIT');
+    return Object.freeze({ account: updated, cycle, duplicate: false, mode: 'SHADOW', funds_moved: false, live_execution_authorized: false });
+  } catch (error) {
+    try { await client.query('ROLLBACK'); } catch {}
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function getPaperArbitragePerformance(pool, userId, { limit = 50 } = {}) {
   if (!pool || !userId) throw new Error('paper_arbitrage_account_required');
   const client = await pool.connect();

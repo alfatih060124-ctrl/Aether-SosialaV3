@@ -27,9 +27,13 @@ assert.equal(stoppedAfterSettlement.stop_requested, false);
 const directStop = applyMemberAutoTradeCommand(started, 'STOP', { now });
 assert.equal(directStop.state, 'STOPPED');
 assert.equal(directStop.stopped_at, now.toISOString());
+const failed = applyMemberAutoTradeCommand(started, 'FAIL', { now });
+assert.equal(failed.state, 'PAUSED');
+assert.equal(failed.stop_requested, false);
 
 assert.deepEqual(MEMBER_AUTOTRADE_STATE_MACHINE.states, ['STOPPED','RUNNING_SCANNING','EXECUTING','SETTLING','PAUSED']);
 assert.deepEqual(MEMBER_AUTOTRADE_STATE_MACHINE.member_commands, ['START','STOP']);
+assert.ok(MEMBER_AUTOTRADE_STATE_MACHINE.internal_commands.includes('FAIL'));
 assert.equal(MEMBER_AUTOTRADE_STATE_MACHINE.execution_mode, 'SHADOW');
 assert.equal(MEMBER_AUTOTRADE_STATE_MACHINE.execution_dispatched, false);
 assert.equal(MEMBER_AUTOTRADE_STATE_MACHINE.live_execution_authorized, false);

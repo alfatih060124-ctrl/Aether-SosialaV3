@@ -381,9 +381,24 @@ try {
       minimumNetEdgeBps: minNetEdgeBps
     });
 
+    const notionalUsdc = Number(quoteUsdcRaw) / 1_000_000;
+    const networkFeeUsdc = Number.isFinite(Number(net.exact_network_fee_bps)) ? notionalUsdc * Number(net.exact_network_fee_bps) / 10_000 : null;
+    const grossProfitBeforeCostsUsdc = Number.isFinite(Number(net.gross_executable_spread_bps)) ? notionalUsdc * Number(net.gross_executable_spread_bps) / 10_000 : null;
+    const marketNetPnlUsdc = Number.isFinite(Number(net.expected_net_edge_bps)) ? notionalUsdc * Number(net.expected_net_edge_bps) / 10_000 : null;
+
     results.push({
       symbol: row.base_token?.symbol || null,
       token_mint: row.primary_mint,
+      quote_mint: USDC_MINT,
+      buy_pool_address: selected.buy_amm_address || null,
+      sell_pool_address: selected.sell_amm_address || null,
+      notional_usdc: notionalUsdc,
+      gross_profit_before_costs_usdc: grossProfitBeforeCostsUsdc,
+      network_fee_usdc: networkFeeUsdc,
+      market_net_pnl_usdc: marketNetPnlUsdc,
+      market_execution_cost_usdc: grossProfitBeforeCostsUsdc !== null && marketNetPnlUsdc !== null ? Math.max(0, grossProfitBeforeCostsUsdc - marketNetPnlUsdc) : null,
+      costs_verified: net.net_edge_costs_included === true && exactFee !== null && simulation?.exact_transaction_fee_ready === true,
+      observed_at: new Date().toISOString(),
       status: net.net_edge_costs_included ? 'NET_EDGE_MEASURED' : 'NET_EDGE_INCOMPLETE',
       buy_dex: selected.buy_dex,
       sell_dex: selected.sell_dex,
