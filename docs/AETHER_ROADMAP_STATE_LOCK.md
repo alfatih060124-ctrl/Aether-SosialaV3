@@ -45,8 +45,8 @@ Hard minimum expected net edge: 20 bps / 0.20%
 | 18 | Scan performance optimization and persistent candidate cache | COMPLETE / LOCKED |
 | 19 | Runtime observability, duration metrics and scan audit events | COMPLETE / LOCKED |
 | 20 | SHADOW validation matrix / validation gate | COMPLETE / LOCKED |
-| 21 | HARDEN + current product/control-plane consolidation | NEXT |
-| 22 | APPROVE + final end-to-end readiness review | NOT STARTED |
+| 21 | HARDEN + current product/control-plane consolidation | COMPLETE / LOCKED |
+| 22 | APPROVE + final end-to-end readiness review | NEXT |
 
 ## Copy Trading status — explicit
 Copy Trading is not deleted. Its SHADOW foundation exists in the repository, including persisted Copy Mandates, follower accounting, admin controls and regressions. The consolidated Copy Mandate → Auto Trade SHADOW runtime was merged historically in PR #193.
@@ -80,6 +80,21 @@ Step 21 acceptance:
 - Copy Trading/Marketplace are not reintroduced into the five-menu member surface;
 - stale/duplicate PR overlap is resolved before integration.
 
+Step 21 completion evidence:
+- canonical Step-21 PR: #338, open/draft/unmerged;
+- canonical GitHub head: `7455f941210ffeb24a85ba2e202cecb79d2a009c`;
+- GitHub tree: `5cb9b6b54d4ad8decdc326e8ce5b26648aab2ff8`, exactly matching the verified local Step-21 tree;
+- Step 20 SHADOW Validation Gate PASS;
+- Step 21 Admin Control Panel Regression PASS;
+- Step 21 Member Area Regression PASS;
+- Step 21 Subscription Regression PASS;
+- Step 21 Member Auto Trade Runtime Binding Regression PASS;
+- Member Delegated Authority Regression PASS;
+- Member LIVE Funding Preflight Regression PASS;
+- Two-Leg LIVE Execution Boundary Regression PASS;
+- Aether V3 CI PASS;
+- SHADOW / LIVE OFF preserved.
+
 ## Step 22 — APPROVE / final readiness review
 Final end-to-end acceptance covers the current Auto Trade launch path only: engine, five-menu Member Area, subscription/payment, delegated authority, funding preflight, new Admin Control Panel, audit, accounting and security gates.
 
@@ -94,9 +109,10 @@ Required output:
 `LIVE PILOT` is outside the numbered 22-step build roadmap. It is never automatic and requires a separate explicit instruction with limited exposure.
 
 ## Current checkpoint
-- Step 20 branch: `feat/step20-shadow-validation-gate`
-- Step 20 HEAD: `6b97df7`
-- Step 20 validation: 8/8 local PASS and GitHub CI PASS
-- Step 20 PR: #336, open/draft/unmerged
+- Step 21 branch: `feat/step21-product-control-plane-consolidation`
+- Step 21 GitHub HEAD: `7455f941210ffeb24a85ba2e202cecb79d2a009c`
+- Step 21 tree: `5cb9b6b54d4ad8decdc326e8ce5b26648aab2ff8` (matches verified local Step-21 tree)
+- Step 21 CI: all observed required workflows PASS
+- Step 21 PR: #338, open/draft/unmerged
 - Roadmap documentation PR: #337, open/draft/unmerged
-- NEXT work item: Step 21 only.
+- NEXT work item: Step 22 only.
