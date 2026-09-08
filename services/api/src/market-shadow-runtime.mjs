@@ -133,7 +133,8 @@ export function startMarketShadowRuntimeScan() {
     SIGNAL_MIN_EXPECTED_NET_EDGE_BPS: '20',
     AETHER_MARKET_VIEWS: 'trending,new,gainers,volume',
     AETHER_CROSS_VENUE_CANDIDATE_LIMIT: '60',
-    AETHER_CROSS_VENUE_DEX_PAIR_ATTEMPTS: '12'
+    AETHER_CROSS_VENUE_DEX_PAIR_ATTEMPTS: '12',
+    AETHER_JUPITER_INTER_QUOTE_DELAY_MS: String(process.env.AETHER_JUPITER_INTER_QUOTE_DELAY_MS || '400')
   };
 
   let stdout = '';

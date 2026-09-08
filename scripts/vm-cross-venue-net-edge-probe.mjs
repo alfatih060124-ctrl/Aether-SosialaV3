@@ -27,12 +27,19 @@ const minVolume24hUsd = Math.max(0, Number(process.env.SIGNAL_MIN_VOLUME_24H_USD
 const maxTop10HolderPct = Math.max(0, Number(process.env.SIGNAL_MAX_TOP10_HOLDER_PCT || 35));
 const maxPriceImpactBps = Math.max(0, Number(process.env.SIGNAL_MAX_PRICE_IMPACT_BPS || 100));
 const quoteUsdcRaw = String(process.env.AETHER_JUPITER_QUOTE_USDC_RAW || '100000000').trim();
-const interRequestDelayMs = Number(process.env.AETHER_JUPITER_INTER_QUOTE_DELAY_MS || (apiKey ? 1100 : 2200));
+const interRequestDelayRaw = Number(process.env.AETHER_JUPITER_INTER_QUOTE_DELAY_MS || (apiKey ? 1100 : 2200));
+const interRequestDelayMs = Number.isFinite(interRequestDelayRaw) ? Math.max(0, interRequestDelayRaw) : (apiKey ? 1100 : 2200);
 const minNetEdgeBps = Math.max(20, Number(process.env.SIGNAL_MIN_EXPECTED_NET_EDGE_BPS || 20));
 const dexPairAttemptsRaw = Number(process.env.AETHER_CROSS_VENUE_DEX_PAIR_ATTEMPTS || 6);
 const maxDexPairAttempts = Number.isSafeInteger(dexPairAttemptsRaw) ? Math.min(12, Math.max(1, dexPairAttemptsRaw)) : 6;
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+let nextJupiterRequestAt = 0;
+async function paceJupiterRequest() {
+  const waitMs = Math.max(0, nextJupiterRequestAt - Date.now());
+  if (waitMs > 0) await sleep(waitMs);
+  nextJupiterRequestAt = Date.now() + interRequestDelayMs;
+}
 function finite(value) { const n = Number(value); return Number.isFinite(n) ? n : null; }
 
 function candidateDiscoveryScore(row) {
@@ -107,6 +114,7 @@ async function rpc(method, params, timeoutMs = 10000) {
 }
 
 async function jupiterQuote({ inputMint, outputMint, amount, dex = null, onlyDirectRoutes = false }) {
+  await paceJupiterRequest();
   const url = new URL('/swap/v1/quote', JUPITER_ORIGIN);
   url.searchParams.set('inputMint', normalizeSolanaMint(inputMint));
   url.searchParams.set('outputMint', normalizeSolanaMint(outputMint));
@@ -127,6 +135,7 @@ function observedMaxPriceImpactBps(buy, sell) {
 }
 
 async function programLabels() {
+  await paceJupiterRequest();
   const url = new URL('/swap/v1/program-id-to-label', JUPITER_ORIGIN);
   const body = await getJson(url);
   return body;
@@ -158,9 +167,7 @@ const unsigned = createJupiterUnsignedSimulationService({ timeoutMs: 12000 });
 
 try {
   const solUsd = await solUsdReference();
-  await sleep(interRequestDelayMs);
   const labelsByProgram = await programLabels();
-  await sleep(interRequestDelayMs);
 
   const candidateMap = new Map();
   const discoveryErrors = [];
@@ -244,79 +251,61 @@ try {
       continue;
     }
 
-    const buyDexes = [...new Set(rawDexPairs.map(item => item.buy_dex))];
-    const sellDexes = [...new Set(rawDexPairs.map(item => item.sell_dex))];
     const buyPreflight = new Map();
     const sellPreflight = new Map();
+    const buyPreflightAttempted = new Set();
+    const sellPreflightAttempted = new Set();
     const preflightAttempts = [];
-
-    for (const dex of buyDexes) {
-      await sleep(interRequestDelayMs);
-      try {
-        const quote = await jupiterQuote({
-          inputMint: USDC_MINT,
-          outputMint: row.primary_mint,
-          amount: quoteUsdcRaw,
-          dex,
-          onlyDirectRoutes: true
-        });
-        buyPreflight.set(dex, quote);
-        preflightAttempts.push({ side: 'BUY', dex, ok: true });
-      } catch (error) {
-        preflightAttempts.push({ side: 'BUY', dex, ok: false, error: String(error?.message || error) });
-      }
-    }
-
+    const quoteAttempts = [];
     const sellReferenceAmount = String(broad?.sell?.in_amount || broad?.buy?.out_amount || '').trim();
-    if (sellReferenceAmount) {
-      for (const dex of sellDexes) {
-        await sleep(interRequestDelayMs);
+
+    let selected = null;
+    let buyQuote = null;
+    let sellQuote = null;
+    let routableCandidateCount = 0;
+
+    // Preserve ranked pair order, but preflight lazily. This avoids probing sell DEXes
+    // when the paired buy DEX has no direct route, without weakening any route gate.
+    for (const candidate of rawDexPairs) {
+      if (!buyPreflightAttempted.has(candidate.buy_dex)) {
+        buyPreflightAttempted.add(candidate.buy_dex);
+        try {
+          const quote = await jupiterQuote({
+            inputMint: USDC_MINT,
+            outputMint: row.primary_mint,
+            amount: quoteUsdcRaw,
+            dex: candidate.buy_dex,
+            onlyDirectRoutes: true
+          });
+          buyPreflight.set(candidate.buy_dex, quote);
+          preflightAttempts.push({ side: 'BUY', dex: candidate.buy_dex, ok: true });
+        } catch (error) {
+          preflightAttempts.push({ side: 'BUY', dex: candidate.buy_dex, ok: false, error: String(error?.message || error) });
+        }
+      }
+      const candidateBuy = buyPreflight.get(candidate.buy_dex);
+      if (!candidateBuy || !sellReferenceAmount) continue;
+
+      if (!sellPreflightAttempted.has(candidate.sell_dex)) {
+        sellPreflightAttempted.add(candidate.sell_dex);
         try {
           const quote = await jupiterQuote({
             inputMint: row.primary_mint,
             outputMint: USDC_MINT,
             amount: sellReferenceAmount,
-            dex,
+            dex: candidate.sell_dex,
             onlyDirectRoutes: true
           });
-          sellPreflight.set(dex, quote);
-          preflightAttempts.push({ side: 'SELL', dex, ok: true });
+          sellPreflight.set(candidate.sell_dex, quote);
+          preflightAttempts.push({ side: 'SELL', dex: candidate.sell_dex, ok: true });
         } catch (error) {
-          preflightAttempts.push({ side: 'SELL', dex, ok: false, error: String(error?.message || error) });
+          preflightAttempts.push({ side: 'SELL', dex: candidate.sell_dex, ok: false, error: String(error?.message || error) });
         }
       }
-    }
+      if (!sellPreflight.has(candidate.sell_dex)) continue;
 
-    const dexPairs = rawDexPairs.filter(candidate => buyPreflight.has(candidate.buy_dex) && sellPreflight.has(candidate.sell_dex));
-    if (!dexPairs.length) {
-      results.push({
-        symbol: row.base_token?.symbol || null,
-        token_mint: row.primary_mint,
-        status: 'NO_ROUTABLE_DISTINCT_DEX_PAIR',
-        dex_pairs_considered: rawDexPairs.length,
-        buy_dexes_preflight_ok: buyPreflight.size,
-        sell_dexes_preflight_ok: sellPreflight.size,
-        preflight_attempts: preflightAttempts,
-        expected_net_edge_bps: null
-      });
-      continue;
-    }
-
-    let selected = null;
-    let buyQuote = null;
-    let sellQuote = null;
-    const quoteAttempts = [];
-
-    for (const candidate of dexPairs) {
+      routableCandidateCount += 1;
       try {
-        const candidateBuy = buyPreflight.get(candidate.buy_dex) || await jupiterQuote({
-          inputMint: USDC_MINT,
-          outputMint: row.primary_mint,
-          amount: quoteUsdcRaw,
-          dex: candidate.buy_dex,
-          onlyDirectRoutes: true
-        });
-        await sleep(interRequestDelayMs);
         const candidateSell = await jupiterQuote({
           inputMint: row.primary_mint,
           outputMint: USDC_MINT,
@@ -340,11 +329,12 @@ try {
     }
 
     if (!selected || !buyQuote || !sellQuote) {
+      const status = routableCandidateCount > 0 ? 'DEX_RESTRICTED_QUOTE_UNAVAILABLE' : 'NO_ROUTABLE_DISTINCT_DEX_PAIR';
       results.push({
         symbol: row.base_token?.symbol || null,
         token_mint: row.primary_mint,
-        status: 'DEX_RESTRICTED_QUOTE_UNAVAILABLE',
-        dex_pairs_considered: dexPairs.length,
+        status,
+        dex_pairs_considered: rawDexPairs.length,
         dex_pair_attempts: quoteAttempts.length,
         buy_dexes_preflight_ok: buyPreflight.size,
         sell_dexes_preflight_ok: sellPreflight.size,
