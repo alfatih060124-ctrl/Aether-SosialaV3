@@ -46,7 +46,7 @@ Hard minimum expected net edge: 20 bps / 0.20%
 | 19 | Runtime observability, duration metrics and scan audit events | COMPLETE / LOCKED |
 | 20 | SHADOW validation matrix / validation gate | COMPLETE / LOCKED |
 | 21 | HARDEN + current product/control-plane consolidation | COMPLETE / LOCKED |
-| 22 | APPROVE + final end-to-end readiness review | NEXT |
+| 22 | APPROVE + final end-to-end readiness review | COMPLETE / LOCKED |
 
 ## Copy Trading status — explicit
 Copy Trading is not deleted. Its SHADOW foundation exists in the repository, including persisted Copy Mandates, follower accounting, admin controls and regressions. The consolidated Copy Mandate → Auto Trade SHADOW runtime was merged historically in PR #193.
@@ -58,7 +58,7 @@ Therefore for the current Auto Trade launch path:
 - Trader Marketplace = PARKED / OUT OF ACTIVE PRODUCT SURFACE.
 - Market Discovery as a standalone member menu = PARKED from the five-menu shell; market data still remains an engine input.
 - These parked modules do not block Steps 21–22.
-- They are not to be silently re-enabled during Step 21.
+- They are not to be silently re-enabled during Step 21 or Step 22.
 - Re-enabling Social/Copy Trading later requires a separate explicit roadmap decision.
 
 ## Step 21 — HARDEN + consolidation
@@ -98,21 +98,31 @@ Step 21 completion evidence:
 ## Step 22 — APPROVE / final readiness review
 Final end-to-end acceptance covers the current Auto Trade launch path only: engine, five-menu Member Area, subscription/payment, delegated authority, funding preflight, new Admin Control Panel, audit, accounting and security gates.
 
-Required output:
-- one release-candidate branch/commit;
-- all required CI green;
-- deployment/runtime audit green;
-- explicit operator-approval workflow recorded;
-- LIVE remains OFF unless the user separately orders activation after all gates pass.
+Step 22 completion evidence:
+- canonical release-candidate branch: `rc/step22-auto-trade-readiness`;
+- canonical Step-22 PR: #339, open/draft/unmerged;
+- exact GitHub head: `1e06fcae62a839ef02323a4af7276773fe47548f`;
+- exact tree: `93d79371e1aa375ad107041a6917c70b4fa03af6`, matching the verified local RC tree;
+- dedicated Step 22 Final Readiness Gate PASS 13/13;
+- GitHub PR workflows on the exact RC head: 9/9 observed runs completed successfully, including Step 22 Final Readiness Gate, Aether V3 CI and Step 20 SHADOW Validation Gate;
+- runtime API health: ok, execution mode SHADOW, LIVE false;
+- runtime API readiness: ready, database ok;
+- operator-approval workflow recorded separately from LIVE activation;
+- `EXECUTION_MODE=SHADOW`, `LIVE_ENABLED=false`, `FIXTURE_GATE_PASSED=false`, `OPERATOR_APPROVED=false` preserved;
+- no signer, transaction submission or fund movement authorized.
 
 ## After Step 22
-`LIVE PILOT` is outside the numbered 22-step build roadmap. It is never automatic and requires a separate explicit instruction with limited exposure.
+`LIVE PILOT` is outside the numbered 22-step build roadmap. It is never automatic and requires a separate explicit user instruction with limited exposure. Until that instruction is given, LIVE remains OFF and all fail-closed gates remain locked.
 
 ## Current checkpoint
-- Step 21 branch: `feat/step21-product-control-plane-consolidation`
-- Step 21 GitHub HEAD: `7455f941210ffeb24a85ba2e202cecb79d2a009c`
-- Step 21 tree: `5cb9b6b54d4ad8decdc326e8ce5b26648aab2ff8` (matches verified local Step-21 tree)
-- Step 21 CI: all observed required workflows PASS
-- Step 21 PR: #338, open/draft/unmerged
-- Roadmap documentation PR: #337, open/draft/unmerged
-- NEXT work item: Step 22 only.
+- Steps 16–22: COMPLETE / LOCKED.
+- Step 21 PR: #338, open/draft/unmerged.
+- Step 22 branch: `rc/step22-auto-trade-readiness`.
+- Step 22 GitHub HEAD: `1e06fcae62a839ef02323a4af7276773fe47548f`.
+- Step 22 tree: `93d79371e1aa375ad107041a6917c70b4fa03af6`.
+- Step 22 CI: 9/9 observed PR workflows PASS.
+- Step 22 PR: #339, open/draft/unmerged.
+- Roadmap documentation PR: #337, open/draft/unmerged.
+- Runtime: SHADOW / LIVE OFF / fail-closed.
+- Numbered 22-step build roadmap is complete.
+- NEXT, only by separate explicit user instruction: LIVE PILOT.
