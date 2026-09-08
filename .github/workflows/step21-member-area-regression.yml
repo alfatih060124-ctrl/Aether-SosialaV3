@@ -1,0 +1,21 @@
+name: Step 21 Member Area Regression
+
+on:
+  pull_request:
+    paths:
+      - 'public/member.html'
+      - 'vercel.json'
+      - 'scripts/step21-member-area-regression.mjs'
+      - '.github/workflows/step21-member-area-regression.yml'
+  workflow_dispatch:
+
+jobs:
+  member-area:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate five-menu member area
+        run: node scripts/step21-member-area-regression.mjs
