@@ -1,0 +1,26 @@
+name: PAPER Arbitrage Persistence Regression
+
+on:
+  pull_request:
+    paths:
+      - 'migrations/024_paper_arbitrage_persistence.sql'
+      - 'services/api/src/paper-arbitrage-persistence.mjs'
+      - 'scripts/regression-paper-arbitrage-persistence.mjs'
+      - '.github/workflows/paper-arbitrage-persistence-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check services/api/src/paper-arbitrage-persistence.mjs
+      - run: node --check scripts/regression-paper-arbitrage-persistence.mjs
+      - run: node scripts/regression-paper-arbitrage-persistence.mjs

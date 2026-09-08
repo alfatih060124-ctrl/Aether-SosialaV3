@@ -13,6 +13,7 @@
   "files": [
     "vercel.json",
     "api/index.mjs",
+    "api/member-performance.mjs",
     "services/api/src/market-intelligence.mjs",
     "services/api/src/auto-trade-training.mjs",
     "services/api/src/signal-intelligence.mjs",
@@ -20,7 +21,6 @@
     "public/account-auto-strategy.js",
     "public/account-wallet-portfolio.js",
     "public/account.html",
-    "public/admin.html",
     "public/aether-mark.svg",
     "public/autotrade-demo.html",
     "public/dashboard.html",
@@ -32,6 +32,11 @@
     "public/og-aether.svg",
     "public/onboarding.html",
     "public/operator-autotrade.html",
-    "public/shadow.html"
+    "public/shadow.html",
+    "api/member-subscription.mjs",
+    "public/member.html",
+    "api/member-authority.mjs",
+    "api/member-autotrade-state.mjs",
+    "public/member-authority-ui.js"
   ]
 }

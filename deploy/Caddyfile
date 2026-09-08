@@ -13,7 +13,7 @@ api.aether.boats {
 
   @public_read {
     method GET
-    path /api/health /api/readiness /api/version /api/execution/status /api/signals/config /api/autotrade/status /api/trades /api/traders /api/traders/* /api/marketplace/fees /api/auth/session /api/account/wallet-portfolio /api/account/trader /api/account/copy-mandates /api/account/copy-trades /api/account/positions /api/account/auto-strategy/demo /api/account/auto-strategy/market-shadow /api/account/autotrade/state
+    path /api/health /api/readiness /api/version /api/execution/status /api/signals/config /api/autotrade/status /api/trades /api/traders /api/traders/* /api/marketplace/fees /api/auth/session /api/account/wallet-portfolio /api/account/trader /api/account/copy-mandates /api/account/copy-trades /api/account/positions /api/account/auto-strategy/demo /api/account/auto-strategy/market-shadow /api/account/autotrade/state /api/account/subscription /api/account/delegated-authority /api/account/live-preflight /api/account/paper-arbitrage/performance
   }
 
   handle @public_read {
@@ -22,7 +22,7 @@ api.aether.boats {
 
   @wallet_auth_write {
     method POST
-    path /api/auth/challenge /api/auth/verify /api/auth/logout /api/account/trader/challenge /api/account/trader/apply /api/account/copy-mandates /api/account/autotrade/evaluate /api/account/auto-strategy/simulate /api/account/auto-strategy/market-shadow /api/account/autotrade/start /api/account/autotrade/stop
+    path /api/auth/challenge /api/auth/verify /api/auth/logout /api/account/trader/challenge /api/account/trader/apply /api/account/copy-mandates /api/account/autotrade/evaluate /api/account/auto-strategy/simulate /api/account/auto-strategy/market-shadow /api/account/autotrade/start /api/account/autotrade/stop /api/account/subscription/quote /api/account/subscription/verify /api/account/delegated-authority/challenge /api/account/delegated-authority/verify /api/account/delegated-authority/revoke
   }
 
   handle @wallet_auth_write {

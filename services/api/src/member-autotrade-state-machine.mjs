@@ -39,6 +39,11 @@ export function applyMemberAutoTradeCommand(snapshot, command, { now = new Date(
     next.state = 'PAUSED';
     next.stop_requested = false;
     next.paused_at = at;
+  } else if (action === 'FAIL') {
+    if (!['RUNNING_SCANNING','EXECUTING','SETTLING'].includes(current)) throw new Error('autotrade_fail_state_conflict');
+    next.state = 'PAUSED';
+    next.stop_requested = false;
+    next.paused_at = at;
   } else if (action === 'BEGIN_EXECUTION') {
     if (current !== 'RUNNING_SCANNING' || next.stop_requested) throw new Error('autotrade_execution_state_conflict');
     next.state = 'EXECUTING';
@@ -127,10 +132,37 @@ export async function commandMemberAutoTradeState(pool, session, command, { now 
   }
 }
 
+export async function commandMemberAutoTradeStateInternal(pool, userId, command, { now = new Date() } = {}) {
+  if (!pool) throw new Error('database_unconfigured');
+  const user = String(userId || '').trim();
+  if (!user) throw new Error('autotrade_internal_user_required');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const locked = await client.query(`SELECT * FROM member_autotrade_states WHERE user_id=$1 FOR UPDATE`, [user]);
+    const row = locked.rows[0];
+    if (!row) throw new Error('autotrade_state_not_found');
+    const next = applyMemberAutoTradeCommand(row, command, { now });
+    const updated = await client.query(`
+      UPDATE member_autotrade_states
+      SET state=$2, stop_requested=$3, started_at=$4, paused_at=$5, stopped_at=$6,
+          updated_at=$7, state_version=state_version+1
+      WHERE user_id=$1 RETURNING *
+    `,[user,next.state,next.stop_requested,next.started_at||row.started_at,next.paused_at,next.stopped_at,next.updated_at]);
+    await client.query('COMMIT');
+    return project(updated.rows[0]);
+  } catch (error) {
+    try { await client.query('ROLLBACK'); } catch {}
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export const MEMBER_AUTOTRADE_STATE_MACHINE = Object.freeze({
   states: STATES,
   member_commands: Object.freeze(['START','STOP']),
-  internal_commands: Object.freeze(['PAUSE','BEGIN_EXECUTION','BEGIN_SETTLING','SETTLED']),
+  internal_commands: Object.freeze(['PAUSE','FAIL','BEGIN_EXECUTION','BEGIN_SETTLING','SETTLED']),
   execution_mode: 'SHADOW',
   execution_dispatched: false,
   live_execution_authorized: false,

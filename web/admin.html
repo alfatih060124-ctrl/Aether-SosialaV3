@@ -3,15 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Aether Social Admin</title>
+<title>AETHER Admin — Control Panel</title>
 <style>
 body{font-family:system-ui;background:#090d18;color:#eef;margin:0}.wrap{max-width:1040px;margin:auto;padding:20px}.card{background:#121a2b;border:1px solid #293650;border-radius:14px;padding:18px;margin:14px 0}input,button,select,textarea{font:inherit;padding:10px;border-radius:9px;border:1px solid #3b4b6d;background:#0c1220;color:#eef}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}label{display:block;margin:10px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.wallet,.application,.mandate,.evidence,.collection{padding:12px;border:1px solid #293650;border-radius:12px;background:#0d1424}.wallet input[type=text],.application input,.application select,.application textarea{width:100%;box-sizing:border-box;margin-top:8px}.application{margin-top:10px}.application .actions,.evidence .actions,.mandate .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.application .meta,.mandate .meta,.evidence .meta,.collection .meta{font-size:.86rem;opacity:.75;word-break:break-word}.ok{color:#62d6a1}.warn{color:#ffd166}.danger{color:#ff7b7b}.note{opacity:.72;font-size:.9rem}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#1b2942;font-size:.82rem;margin-left:6px}pre{white-space:pre-wrap;max-height:420px;overflow:auto}.verify-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.verify-grid label{margin:0}.verify-grid textarea{min-height:70px}.stack{display:grid;gap:10px}.auto-evidence{margin-top:12px;padding:12px;border:1px solid #31536a;border-radius:12px;background:#0b1926}.auto-evidence .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}details.manual-evidence{margin-top:12px;border-top:1px solid #293650;padding-top:10px}details.manual-evidence summary{cursor:pointer;color:#ffd166;font-weight:650}@media(max-width:750px){.grid,.verify-grid{grid-template-columns:1fr}}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.tabs button.active{background:#8de6cf;color:#07111f}.panel[hidden]{display:none}.banner{background:#0c1829;border:1px solid #294565;border-radius:14px;padding:14px;margin:14px 0}.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.metric{background:#0d1424;border:1px solid #293650;border-radius:12px;padding:12px}.metric span{display:block;font-size:.76rem;opacity:.68;text-transform:uppercase}.metric b{display:block;margin-top:7px;font-size:1.08rem}.package-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.package{padding:12px;border:1px solid #293650;border-radius:12px;background:#0d1424}.member-row{padding:11px;border:1px solid #293650;border-radius:12px;margin:8px 0;background:#0d1424}.member-row .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.locked{opacity:.65}.topline{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}@media(max-width:750px){.metric-grid,.package-grid{grid-template-columns:1fr 1fr}}@media(max-width:480px){.metric-grid,.package-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <main class="wrap">
-<h1>Aether Social — Admin Control Panel</h1>
-<p>SHADOW execution • verifiable trader review • follower mandate controls • LIVE remains locked</p>
+<div class="topline"><div><h1>AETHER — Admin Control Panel</h1><p>Operational control plane for AETHER. Member Area remains a separate five-menu product surface.</p></div><span class="pill">SHADOW · FAIL-CLOSED · LIVE OFF</span></div>
+<div class="banner"><strong>Canonical engine scope:</strong> TWO_LEG_ARBITRAGE · ORCA ↔ Raydium · minimum expected NET edge 0.20%. Copy Trade is a PARKED module and is not part of the active Member Area.</div>
+<div class="tabs" id="adminTabs">
+<button class="active" data-tab="engine">Engine Control</button><button data-tab="subscription">Subscription & Payments</button><button data-tab="fees">Fee Configuration</button><button data-tab="members">Members & LIVE Access</button><button data-tab="treasury">Treasury & Wallets</button><button data-tab="traders">Trader Verification</button><button data-tab="audit">Audit & Risk</button><button data-tab="parked">Parked Modules</button>
+</div>
 
 <section class="card">
 <h2>Admin Authentication</h2>
@@ -20,22 +24,45 @@ body{font-family:system-ui;background:#090d18;color:#eef;margin:0}.wrap{max-widt
 <div id="status" style="margin-top:10px"></div>
 </section>
 
-<section class="card">
+<section class="card panel" data-panel="engine">
+<h2>Engine Control</h2>
+<div class="metric-grid"><div class="metric"><span>Execution mode</span><b id="engineMode">SHADOW</b></div><div class="metric"><span>Strategy</span><b>ORCA ↔ Raydium</b></div><div class="metric"><span>NET edge floor</span><b>0.20%</b></div><div class="metric"><span>LIVE authorization</span><b id="engineLive" class="warn">LOCKED</b></div></div>
+<p class="note">Control actions are backend-authoritative. Step 21 does not bypass signer/network/fund gates. LIVE activation remains unavailable until the final readiness/approval stage.</p>
+<div class="actions"><button onclick="setShadowScheduler(true)">Start SHADOW Worker</button><button onclick="setShadowScheduler(false)">Stop SHADOW Worker</button><button onclick="liveAction('REQUEST_LIVE')">Evaluate LIVE Readiness</button><button onclick="liveAction('RETURN_SHADOW')">Return SHADOW</button><button onclick="liveAction('KILL_LIVE')">Emergency Kill</button><button disabled title="Final approval gate required">Activate LIVE — LOCKED</button><button onclick="Promise.all([loadLiveControl(),loadRuntimeAdmin()])">Refresh</button></div>
+<div id="runtimeSummary" class="note" style="margin-top:10px">Runtime status not loaded.</div><div id="gateList" class="stack" style="margin-top:12px"></div><pre id="engineLog"></pre>
+</section>
+
+<section class="card panel" data-panel="subscription" hidden>
+<h2>Subscription & Payments</h2>
+<p class="note"><strong>SERVER-AUTHORITATIVE</strong>, versioned pricing only. Supported durations: 30 days / 90 days / 180 days / 360 days. Finalized Solana evidence required for USDC payment verification. Payment signatures are Database-enforced unique.</p>
+<div id="subscriptionSummary" class="warn">Connect Admin to load billing summary.</div><div id="subscriptionCatalog" class="package-grid" style="margin-top:12px"></div>
+<div class="card" style="margin-top:14px"><strong>Create New Price Version</strong><div class="grid"><label>Duration<select id="priceDuration"><option>30</option><option>90</option><option>180</option><option>360</option></select></label><label>Base Price (USDC)<input id="priceBase" type="text" placeholder="e.g. 35"></label><label>Discount (bps)<input id="priceDiscount" type="number" min="0" max="10000" value="0"></label><label><input id="priceActive" type="checkbox" checked> Activate this version</label></div><button onclick="createPriceVersion()">Create Version</button><div id="priceStatus" class="note" style="margin-top:8px"></div></div>
+<div id="subscriptionOrders" class="stack" style="margin-top:12px"></div>
+</section>
+
+<section class="card panel" data-panel="members" hidden>
+<h2>Members & LIVE Access</h2>
+<p class="note">Member Area remains exactly five menus: Dashboard, Auto Trade, Performance, Subscription, Account. Admin can inspect account status, subscription, delegated authority and Auto Trade state. LIVE remains fail-closed.</p>
+<button onclick="loadMembers()">Refresh Members</button><div id="membersList" style="margin-top:10px" class="warn">Connect Admin to load members.</div>
+</section>
+
+<section class="card panel" data-panel="traders" hidden>
 <h2>Trader Applications & Verification</h2>
 <p class="note">Onboarding approval does not publish a trader. Automatic collection records only auditable provenance. Performance evidence from reconciled trades must still be explicitly verified, and publication is a separate action. None of these steps enables LIVE execution.</p>
 <button onclick="loadTraderApps()">Refresh Applications</button>
 <div id="traderApps" class="warn" style="margin-top:10px">Connect Admin to load the trader queue.</div>
 </section>
 
-<section class="card">
-<h2>Follower Copy Mandates</h2>
-<p class="note">All mandates remain SHADOW with live_execution_authorized=false. Admin can inspect or pause/resume them for safety. CANCELLED mandates are terminal and cannot be reactivated. Admin cannot convert a mandate to LIVE.</p>
+<section class="card panel" data-panel="parked" hidden>
+<h2>PARKED — Follower Copy Mandates</h2>
+<p class="note">PARKED MODULE. This legacy Copy Trade control is preserved for safety/inspection only and is not part of the active Member Area. All mandates remain SHADOW with live_execution_authorized=false. Admin can inspect or pause/resume them for safety. CANCELLED mandates are terminal and cannot be reactivated. Admin cannot convert a mandate to LIVE.</p>
 <button onclick="loadCopyPolicies()">Refresh Mandates</button>
 <div id="copyPolicies" class="warn" style="margin-top:10px">Connect Admin to load copy mandates.</div>
 </section>
 
-<section class="card">
-<h2>Wallet Infrastructure</h2>
+<section class="card panel" data-panel="treasury" hidden>
+<h2>Treasury & Payment Monitoring</h2>
+<p class="note">Wallet infrastructure and treasury/payment destinations are controlled here. Public addresses only; payment monitoring remains evidence-based.</p>
 <p class="danger"><strong>PUBLIC ADDRESS / PUBLIC KEY ONLY.</strong> Never enter a seed phrase, private key, hardware-wallet secret, or recovery phrase into AETHER Admin.</p>
 <p>User, follower, and trader wallets remain self-custodied and are not entered on this page.</p>
 <div id="walletReadiness" class="warn">Connect Admin to view wallet readiness.</div>
@@ -51,8 +78,8 @@ body{font-family:system-ui;background:#090d18;color:#eef;margin:0}.wrap{max-widt
 <div id="walletStatus" style="margin-top:10px"></div>
 </section>
 
-<section class="card">
-<h2>Revenue & Rental</h2>
+<section class="card panel" data-panel="fees" hidden>
+<h2>Fee Configuration</h2>
 <div id="current">Connect Admin to load configuration.</div>
 <div class="grid">
 <label>Performance Fee (%)<input id="perf" type="number" min="0" max="100" step="0.01"><span class="note">Fee on net realized profit.</span></label>
@@ -60,10 +87,10 @@ body{font-family:system-ui;background:#090d18;color:#eef;margin:0}.wrap{max-widt
 <label>Execution Rental (%) / month<input id="rental" type="number" min="0" max="100" step="0.01"><span class="note">Monthly access rental for the Execution Engine.</span></label>
 </div>
 <label><input id="enabled" type="checkbox"> Revenue & fee system enabled</label>
-<button onclick="saveFees()">Save Configuration</button>
+<button onclick="saveFees()">Apply SHADOW Fee Version</button><button onclick="loadFeeHistory()">Refresh Version History</button><div class="note">Creates an audited, versioned SHADOW fee configuration. The legacy direct PATCH route stays blocked; this action cannot authorize LIVE, signing, submission or fund movement.</div><div id="feeHistory" class="stack" style="margin-top:10px"></div>
 </section>
 
-<section class="card">
+<section class="card panel" data-panel="audit" hidden>
 <h2>Risk / Audit</h2>
 <button onclick="loadLogs()">Refresh</button>
 <pre id="logs"></pre>
@@ -78,7 +105,7 @@ const pct=b=>((Number(b)||0)/100).toFixed(2);
 const walletRoles=['TREASURY_MULTISIG','FEE_COLLECTOR','EXECUTION_AUTHORITY','EMERGENCY_MULTISIG','OPERATIONS_FEE_PAYER','PROGRAM_UPGRADE_AUTHORITY'];
 async function api(url,opt={}){const r=await fetch(url,{...opt,headers:{...hdr(),...(opt.headers||{})}});const b=await r.json().catch(()=>({error:'invalid_response'}));if(!r.ok)throw Error(b.error||r.status);return b}
 function showReadiness(r){const ok=r.wallet_layer_ready_for_live;$('#walletReadiness').className=ok?'ok':'warn';$('#walletReadiness').textContent=(ok?'Wallet layer complete':'Wallet layer incomplete')+' • '+r.required_configured+'/'+r.required_total+' required configured'+(r.missing_roles?.length?' • missing: '+r.missing_roles.join(', '):'')+' • LIVE authorized=false';}
-async function loadAdmin(){token=$('#token').value.trim();if(!token){$('#status').innerHTML='<span class="warn">Enter ADMIN_API_TOKEN.</span>';return}try{const [f,e,w]=await Promise.all([api('/api/marketplace/fees'),api('/api/execution/status'),api('/api/admin/wallets')]);$('#perf').value=pct(f.config.performance_fee_bps);$('#exec').value=pct(f.config.execution_fee_bps);$('#rental').value=pct(f.config.execution_rental_fee_bps);$('#enabled').checked=f.config.enabled;$('#current').innerHTML='<span class="ok">Connected</span> • '+(e.mode||'SHADOW')+' • live='+e.live_enabled+' • fail-closed='+e.fail_closed;for(const item of w.items){const el=$('#w_'+item.role);if(el)el.value=item.public_address||''}showReadiness(w.readiness);$('#status').innerHTML='<span class="ok">Admin connected.</span>';await Promise.all([loadTraderApps(),loadCopyPolicies(),loadLogs()])}catch(err){$('#status').innerHTML='<span class="warn">'+err.message+'</span>'}}
+async function loadAdmin(){token=$('#token').value.trim();if(!token){$('#status').innerHTML='<span class="warn">Enter ADMIN_API_TOKEN.</span>';return}try{const [f,e,w]=await Promise.all([api('/api/marketplace/fees'),api('/api/execution/status'),api('/api/admin/wallets')]);$('#perf').value=pct(f.config.performance_fee_bps);$('#exec').value=pct(f.config.execution_fee_bps);$('#rental').value=pct(f.config.execution_rental_fee_bps);$('#enabled').checked=f.config.enabled;$('#current').innerHTML='<span class="ok">Connected</span> • '+(e.mode||'SHADOW')+' • live='+e.live_enabled+' • fail-closed='+e.fail_closed;for(const item of w.items){const el=$('#w_'+item.role);if(el)el.value=item.public_address||''}showReadiness(w.readiness);$('#status').innerHTML='<span class="ok">Admin connected.</span>';await Promise.all([loadTraderApps(),loadCopyPolicies(),loadLogs(),loadLiveControl(),loadRuntimeAdmin(),loadSubscriptionAdmin(),loadMembers(),loadFeeHistory()])}catch(err){$('#status').innerHTML='<span class="warn">'+err.message+'</span>'}}
 function input(label,type,value=''){const wrap=document.createElement('label');wrap.textContent=label;const el=document.createElement(type==='textarea'?'textarea':type==='select'?'select':'input');if(type!=='textarea'&&type!=='select')el.type=type;el.value=value;wrap.appendChild(el);return {wrap,el}}
 function traderApplicationCard(item){
  const wrap=document.createElement('div');wrap.className='application';
@@ -139,8 +166,22 @@ function mandateCard(item){const d=document.createElement('div');d.className='ma
 async function loadCopyPolicies(){if(!token)return;const host=$('#copyPolicies');host.className='';host.textContent='Loading…';try{const b=await api('/api/admin/copy-policies');host.textContent='';if(!b.items?.length){host.className='note';host.textContent='No copy mandates yet.';return}for(const item of b.items)host.appendChild(mandateCard(item))}catch(err){host.className='warn';host.textContent=err.message}}
 async function adminToggleMandate(id,enabled){try{await api('/api/admin/copy-policies/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({enabled})});await Promise.all([loadCopyPolicies(),loadLogs()])}catch(err){$('#status').innerHTML='<span class="warn">'+err.message+'</span>'}}
 async function saveWallets(){if(!token){$('#walletStatus').innerHTML='<span class="warn">Connect Admin first.</span>';return}try{let saved=0,lastReadiness=null;for(const role of walletRoles){const address=$('#w_'+role).value.trim();if(!address)continue;const b=await api('/api/admin/wallets/'+role,{method:'PUT',body:JSON.stringify({public_address:address,enabled:true})});lastReadiness=b.readiness;saved++}if(!saved){$('#walletStatus').innerHTML='<span class="warn">No public address was entered.</span>';return}if(lastReadiness)showReadiness(lastReadiness);$('#walletStatus').innerHTML='<span class="ok">Saved '+saved+' wallet role(s). No private keys stored.</span>';await loadLogs()}catch(err){$('#walletStatus').innerHTML='<span class="warn">'+err.message+'</span>'}}
-async function saveFees(){try{const b=await api('/api/admin/fees',{method:'PATCH',body:JSON.stringify({performance_fee_bps:bps($('#perf').value),execution_fee_bps:bps($('#exec').value),execution_rental_fee_bps:bps($('#rental').value),enabled:$('#enabled').checked})});$('#current').innerHTML='<span class="ok">Saved</span> • Performance '+pct(b.config.performance_fee_bps)+'% • Execution '+pct(b.config.execution_fee_bps)+'% • Rental '+pct(b.config.execution_rental_fee_bps)+'%/month';await loadLogs()}catch(err){$('#status').innerHTML='<span class="warn">'+err.message+'</span>'}}
+async function saveFees(){if(!token){$('#status').innerHTML='<span class="warn">Connect Admin first.</span>';return}if(!window.confirm('Apply this fee configuration as a new audited SHADOW version? LIVE remains OFF.'))return;try{const b=await api('/api/admin/fees/apply-shadow',{method:'POST',body:JSON.stringify({performance_fee_bps:bps($('#perf').value),execution_fee_bps:bps($('#exec').value),execution_rental_fee_bps:bps($('#rental').value),enabled:$('#enabled').checked,confirm_shadow_only:true})});$('#current').innerHTML='<span class="ok">Applied version '+b.version.version_number+'</span> • Performance '+pct(b.config.performance_fee_bps)+'% • Execution '+pct(b.config.execution_fee_bps)+'% • Rental '+pct(b.config.execution_rental_fee_bps)+'%/month • LIVE authorized=false';await Promise.all([loadFeeHistory(),loadLogs()])}catch(err){$('#status').innerHTML='<span class="warn">'+err.message+'</span>'}}
+async function loadFeeHistory(){if(!token)return;const host=$('#feeHistory');try{const d=await api('/api/admin/fees/history');host.textContent='';for(const v of d.items||[]){const row=document.createElement('div');row.className='member-row';row.textContent=`v${v.version_number} · performance ${pct(v.performance_fee_bps)}% · execution ${pct(v.execution_fee_bps)}% · rental ${pct(v.execution_rental_fee_bps)}%/month · ${v.enabled?'enabled':'disabled'} · ${v.created_at} · LIVE authorized=false`;host.appendChild(row)}}catch(err){host.textContent=err.message}}
 async function loadLogs(){if(!token)return;try{const [r,a]=await Promise.all([api('/api/admin/risk'),api('/api/admin/audit')]);$('#logs').textContent=JSON.stringify({risk:r.items,audit:a.items},null,2)}catch(err){$('#logs').textContent=err.message}}
+async function loadLiveControl(){if(!token)return;try{const d=await api('/api/admin/live-control');const g=d.gate||{},st=g.state||{};$('#engineMode').textContent=d.effective_mode||st.execution_mode||'SHADOW';$('#engineLive').textContent=g.live_execution_authorized===true?'AUTHORIZED':'LOCKED';$('#engineLive').className=g.live_execution_authorized===true?'ok':'warn';const labels={execution_mode:'Execution mode',live_enabled:'LIVE enabled',readiness_passed:'Readiness passed',admin_live_approved:'Admin approved',signer_unlocked:'Signer unlocked',network_submission_enabled:'Network submission',fund_movement_enabled:'Fund movement',emergency_kill_switch:'Emergency kill'};const host=$('#gateList');host.textContent='';for(const [k,label] of Object.entries(labels)){const row=document.createElement('div');row.className='member-row';row.textContent=label+': '+String(st[k]??'—');host.appendChild(row)}$('#engineLog').textContent=JSON.stringify({message:d.message,fail_closed:d.fail_closed,runtime_mutation_applied:d.runtime_mutation_applied,live_execution_authorized:g.live_execution_authorized===true},null,2)}catch(err){$('#engineLog').textContent=err.message}}
+async function liveAction(action){if(!token){$('#engineLog').textContent='Connect Admin first.';return}try{const d=await api('/api/admin/live-control',{method:'POST',body:JSON.stringify({action})});$('#engineLog').textContent=JSON.stringify(d,null,2);await Promise.all([loadLiveControl(),loadLogs()])}catch(err){$('#engineLog').textContent='Fail-closed: '+err.message;await loadLiveControl().catch(()=>{})}}
+async function loadRuntimeAdmin(){if(!token)return;try{const d=await api('/api/admin/runtime');const s=d.member_autotrade_scheduler||{};const counts=(d.member_state_counts||[]).map(x=>x.state+'='+x.count).join(' · ')||'no member states';$('#runtimeSummary').className=s.enabled?'ok':'note';$('#runtimeSummary').textContent=`SHADOW worker ${s.enabled?'RUNNING':'STOPPED'} · interval ${s.interval_ms||'—'} ms · ${counts} · min NET edge 0.20% · LIVE authorized=false`;}catch(err){$('#runtimeSummary').className='warn';$('#runtimeSummary').textContent=err.message}}
+async function setShadowScheduler(enabled){if(!token){$('#engineLog').textContent='Connect Admin first.';return}try{const d=await api('/api/admin/runtime/scheduler',{method:'POST',body:JSON.stringify({enabled})});$('#engineLog').textContent=`SHADOW worker ${d.scheduler?.enabled?'STARTED':'STOPPED'} · LIVE authorized=false`;await Promise.all([loadRuntimeAdmin(),loadLogs()])}catch(err){$('#engineLog').textContent='Scheduler change failed closed: '+err.message}}
+function atomicFromUsdc(value){const raw=String(value||'').trim();if(!/^\d+(?:\.\d{1,6})?$/.test(raw))throw Error('invalid_usdc_amount');const [w,f='']=raw.split('.');return (BigInt(w)*1000000n+BigInt((f+'000000').slice(0,6))).toString()}
+function fmtAtomic(value){try{const n=BigInt(String(value||0));return (Number(n)/1e6).toFixed(6).replace(/0+$/,'').replace(/\.$/,'')+' USDC'}catch{return'—'}}
+async function loadSubscriptionAdmin(){if(!token)return;try{const d=await api('/api/admin/subscriptions');const s=d.summary||{};$('#subscriptionSummary').className='ok';$('#subscriptionSummary').textContent=`Members ${s.members_total||0} · Active subscriptions ${s.subscriptions_active||0} · Pending orders ${s.pending_orders||0} · Verified payments ${s.verified_payments||0}`;const host=$('#subscriptionCatalog');host.textContent='';for(const p of d.catalog||[]){const card=document.createElement('div');card.className='package';card.innerHTML=`<strong>${p.duration_days} days · v${p.price_version}</strong><div>${fmtAtomic(p.final_price_usdc_atomic)}</div><div class="note">Base ${fmtAtomic(p.base_price_usdc_atomic)} · discount ${p.discount_bps} bps · ${p.active?'ACTIVE':'inactive'}</div>`;host.appendChild(card)}const orders=$('#subscriptionOrders');orders.textContent='';for(const o of d.recent_orders||[]){const row=document.createElement('div');row.className='member-row';row.textContent=`${o.duration_days}d · ${fmtAtomic(o.final_price_usdc_atomic)} · ${o.status} · ${o.member_wallet}`;orders.appendChild(row)}}catch(err){$('#subscriptionSummary').className='warn';$('#subscriptionSummary').textContent=err.message}}
+async function createPriceVersion(){if(!token){$('#priceStatus').textContent='Connect Admin first.';return}try{const body={duration_days:Number($('#priceDuration').value),base_price_usdc_atomic:atomicFromUsdc($('#priceBase').value),discount_bps:Number($('#priceDiscount').value||0),active:$('#priceActive').checked,promo_enabled:false};const d=await api('/api/admin/subscriptions/prices',{method:'POST',body:JSON.stringify(body)});$('#priceStatus').className='ok';$('#priceStatus').textContent=`Created ${d.price.duration_days}d version ${d.price.price_version} · ${fmtAtomic(d.price.final_price_usdc_atomic)}`;await Promise.all([loadSubscriptionAdmin(),loadLogs()])}catch(err){$('#priceStatus').className='warn';$('#priceStatus').textContent=err.message}}
+function memberCard(item){const row=document.createElement('div');row.className='member-row';const title=document.createElement('strong');title.textContent=item.display_name||item.username||item.wallet_address||item.user_id;row.appendChild(title);const meta=document.createElement('div');meta.className='note';meta.textContent=`${item.status} · subscription ${item.subscription_status||'NONE'} · authority ${item.authority_status||'NONE'} · Auto Trade ${item.autotrade_state||'STOPPED'} · wallet ${item.wallet_address||'—'} · LIVE authorized=false`;row.appendChild(meta);const actions=document.createElement('div');actions.className='actions';for(const status of ['ACTIVE','SUSPENDED','CLOSED']){if(status===item.status)continue;const b=document.createElement('button');b.textContent=status;b.onclick=()=>setMemberStatus(item.user_id,status);actions.appendChild(b)}row.appendChild(actions);return row}
+async function loadMembers(){if(!token)return;const host=$('#membersList');try{const d=await api('/api/admin/members');host.className='';host.textContent='';if(!d.items?.length){host.className='note';host.textContent='No members yet.';return}for(const item of d.items)host.appendChild(memberCard(item))}catch(err){host.className='warn';host.textContent=err.message}}
+async function setMemberStatus(userId,status){if(!window.confirm(`Set member ${userId} to ${status}?`))return;try{await api('/api/admin/members/'+encodeURIComponent(userId)+'/status',{method:'PATCH',body:JSON.stringify({status})});await Promise.all([loadMembers(),loadLogs()])}catch(err){$('#status').innerHTML='<span class="warn">'+err.message+'</span>'}}
+function selectAdminTab(name){document.querySelectorAll('#adminTabs [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('[data-panel]').forEach(p=>p.hidden=p.dataset.panel!==name)}
+document.querySelectorAll('#adminTabs [data-tab]').forEach(b=>b.addEventListener('click',()=>selectAdminTab(b.dataset.tab)));
 </script>
 </body>
 </html>

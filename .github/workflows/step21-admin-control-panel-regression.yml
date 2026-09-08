@@ -1,0 +1,26 @@
+name: Step 21 Admin Control Panel Regression
+
+on:
+  pull_request:
+    paths:
+      - 'web/admin.html'
+      - 'services/api/src/server.mjs'
+      - 'migrations/028_platform_fee_config_versions.sql'
+      - 'deploy/Caddyfile'
+      - 'deploy/vercel-direct-deploy-manifest.json'
+      - 'scripts/step21-admin-control-panel-regression.mjs'
+      - '.github/workflows/step21-admin-control-panel-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  admin-control-panel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/step21-admin-control-panel-regression.mjs
