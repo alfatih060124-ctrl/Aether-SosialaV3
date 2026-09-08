@@ -9,6 +9,45 @@ const LEGACY_ROUTE = '/api/autotrade/evaluate';
 const DEMO_STATE_ROUTE = '/api/account/auto-strategy/demo';
 const DEMO_SIMULATE_ROUTE = '/api/account/auto-strategy/simulate';
 const MARKET_SHADOW_ROUTE = '/api/account/auto-strategy/market-shadow';
+const auditedTerminalMarketShadowScans = new Set();
+
+function rememberTerminalMarketShadowAudit(scanId) {
+  if (!scanId) return;
+  auditedTerminalMarketShadowScans.add(scanId);
+  if (auditedTerminalMarketShadowScans.size > 256) {
+    auditedTerminalMarketShadowScans.delete(auditedTerminalMarketShadowScans.values().next().value);
+  }
+}
+
+async function appendMarketShadowAudit(repos, eventType, session, scan) {
+  if (!repos?.auditEvents?.append || !scan?.scan_id) return false;
+  try {
+    await repos.auditEvents.append({
+      event_type: eventType,
+      actor: session?.primary_wallet || session?.user_id || 'member',
+      entity_type: 'market_shadow_scan',
+      entity_id: scan.scan_id,
+      payload: {
+        status: scan.status,
+        duration_ms: scan.duration_ms ?? scan.observability?.current_scan_duration_ms ?? null,
+        scans_started: scan.observability?.scans_started ?? null,
+        scans_completed: scan.observability?.scans_completed ?? null,
+        scans_failed: scan.observability?.scans_failed ?? null,
+        candidates_scanned: scan.summary?.candidates_scanned ?? null,
+        qualified_count: scan.summary?.qualified_count ?? null,
+        min_expected_net_edge_bps: Math.max(20, Number(scan.min_expected_net_edge_bps || 20)),
+        mode: 'SHADOW',
+        execution_dispatched: false,
+        transaction_signed: false,
+        network_submission_authorized: false,
+        live_execution_authorized: false
+      }
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function statusFor(error) {
   const code = String(error?.message || '');
@@ -64,9 +103,27 @@ export async function handleMemberAutoTradeRoute({
         send(res, 401, { error: 'session_required', mode: 'SHADOW', live_execution_authorized: false });
         return true;
       }
-      const scan = req.method === 'POST' ? startMarketShadowRuntimeScan() : getMarketShadowRuntimeState();
+      const before = getMarketShadowRuntimeState();
+      const scan = req.method === 'POST' ? startMarketShadowRuntimeScan() : before;
+      let auditRecorded = false;
+      let auditEventType = null;
+      if (req.method === 'POST' && scan.status === 'RUNNING' && scan.scan_id && scan.scan_id !== before.scan_id) {
+        auditEventType = 'MARKET_SHADOW_SCAN_STARTED';
+        auditRecorded = await appendMarketShadowAudit(repos, auditEventType, session, scan);
+      } else if (req.method === 'GET' && ['COMPLETE', 'ERROR'].includes(scan.status) && scan.scan_id && !auditedTerminalMarketShadowScans.has(scan.scan_id)) {
+        auditEventType = scan.status === 'COMPLETE' ? 'MARKET_SHADOW_SCAN_COMPLETED' : 'MARKET_SHADOW_SCAN_FAILED';
+        auditRecorded = await appendMarketShadowAudit(repos, auditEventType, session, scan);
+        if (auditRecorded) rememberTerminalMarketShadowAudit(scan.scan_id);
+      }
       send(res, req.method === 'POST' ? 202 : 200, {
         scan,
+        observability: {
+          audit_recorded: auditRecorded,
+          audit_event_type: auditEventType,
+          runtime_metrics: scan.observability || null,
+          mode: 'SHADOW',
+          live_execution_authorized: false
+        },
         simulator_runtime: 'PRIMARY_VM_REAL_MARKET_SHADOW',
         authenticated_user_id: session.user_id,
         market_data_only: true,
