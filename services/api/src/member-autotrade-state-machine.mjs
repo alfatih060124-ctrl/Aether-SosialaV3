@@ -59,6 +59,17 @@ export function applyMemberAutoTradeCommand(snapshot, command, { now = new Date(
     } else {
       next.state = 'RUNNING_SCANNING';
     }
+  } else if (action === 'RECOVER_TIMEOUT') {
+    if (!['EXECUTING','SETTLING'].includes(current)) throw new Error('autotrade_recovery_state_conflict');
+    if (next.stop_requested) {
+      next.state = 'STOPPED';
+      next.stop_requested = false;
+      next.stopped_at = at;
+    } else {
+      next.state = 'PAUSED';
+      next.stop_requested = false;
+      next.paused_at = at;
+    }
   } else {
     throw new Error('autotrade_command_invalid');
   }
@@ -162,7 +173,7 @@ export async function commandMemberAutoTradeStateInternal(pool, userId, command,
 export const MEMBER_AUTOTRADE_STATE_MACHINE = Object.freeze({
   states: STATES,
   member_commands: Object.freeze(['START','STOP']),
-  internal_commands: Object.freeze(['PAUSE','FAIL','BEGIN_EXECUTION','BEGIN_SETTLING','SETTLED']),
+  internal_commands: Object.freeze(['PAUSE','FAIL','BEGIN_EXECUTION','BEGIN_SETTLING','SETTLED','RECOVER_TIMEOUT']),
   execution_mode: 'SHADOW',
   execution_dispatched: false,
   live_execution_authorized: false,

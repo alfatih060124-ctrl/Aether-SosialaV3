@@ -1,4 +1,4 @@
-const HARD_MIN_EXPECTED_NET_EDGE_BPS = 20;
+const HARD_MIN_EXPECTED_NET_EDGE_BPS = 0.5;
 
 function positiveBigInt(value, label) {
   const raw = String(value ?? '').trim();
@@ -34,11 +34,15 @@ function reportEntries(payload) {
   return rows;
 }
 
-function observedRouteAmmAddresses(payload) {
+function observedRouteAmmLabels(payload) {
   const routePlan = Array.isArray(payload?.routePlan) ? payload.routePlan : [];
-  return new Set(routePlan
-    .map(item => String(item?.swapInfo?.ammKey || '').trim())
-    .filter(Boolean));
+  const labels = new Map();
+  for (const item of routePlan) {
+    const amm = String(item?.swapInfo?.ammKey || '').trim();
+    const label = String(item?.swapInfo?.label || '').trim();
+    if (amm) labels.set(amm, label || null);
+  }
+  return labels;
 }
 
 export function rankCrossVenueReportPairs(quoteEvidence) {
@@ -48,8 +52,8 @@ export function rankCrossVenueReportPairs(quoteEvidence) {
   const sellInput = positiveBigInt(quoteEvidence?.sell?.in_amount, 'sell_input_amount_required');
   const buys = reportEntries(buyPayload);
   const sells = reportEntries(sellPayload);
-  const observedBuyAmms = observedRouteAmmAddresses(buyPayload);
-  const observedSellAmms = observedRouteAmmAddresses(sellPayload);
+  const observedBuyAmms = observedRouteAmmLabels(buyPayload);
+  const observedSellAmms = observedRouteAmmLabels(sellPayload);
   const rows = [];
 
   for (const buy of buys) {
@@ -66,6 +70,8 @@ export function rankCrossVenueReportPairs(quoteEvidence) {
       rows.push(Object.freeze({
         buy_amm_address: buy.amm_address,
         sell_amm_address: sell.amm_address,
+        buy_dex_label: observedBuyAmms.get(buy.amm_address) || null,
+        sell_dex_label: observedSellAmms.get(sell.amm_address) || null,
         buy_route_observed: buyRouteObserved,
         sell_route_observed: sellRouteObserved,
         routability_score: Number(buyRouteObserved) + Number(sellRouteObserved),
@@ -89,6 +95,7 @@ export function computeExecutableRoundTripEdgeBps(initialUsdcRaw, returnedUsdcRa
 }
 
 export function computeExactNetworkFeeBps({ exactRoundtripFeeLamports, solUsd, notionalUsdc }) {
+  if (exactRoundtripFeeLamports === null || exactRoundtripFeeLamports === undefined || exactRoundtripFeeLamports === '') return null;
   const lamports = Number(exactRoundtripFeeLamports);
   const solPrice = finitePositive(solUsd);
   const notional = finitePositive(notionalUsdc);
@@ -100,21 +107,33 @@ export function computeExactNetworkFeeBps({ exactRoundtripFeeLamports, solUsd, n
 export function finalizeExpectedNetEdge({
   grossExecutableSpreadBps,
   exactRoundtripFeeLamports,
+  exactAccountSetupLamports = null,
   solUsd,
   notionalUsdc,
   minimumNetEdgeBps = HARD_MIN_EXPECTED_NET_EDGE_BPS
 }) {
   const gross = Number(grossExecutableSpreadBps);
   const networkFeeBps = computeExactNetworkFeeBps({ exactRoundtripFeeLamports, solUsd, notionalUsdc });
+  const accountSetupBps = computeExactNetworkFeeBps({ exactRoundtripFeeLamports: exactAccountSetupLamports, solUsd, notionalUsdc });
   const requestedFloor = Number(minimumNetEdgeBps);
   const effectiveFloor = Number.isFinite(requestedFloor)
     ? Math.max(HARD_MIN_EXPECTED_NET_EDGE_BPS, requestedFloor)
     : HARD_MIN_EXPECTED_NET_EDGE_BPS;
 
+  // ATA/token-account rent is refundable rent-exempt capital, not a recurring
+  // trading expense. The SHADOW simulation owner can be missing ATAs that a real
+  // member wallet already has, so charging that reserve on every PAPER cycle is
+  // a false negative. Keep the reserve visible, but NET edge deducts only
+  // irreversible recurring execution costs. DEX fees and price impact are
+  // already embedded in the executable BUY/SELL quote outputs.
   if (!Number.isFinite(gross) || networkFeeBps === null) {
     return Object.freeze({
       gross_executable_spread_bps: Number.isFinite(gross) ? gross : null,
       exact_network_fee_bps: networkFeeBps,
+      exact_account_setup_bps: accountSetupBps,
+      exact_recurring_execution_cost_bps: networkFeeBps,
+      exact_total_execution_cost_bps: networkFeeBps,
+      setup_capital_verified: accountSetupBps !== null,
       expected_net_edge_bps: null,
       net_edge_costs_included: false,
       min_expected_net_edge_bps: effectiveFloor,
@@ -127,6 +146,10 @@ export function finalizeExpectedNetEdge({
   return Object.freeze({
     gross_executable_spread_bps: gross,
     exact_network_fee_bps: networkFeeBps,
+    exact_account_setup_bps: accountSetupBps,
+    exact_recurring_execution_cost_bps: networkFeeBps,
+    exact_total_execution_cost_bps: networkFeeBps,
+    setup_capital_verified: accountSetupBps !== null,
     expected_net_edge_bps: expected,
     net_edge_costs_included: true,
     min_expected_net_edge_bps: effectiveFloor,

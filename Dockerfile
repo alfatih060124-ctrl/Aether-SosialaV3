@@ -6,6 +6,7 @@ COPY services/api/src ./services/api/src
 COPY packages ./packages
 COPY migrations ./migrations
 COPY scripts ./scripts
+COPY public ./public
 COPY web ./web
 ENV NODE_ENV=production
 ENV PORT=8080

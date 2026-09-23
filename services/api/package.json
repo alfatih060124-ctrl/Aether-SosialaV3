@@ -2,7 +2,21 @@
   "name": "@aether/api",
   "private": true,
   "type": "module",
-  "scripts": {"start": "node src/server.mjs"},
-  "engines": {"node": ">=20"},
-  "dependencies": {"pg": "^8.16.3"}
+  "scripts": {
+    "start": "node src/server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@meteora-ag/dlmm": "1.9.14",
+    "@orca-so/whirlpools-client": "^7.0.0",
+    "@orca-so/whirlpools-core": "^3.1.1",
+    "@raydium-io/raydium-sdk-v2": "0.2.42-alpha",
+    "@solana/kit": "^5.5.1",
+    "@solana/spl-token": "0.4.15",
+    "@solana/web3.js": "1.98.4",
+    "bn.js": "^5.2.2",
+    "pg": "^8.16.3"
+  }
 }

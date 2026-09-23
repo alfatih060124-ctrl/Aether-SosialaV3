@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {createJitoReadonlyMarketSource} from '../services/api/src/jito-readonly-market-source.mjs';
+const calls=[];
+const fetchImpl=async(_url,init)=>{calls.push(JSON.parse(init.body));return {ok:true,json:async()=>({jsonrpc:'2.0',result:{value:[]}})};};
+const source=createJitoReadonlyMarketSource({fetchImpl});
+assert.equal(source.safety.read_only,true); assert.equal(source.safety.send_bundle,false); assert.equal(source.safety.send_transaction,false);
+await source.getInflightBundleStatuses(['a','b','c','d','e','f']);
+assert.equal(calls[0].method,'getInflightBundleStatuses'); assert.equal(calls[0].params[0].length,5);
+await source.getBundleStatuses(['x']); assert.equal(calls[1].method,'getBundleStatuses');
+console.log('PASS jito readonly market source regression');

@@ -1,0 +1,3 @@
+import assert from 'node:assert/strict'; import {createRaydiumReadonlyQuoteService} from '../services/api/src/raydium-readonly-quote.mjs';
+const s=createRaydiumReadonlyQuoteService({timeoutMs:1200}); assert.equal(s.safety.read_only,true); assert.equal(s.safety.transaction_submission,false); assert.equal(s.safety.signer_requested,false);
+const q=await s.quote({inputMint:'So11111111111111111111111111111111111111112',outputMint:'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',amount:'100000000'}); assert.equal(q.provider,'RAYDIUM'); assert.ok(BigInt(q.outputAmount)>0n); console.log('PASS raydium readonly quote regression',JSON.stringify({latency_ms:q.latency_ms,outputAmount:q.outputAmount}));

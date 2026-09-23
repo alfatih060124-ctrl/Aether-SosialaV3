@@ -26,4 +26,4 @@ for (const [name, file] of checks) {
   }
 }
 
-console.log(JSON.stringify({ status: 'PASS', schema: 'aether.step20.shadow-validation.v1', checks: results, mode: 'SHADOW', min_expected_net_edge_bps: 20, live_execution_authorized: false }, null, 2));
+console.log(JSON.stringify({ status: 'PASS', schema: 'aether.step20.shadow-validation.v1', checks: results, mode: 'SHADOW', min_expected_net_edge_bps: 0.5, live_execution_authorized: false }, null, 2));

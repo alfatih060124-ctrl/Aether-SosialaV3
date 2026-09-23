@@ -13,11 +13,23 @@ assert.equal(computeExactNetworkFeeBps({ exactRoundtripFeeLamports: 10000, solUs
 const ready = finalizeExpectedNetEdge({
   grossExecutableSpreadBps: 25,
   exactRoundtripFeeLamports: 10000,
+  exactAccountSetupLamports: 0,
   solUsd: 200,
   notionalUsdc: 100
 });
 assert.equal(ready.net_edge_costs_included, true);
 assert.equal(ready.expected_net_edge_bps, 24.8);
+assert.equal(ready.min_expected_net_edge_bps, 0.5);
+
+const unknownSetup = finalizeExpectedNetEdge({
+  grossExecutableSpreadBps: 25,
+  exactRoundtripFeeLamports: 10000,
+  solUsd: 200,
+  notionalUsdc: 100
+});
+assert.equal(unknownSetup.net_edge_costs_included, false);
+assert.equal(unknownSetup.expected_net_edge_bps, null);
+assert.equal(unknownSetup.net_edge_gate_passed, false);
 
 const incomplete = finalizeExpectedNetEdge({
   grossExecutableSpreadBps: 25,

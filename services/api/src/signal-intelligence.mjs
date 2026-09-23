@@ -1,4 +1,4 @@
-const HARD_MIN_EXPECTED_NET_EDGE_BPS = 20;
+const HARD_MIN_EXPECTED_NET_EDGE_BPS = 0.5;
 
 const finite = (value, fallback = null) => {
   const n = Number(value);

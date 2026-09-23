@@ -9,7 +9,7 @@ const state = runtime.getMarketShadowRuntimeState();
 
 assert.equal(state.status, 'IDLE');
 assert.equal(state.mode, 'SHADOW');
-assert.equal(state.min_expected_net_edge_bps, 20);
+assert.equal(state.min_expected_net_edge_bps, 0.5);
 assert.equal(state.live_execution_authorized, false);
 assert.equal(state.observability.scan_target_ms, 30000);
 assert.equal(state.observability.scans_started, 0);
@@ -17,8 +17,13 @@ assert.equal(state.observability.scans_completed, 0);
 assert.equal(state.observability.scans_failed, 0);
 assert.equal(state.observability.current_scan_duration_ms, null);
 assert.equal(state.observability.last_scan_duration_ms, null);
+assert.equal(state.observability.provider_rate_limit_events_total, 0);
+assert.equal(state.observability.provider_cooldown_active, false);
+assert.equal(state.observability.provider_cooldown_remaining_ms, 0);
+assert.equal(state.observability.last_rpc_provider_path, null);
+assert.equal(state.observability.last_rpc_primary_health, null);
 assert.equal(state.observability.mode, 'SHADOW');
-assert.equal(state.observability.min_expected_net_edge_bps, 20);
+assert.equal(state.observability.min_expected_net_edge_bps, 0.5);
 assert.equal(state.observability.live_execution_authorized, false);
 
 for (const required of [
@@ -39,10 +44,12 @@ for (const required of [
 ]) assert.ok(routeSource.includes(required), `audit trail missing ${required}`);
 
 for (const required of [
-  'id="scanDuration"',
-  'runtime scans',
-  'scan_target_ms',
-  'Runtime scan counters are observability',
+  'Observability Metrics',
+  'id="xStarted"',
+  'id="xComplete"',
+  'id="xFailed"',
+  'id="xDuration"',
+  'id="xEdge"',
   'SHADOW · LIVE OFF'
 ]) assert.ok(page.includes(required), `observability dashboard missing ${required}`);
 

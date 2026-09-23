@@ -53,6 +53,12 @@ assert.equal(accounting.profitable_cycles_delta, 1);
 assert.equal(accounting.execution_dispatched, false);
 assert.equal(accounting.funds_moved, false);
 assert.equal(accounting.live_execution_authorized, false);
+const meteoraResult = structuredClone(result);
+meteoraResult.assessment.arbitrage.buy_route.dex_id = 'Meteora DLMM';
+meteoraResult.assessment.arbitrage.sell_route.dex_id = 'Phoenix';
+const multiDexAccounting = derivePaperArbitrageAccounting({ result: meteoraResult, account: { cash_balance_usdc: 200 }, performanceFeeBps: 0 });
+assert.equal(multiDexAccounting.buy_dex, 'meteora');
+assert.equal(multiDexAccounting.sell_dex, 'phoenix');
 
 await assert.rejects(async () => derivePaperArbitrageAccounting({ result: { ...result, live_execution_authorized: true }, account: { cash_balance_usdc: 200 }, performanceFeeBps: 0 }), /paper_arbitrage_shadow_invariant_failed/);
 await assert.rejects(async () => derivePaperArbitrageAccounting({ result: { ...result, qualified: false }, account: { cash_balance_usdc: 200 }, performanceFeeBps: 0 }), /paper_arbitrage_qualified_settlement_required/);
@@ -99,6 +105,7 @@ assert.equal(queries.some(sql => sql.startsWith('INSERT INTO member_paper_arbitr
 
 assert.equal(PAPER_ARBITRAGE_PERSISTENCE.legacy_training_positions_reused, false);
 assert.equal(PAPER_ARBITRAGE_PERSISTENCE.transaction_count_cap, null);
+assert.deepEqual(PAPER_ARBITRAGE_PERSISTENCE.shadow_supported_dexes, ['orca','raydium','meteora','phoenix']);
 assert.equal(PAPER_ARBITRAGE_PERSISTENCE.idempotency_key_required, true);
 assert.equal(PAPER_ARBITRAGE_PERSISTENCE.performance_time_basis, 'OBSERVED_AT');
 assert.deepEqual(PAPER_ARBITRAGE_PERSISTENCE.performance_windows, ['TODAY','7D','30D','ALL_TIME']);

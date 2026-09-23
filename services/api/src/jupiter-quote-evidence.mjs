@@ -1,6 +1,7 @@
 import { normalizeSolanaMint } from './market-intelligence.mjs';
 
-const JUPITER_ORIGIN = 'https://api.jup.ag';
+const JUPITER_PRO_ORIGIN = 'https://api.jup.ag';
+const JUPITER_PUBLIC_ORIGIN = 'https://lite-api.jup.ag';
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
 function sleep(ms) {
@@ -38,27 +39,48 @@ function routeEvidence(payload) {
   };
 }
 
-async function getJson(fetchImpl, url, { apiKey, timeoutMs }) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const headers = { accept: 'application/json' };
-    if (apiKey) headers['x-api-key'] = apiKey;
-    const response = await fetchImpl(url, { headers, signal: controller.signal, redirect: 'error' });
-    if (response.status === 429) throw new Error('jupiter_quote_rate_limited');
-    if (!response.ok) throw new Error(`jupiter_quote_http_${response.status}`);
-    const body = await response.json();
-    if (!body || typeof body !== 'object') throw new Error('jupiter_quote_invalid_payload');
-    if (body.error) throw new Error('jupiter_quote_no_route');
-    positiveIntegerString(body.inAmount, 'jupiter_quote_invalid_in_amount');
-    positiveIntegerString(body.outAmount, 'jupiter_quote_invalid_out_amount');
-    return body;
-  } catch (error) {
-    if (error?.name === 'AbortError') throw new Error('jupiter_quote_timeout');
-    throw error;
-  } finally {
-    clearTimeout(timer);
+async function getJson(fetchImpl, url, { apiKey, timeoutMs, baseDelayMs = 2200, maxRetries = 4 }) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const headers = { accept: 'application/json' };
+      if (apiKey && url.origin === JUPITER_PRO_ORIGIN) headers['x-api-key'] = apiKey;
+      let response = await fetchImpl(url, { headers, signal: controller.signal, redirect: 'error' });
+      if ([401, 403, 429].includes(response.status) && apiKey) {
+        const fallbackOrigin = url.origin === JUPITER_PRO_ORIGIN ? JUPITER_PUBLIC_ORIGIN : JUPITER_PRO_ORIGIN;
+        const fallbackUrl = new URL(url.pathname + url.search, fallbackOrigin);
+        const fallbackHeaders = { accept: 'application/json' };
+        if (fallbackOrigin === JUPITER_PRO_ORIGIN) fallbackHeaders['x-api-key'] = apiKey;
+        response = await fetchImpl(fallbackUrl, { headers: fallbackHeaders, signal: controller.signal, redirect: 'error' });
+      }
+      if (response.status === 429) {
+        const retryAfter = Number(response.headers?.get?.('retry-after'));
+        const error = new Error('jupiter_quote_rate_limited');
+        error.retry_after_ms = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : null;
+        throw error;
+      }
+      if (!response.ok) throw new Error(`jupiter_quote_http_${response.status}`);
+      const body = await response.json();
+      if (!body || typeof body !== 'object') throw new Error('jupiter_quote_invalid_payload');
+      if (body.error) throw new Error('jupiter_quote_no_route');
+      positiveIntegerString(body.inAmount, 'jupiter_quote_invalid_in_amount');
+      positiveIntegerString(body.outAmount, 'jupiter_quote_invalid_out_amount');
+      return body;
+    } catch (error) {
+      lastError = error?.name === 'AbortError' ? new Error('jupiter_quote_timeout') : error;
+      const retryable = ['jupiter_quote_rate_limited', 'jupiter_quote_timeout'].includes(String(lastError?.message || lastError));
+      if (!retryable || attempt >= maxRetries) throw lastError;
+      const exponential = Math.min(20_000, Math.max(500, baseDelayMs) * (2 ** attempt));
+      const retryAfterMs = Number(lastError?.retry_after_ms || 0);
+      const jitterMs = Math.floor(Math.random() * 350);
+      await sleep(Math.max(exponential, retryAfterMs) + jitterMs);
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  throw lastError;
 }
 
 export function createJupiterQuoteEvidenceService({
@@ -66,25 +88,40 @@ export function createJupiterQuoteEvidenceService({
   apiKey = process.env.JUPITER_API_KEY || '',
   timeoutMs = 10_000,
   slippageBps = Number(process.env.SIGNAL_MAX_SLIPPAGE_BPS || 100),
-  interQuoteDelayMs = Number(process.env.AETHER_JUPITER_INTER_QUOTE_DELAY_MS || (process.env.JUPITER_API_KEY ? 1100 : 2200))
+  interQuoteDelayMs = Number(process.env.AETHER_JUPITER_INTER_QUOTE_DELAY_MS || (process.env.JUPITER_API_KEY ? 1100 : 2200)),
+  maxRetries = Number(process.env.AETHER_JUPITER_QUOTE_MAX_RETRIES || 4),
+  preferPublic = String(process.env.AETHER_JUPITER_PREFER_PUBLIC || 'false').toLowerCase() === 'true'
 } = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('fetch_unavailable');
   const safeSlippageBps = Number.isFinite(Number(slippageBps)) ? Math.min(500, Math.max(1, Math.trunc(Number(slippageBps)))) : 100;
-  const safeDelayMs = Number.isFinite(Number(interQuoteDelayMs)) ? Math.min(10_000, Math.max(500, Math.trunc(Number(interQuoteDelayMs)))) : 2200;
+  const safeDelayMs = Number.isFinite(Number(interQuoteDelayMs)) ? Math.min(10_000, Math.max(0, Math.trunc(Number(interQuoteDelayMs)))) : 2200;
+  const safeMaxRetries = Number.isSafeInteger(Number(maxRetries)) ? Math.min(4, Math.max(0, Number(maxRetries))) : 4;
+  const quoteCacheTtlMs = Math.min(5_000, Math.max(100, Number(process.env.AETHER_JUPITER_QUOTE_CACHE_TTL_MS || 500)));
+  const quoteCache = new Map();
 
   async function quote(inputMint, outputMint, amount) {
     const input = normalizeSolanaMint(inputMint);
     const output = normalizeSolanaMint(outputMint);
     const rawAmount = positiveIntegerString(amount, 'jupiter_quote_amount_required');
-    const url = new URL('/swap/v1/quote', JUPITER_ORIGIN);
+    const hasKey = Boolean(String(apiKey || '').trim());
+    const origin = preferPublic || !hasKey ? JUPITER_PUBLIC_ORIGIN : JUPITER_PRO_ORIGIN;
+    const url = new URL('/swap/v1/quote', origin);
     url.searchParams.set('inputMint', input);
     url.searchParams.set('outputMint', output);
     url.searchParams.set('amount', rawAmount);
     url.searchParams.set('slippageBps', String(safeSlippageBps));
     url.searchParams.set('restrictIntermediateTokens', 'true');
     url.searchParams.set('instructionVersion', 'V2');
-    const payload = await getJson(fetchImpl, url, { apiKey: String(apiKey || '').trim(), timeoutMs });
-    return {
+    const cacheKey = url.toString();
+    const cached = quoteCache.get(cacheKey);
+    if (cached && cached.expires_at > Date.now()) return cached.value;
+    const payload = await getJson(fetchImpl, url, {
+      apiKey: String(apiKey || '').trim(),
+      timeoutMs,
+      baseDelayMs: safeDelayMs,
+      maxRetries: safeMaxRetries
+    });
+    const result = {
       input_mint: input,
       output_mint: output,
       in_amount: payload.inAmount,
@@ -105,6 +142,8 @@ export function createJupiterQuoteEvidenceService({
       network_submission_authorized: false,
       live_execution_authorized: false
     };
+    quoteCache.set(cacheKey, { value: result, expires_at: Date.now() + quoteCacheTtlMs });
+    return result;
   }
 
   return Object.freeze({
@@ -113,7 +152,8 @@ export function createJupiterQuoteEvidenceService({
       const mint = normalizeSolanaMint(tokenMint);
       const initialUsdc = positiveIntegerString(usdcAmountRaw, 'jupiter_quote_usdc_amount_required');
       const buy = await quote(USDC_MINT, mint, initialUsdc);
-      await sleep(safeDelayMs);
+      // The sell amount depends on the fresh buy output, so this remains causally sequential,
+      // but there is no artificial sleep on the hot path. Provider backoff still handles 429s.
       const sell = await quote(mint, USDC_MINT, buy.out_amount);
       const initial = BigInt(initialUsdc);
       const returned = BigInt(sell.out_amount);

@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {evaluateRealMarketShadowTransaction} from '../services/api/src/real-market-shadow-candidate.mjs';
+const parsed={success:true,signature:'real-sig',slot:99,token_mints:['MintA','MintB','MintA']};
+const report={info:{AmmA:'100',AmmB:'101'}};
+const quoteService={getUsdcRoundTripEvidence:async mint=>({roundtrip_quote_edge_bps:mint==='MintA'?7:-3,buy:{in_amount:'100',provider_quote_response:{mostReliableAmmsQuoteReport:report,routePlan:[]}},sell:{in_amount:'100',provider_quote_response:{mostReliableAmmsQuoteReport:report,routePlan:[]}}})};
+const r=await evaluateRealMarketShadowTransaction(parsed,{quoteService,minimumNetEdgeBps:0.5});
+assert.equal(r.candidates.length,2);assert.equal(r.approval_key,'POST_COST_NET_EDGE');
+assert.equal(r.token_universe_policy,'ALL_MINTS_OBSERVED_IN_REAL_TRANSACTION');
+assert.ok(r.candidates.every(x=>x.approved===false&&x.approval_state==='PENDING_COST_EVIDENCE'));
+assert.ok(r.candidates.every(x=>x.market_source==='SOLANA_RPC_REAL_TRANSACTION'));
+console.log('PASS real market shadow candidate regression');

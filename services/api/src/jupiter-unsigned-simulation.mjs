@@ -1,6 +1,7 @@
 import { normalizeSolanaMint } from './market-intelligence.mjs';
 
-const JUPITER_ORIGIN = 'https://api.jup.ag';
+const JUPITER_PRO_ORIGIN = 'https://api.jup.ag';
+const JUPITER_PUBLIC_ORIGIN = 'https://lite-api.jup.ag';
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -48,7 +49,7 @@ async function postJson(fetchImpl, url, body, { apiKey, timeoutMs }) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const headers = { accept: 'application/json', 'content-type': 'application/json' };
-    if (apiKey) headers['x-api-key'] = apiKey;
+    if (apiKey && url.origin === JUPITER_PRO_ORIGIN) headers['x-api-key'] = apiKey;
     const response = await fetchImpl(url, {
       method: 'POST',
       headers,
@@ -56,6 +57,21 @@ async function postJson(fetchImpl, url, body, { apiKey, timeoutMs }) {
       signal: controller.signal,
       redirect: 'error'
     });
+    if ([401, 403, 429].includes(response.status) && apiKey) {
+      const fallbackOrigin = url.origin === JUPITER_PRO_ORIGIN ? JUPITER_PUBLIC_ORIGIN : JUPITER_PRO_ORIGIN;
+      const fallbackUrl = new URL(url.pathname + url.search, fallbackOrigin);
+      const fallbackHeaders = { accept: 'application/json', 'content-type': 'application/json' };
+      if (fallbackOrigin === JUPITER_PRO_ORIGIN) fallbackHeaders['x-api-key'] = apiKey;
+      const fallbackResponse = await fetchImpl(fallbackUrl, {
+        method: 'POST',
+        headers: fallbackHeaders,
+        body: JSON.stringify(body), signal: controller.signal, redirect: 'error'
+      });
+      if (fallbackResponse.ok) {
+        const fallbackPayload = await fallbackResponse.json();
+        if (fallbackPayload && typeof fallbackPayload === 'object' && fallbackPayload.swapTransaction) return fallbackPayload;
+      }
+    }
     if (response.status === 429) throw new Error('jupiter_swap_rate_limited');
     if (!response.ok) throw new Error(`jupiter_swap_http_${response.status}`);
     const payload = await response.json();
@@ -135,7 +151,8 @@ export function createJupiterUnsignedSimulationService({
   simulationPublicKey = process.env.AETHER_SHADOW_SIMULATION_PUBLIC_KEY || '',
   timeoutMs = 12_000,
   interSwapDelayMs = Number(process.env.AETHER_JUPITER_INTER_SWAP_DELAY_MS || (process.env.JUPITER_API_KEY ? 1300 : 2600)),
-  maxSwapRetries = Number(process.env.AETHER_JUPITER_SWAP_MAX_RETRIES || 3)
+  maxSwapRetries = Number(process.env.AETHER_JUPITER_SWAP_MAX_RETRIES || 3),
+  preferPublic = String(process.env.AETHER_JUPITER_PREFER_PUBLIC || 'false').toLowerCase() === 'true'
 } = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('fetch_unavailable');
   const rpcEndpoint = httpsUrl(endpoint, 'solana_rpc_url_required');
@@ -143,11 +160,12 @@ export function createJupiterUnsignedSimulationService({
   if (!rawPublicKey) throw new Error('shadow_simulation_public_key_required');
   const userPublicKey = normalizeSolanaMint(rawPublicKey);
   const safeApiKey = String(apiKey || '').trim();
-  const safeDelayMs = Number.isFinite(Number(interSwapDelayMs)) ? Math.min(15_000, Math.max(1000, Math.trunc(Number(interSwapDelayMs)))) : 1300;
+  const safeDelayMs = Number.isFinite(Number(interSwapDelayMs)) ? Math.min(15_000, Math.max(0, Math.trunc(Number(interSwapDelayMs)))) : 1300;
   const safeMaxRetries = Number.isSafeInteger(Number(maxSwapRetries)) ? Math.min(5, Math.max(0, Number(maxSwapRetries))) : 3;
 
   async function buildSwapWithBackoff(quoteResponse) {
-    const url = new URL('/swap/v1/swap', JUPITER_ORIGIN);
+    const origin = preferPublic || !safeApiKey ? JUPITER_PUBLIC_ORIGIN : JUPITER_PRO_ORIGIN;
+    const url = new URL('/swap/v1/swap', origin);
     let lastError = null;
     for (let attempt = 0; attempt <= safeMaxRetries; attempt += 1) {
       try {
@@ -183,7 +201,8 @@ export function createJupiterUnsignedSimulationService({
       }], timeoutMs)
     ]);
 
-    const lamports = Number(feeResult?.value);
+    const rawFeeLamports = feeResult?.value;
+    const lamports = rawFeeLamports === null || rawFeeLamports === undefined ? NaN : Number(rawFeeLamports);
     const exactFeeLamports = Number.isSafeInteger(lamports) && lamports >= 0 ? lamports : null;
     const sim = simulationResult(simulation);
     const state = classifySimulationState(sim);
@@ -224,11 +243,16 @@ export function createJupiterUnsignedSimulationService({
     user_public_key: userPublicKey,
     inter_swap_delay_ms: safeDelayMs,
     swap_max_retries: safeMaxRetries,
+    async observeLeg(quoteEvidence) {
+      return buildAndObserve(quoteEvidence);
+    },
     async observeRoundTrip(quoteEvidence) {
-      await sleep(safeDelayMs);
-      const buy = await buildAndObserve(quoteEvidence?.buy);
-      await sleep(safeDelayMs);
-      const sell = await buildAndObserve(quoteEvidence?.sell);
+      // PAPER/SHADOW observation has no signing or submission dependency between legs.
+      // Build/simulate both unsigned legs concurrently to keep quote age low.
+      const [buy, sell] = await Promise.all([
+        buildAndObserve(quoteEvidence?.buy),
+        buildAndObserve(quoteEvidence?.sell)
+      ]);
       const buyFee = buy.exact_fee_lamports;
       const sellFee = sell.exact_fee_lamports;
       const accountStateAvailable = Boolean(buy.simulation_account_state_available && sell.simulation_account_state_available);
