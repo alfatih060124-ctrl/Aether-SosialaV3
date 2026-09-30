@@ -1,6 +1,21 @@
 import { randomUUID } from 'node:crypto';
 
-const EXECUTION_STATUSES = new Set(['PENDING', 'QUEUED', 'SIMULATED', 'EXECUTED', 'REJECTED', 'FAILED']);
+const LEGACY_EXECUTION_STATUSES = new Set(['PENDING', 'QUEUED', 'EXECUTED']);
+export const CANONICAL_EXECUTION_STATES = Object.freeze(['CREATED','RISK_CHECKED','QUOTED','SIMULATED','AUTHORIZED','DISPATCHED','CONFIRMED','RECONCILED','REJECTED','FAILED']);
+const CANONICAL_EXECUTION_STATE_SET = new Set(CANONICAL_EXECUTION_STATES);
+const EXECUTION_STATUSES = new Set([...LEGACY_EXECUTION_STATUSES, ...CANONICAL_EXECUTION_STATES]);
+const CANONICAL_TRANSITIONS = Object.freeze({
+  CREATED: new Set(['RISK_CHECKED','REJECTED','FAILED']),
+  RISK_CHECKED: new Set(['QUOTED','REJECTED','FAILED']),
+  QUOTED: new Set(['SIMULATED','REJECTED','FAILED']),
+  SIMULATED: new Set(['AUTHORIZED','REJECTED','FAILED']),
+  AUTHORIZED: new Set(['DISPATCHED','REJECTED','FAILED']),
+  DISPATCHED: new Set(['CONFIRMED','FAILED']),
+  CONFIRMED: new Set(['RECONCILED','FAILED']),
+  RECONCILED: new Set(),
+  REJECTED: new Set(),
+  FAILED: new Set()
+});
 const EXECUTION_MODES = new Set(['SHADOW', 'PAPER', 'LIVE']);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -8,6 +23,10 @@ const assertUUID = (value, field) => {
   if (typeof value !== 'string' || !UUID_RE.test(value)) {
     throw new Error(`invalid_${field}_uuid`);
   }
+};
+
+const assertCanonicalState = (state) => {
+  if (!CANONICAL_EXECUTION_STATE_SET.has(state)) throw new Error('invalid_canonical_execution_state');
 };
 
 export function createExecutionRequestRepository(pool) {
@@ -90,6 +109,28 @@ export function createExecutionRequestRepository(pool) {
         'UPDATE execution_requests SET status=$2,updated_at=now() WHERE execution_request_id=$1 RETURNING *',
         [id, status]
       )).rows[0] ?? null;
+    },
+    async transitionCanonicalState(id, expectedState, nextState) {
+      assertUUID(id, 'execution_request_id');
+      assertCanonicalState(expectedState);
+      assertCanonicalState(nextState);
+      if (!CANONICAL_TRANSITIONS[expectedState].has(nextState)) throw new Error('invalid_execution_transition');
+
+      const result = await pool.query(
+        `UPDATE execution_requests
+            SET status=$3,updated_at=now()
+          WHERE execution_request_id=$1 AND status=$2
+          RETURNING *`,
+        [id, expectedState, nextState]
+      );
+      if (result.rows[0]) return result.rows[0];
+
+      const current = await pool.query(
+        'SELECT status FROM execution_requests WHERE execution_request_id=$1',
+        [id]
+      );
+      if (!current.rows[0]) throw new Error('execution_request_not_found');
+      throw new Error('execution_state_conflict');
     }
   };
 }
