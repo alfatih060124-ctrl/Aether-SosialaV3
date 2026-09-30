@@ -1,0 +1,30 @@
+name: Exact Reconciled Metrics Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/trader-evidence-collector.mjs'
+      - 'scripts/exact-reconciled-metrics-regression.mjs'
+      - '.github/workflows/exact-reconciled-metrics-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/api/src/trader-evidence-collector.mjs'
+      - 'scripts/exact-reconciled-metrics-regression.mjs'
+      - '.github/workflows/exact-reconciled-metrics-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: node --check services/api/src/trader-evidence-collector.mjs && node --check scripts/exact-reconciled-metrics-regression.mjs
+      - name: Run regression
+        run: node scripts/exact-reconciled-metrics-regression.mjs

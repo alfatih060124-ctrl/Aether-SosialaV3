@@ -4,7 +4,7 @@ const SOURCES = new Set(['SOLANA_RPC','SOLSCAN','INDEXER','INTERNAL_RECONCILIATI
 
 function int(value, name, min, max) {
   const n = Number(value);
-  if (!Number.isInteger(n) || n < min || n > max) throw new Error(`invalid_${name}`);
+  if (!Number.isSafeInteger(n) || n < min || n > max) throw new Error(`invalid_${name}`);
   return n;
 }
 
@@ -12,6 +12,24 @@ function text(value, name, min, max) {
   const s = String(value ?? '').trim();
   if (s.length < min || s.length > max) throw new Error(`invalid_${name}`);
   return s;
+}
+
+function floorDiv(numerator, denominator) {
+  if (denominator <= 0n) throw new Error('invalid_metric_denominator');
+  let quotient = numerator / denominator;
+  const remainder = numerator % denominator;
+  if (remainder < 0n) quotient -= 1n;
+  return quotient;
+}
+
+function roundRatio(numerator, denominator) {
+  return floorDiv((2n * numerator) + denominator, 2n * denominator);
+}
+
+function metricNumber(value, name) {
+  const n = Number(value);
+  if (!Number.isSafeInteger(n)) throw new Error(`invalid_${name}`);
+  return n;
 }
 
 export function normalizeEvidenceReference({ sourceType, reference }) {
@@ -31,22 +49,23 @@ export function calculateReconciledMetrics(trades = []) {
     equity_after_minor: int(trade.equity_after_minor, `trade_${i}_equity_after_minor`, 1, 9_000_000_000_000_000)
   }));
 
-  const capital = rows.reduce((sum, row) => sum + row.capital_minor, 0);
-  const pnl = rows.reduce((sum, row) => sum + row.realized_pnl_minor, 0);
+  const capital = rows.reduce((sum, row) => sum + BigInt(row.capital_minor), 0n);
+  const pnl = rows.reduce((sum, row) => sum + BigInt(row.realized_pnl_minor), 0n);
   const wins = rows.filter(row => row.realized_pnl_minor > 0).length;
-  let peak = rows[0].equity_after_minor;
-  let maxDrawdownBps = 0;
+  let peak = BigInt(rows[0].equity_after_minor);
+  let maxDrawdownBps = 0n;
   for (const row of rows) {
-    peak = Math.max(peak, row.equity_after_minor);
-    const dd = Math.round(((peak - row.equity_after_minor) * 10_000) / peak);
-    maxDrawdownBps = Math.max(maxDrawdownBps, dd);
+    const equity = BigInt(row.equity_after_minor);
+    if (equity > peak) peak = equity;
+    const dd = roundRatio((peak - equity) * 10_000n, peak);
+    if (dd > maxDrawdownBps) maxDrawdownBps = dd;
   }
 
   return {
     trades_count: rows.length,
-    total_return_bps: Math.round((pnl * 10_000) / capital),
-    win_rate_bps: Math.round((wins * 10_000) / rows.length),
-    drawdown_bps: maxDrawdownBps
+    total_return_bps: metricNumber(roundRatio(pnl * 10_000n, capital), 'total_return_bps'),
+    win_rate_bps: metricNumber(roundRatio(BigInt(wins) * 10_000n, BigInt(rows.length)), 'win_rate_bps'),
+    drawdown_bps: metricNumber(maxDrawdownBps, 'drawdown_bps')
   };
 }
 
