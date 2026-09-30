@@ -1,0 +1,21 @@
+name: Source Reference Regression
+
+on:
+  pull_request:
+    paths:
+      - 'packages/data-evidence/source-reference.mjs'
+      - 'scripts/source-reference-regression.mjs'
+      - '.github/workflows/source-reference-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-reference-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/source-reference-regression.mjs
