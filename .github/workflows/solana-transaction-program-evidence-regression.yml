@@ -1,0 +1,25 @@
+name: Solana Transaction Program Evidence Regression
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/src/solana-transaction-program-evidence.mjs'
+      - 'scripts/regression-solana-transaction-program-evidence.mjs'
+      - '.github/workflows/solana-transaction-program-evidence-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: node --check services/api/src/solana-transaction-program-evidence.mjs && node --check scripts/regression-solana-transaction-program-evidence.mjs
+      - name: Run synthetic fail-closed regression
+        run: node scripts/regression-solana-transaction-program-evidence.mjs
