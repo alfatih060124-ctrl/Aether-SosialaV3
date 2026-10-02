@@ -1,119 +1,74 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Connect Wallet — AETHER</title>
-<meta name="description" content="Create or access an AETHER account with a Solana wallet signature. Non-custodial wallet ownership verification only; no trade or fund movement is authorized.">
-<meta name="robots" content="noindex,nofollow">
-<meta name="theme-color" content="#07111f">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Connect AETHER Wallet — AITrade AETHER</title>
+<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#030303">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
-:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f5f8ff;background:#07111f}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 75% 10%,rgba(52,108,176,.18),transparent 31%),radial-gradient(circle at 20% 30%,rgba(35,179,145,.12),transparent 30%),#07111f}.shell{max-width:980px;margin:auto;padding:0 20px}.nav{height:72px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.07)}a{color:inherit;text-decoration:none}.brand{display:inline-flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.16em}.brand img{width:34px;height:34px;border-radius:10px}.back{font-size:14px;color:#9fb0c8}.main{padding:72px 0}.eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#8de6cf;font-weight:800}h1{font-size:clamp(42px,7vw,72px);line-height:1;letter-spacing:-.05em;margin:16px 0 18px}.lead{max-width:760px;color:#9fb0c8;font-size:18px;line-height:1.7}.brand-statement{max-width:820px;margin:20px 0 0;padding:14px 16px;border:1px solid rgba(141,230,207,.18);border-radius:14px;background:rgba(141,230,207,.045);font-size:clamp(14px,2.2vw,17px);line-height:1.55;color:#d8f4ec;font-weight:700}.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;margin-top:38px}.card{border:1px solid #203451;background:rgba(13,26,45,.82);border-radius:20px;padding:24px}.card h2{margin:0 0 8px;font-size:21px}.muted{color:#9fb0c8;line-height:1.6;font-size:14px}.btn{width:100%;margin-top:14px;padding:13px 16px;border-radius:11px;border:1px solid #f5f8ff;background:#f5f8ff;color:#07111f;font-weight:800;cursor:pointer}.btn.secondary{background:#0c1829;color:#f5f8ff;border-color:#203451}.btn:disabled{opacity:.48;cursor:not-allowed}.status{margin-top:16px;border:1px solid #203451;background:#091523;border-radius:12px;padding:13px;font-size:13px;color:#b9c7da;line-height:1.55}.ok{color:#8de6cf}.warn{color:#f7d37a}.steps{display:grid;gap:12px;margin-top:18px}.step{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;padding:13px;border:1px solid rgba(255,255,255,.07);border-radius:13px}.n{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:#10213a;color:#8de6cf;font-weight:800}.step b{display:block;margin-bottom:3px}.safe{margin-top:18px;border:1px solid rgba(141,230,207,.25);background:rgba(141,230,207,.06);padding:14px;border-radius:12px;font-size:13px;color:#b8d9d0;line-height:1.6}.address{word-break:break-all;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#dbe7f7}.consents{display:grid;gap:10px;margin-top:18px}.consent{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;padding:11px 12px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:#0a1626}.consent input{margin-top:3px;width:16px;height:16px}.consent span{font-size:13px;color:#c3cee0;line-height:1.45}.account-link{display:inline-block;margin-top:10px;color:#8de6cf;font-weight:800}.foot{padding:26px 0 40px;color:#8193ac;font-size:12px}@media(max-width:760px){.grid{grid-template-columns:1fr}.main{padding-top:48px}.nav{height:64px}.brand span{font-size:13px}.brand img{width:30px;height:30px}.brand-statement{margin-top:16px}}
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#030303;--panel:#0b0906;--line:#604114;--text:#fff;--muted:#bdb4a6;--gold:#f5b942;--gold2:#ffe09a}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{min-height:100svh;background:radial-gradient(circle at 78% 14%,rgba(245,185,66,.16),transparent 28%),#030303}
+.shell{max-width:760px;margin:auto;padding:0 18px}.nav{height:72px;display:flex;align-items:center;border-bottom:1px solid #39270f}.brand{display:flex;align-items:center;gap:10px;color:var(--gold2);text-decoration:none;font-weight:900;letter-spacing:.16em}.brand img{width:40px;height:40px}
+.main{padding:42px 0 54px}.eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);font-weight:900}h1{font-size:clamp(38px,10vw,58px);letter-spacing:-.05em;line-height:1;margin:11px 0 14px}.lead{color:var(--muted);font-size:15px;line-height:1.65;margin:0}
+.card{margin-top:22px;border:1px solid var(--line);background:linear-gradient(145deg,rgba(22,15,6,.96),rgba(5,5,5,.98));border-radius:20px;padding:20px;box-shadow:0 0 52px rgba(245,185,66,.08)}
+.wallet-head{display:flex;align-items:center;gap:14px;padding:5px 0 11px}.wallet-mark{width:58px;height:58px;border:1px solid #8a5b1e;border-radius:16px;background:#050403;display:grid;place-items:center}.wallet-mark img{width:44px;height:44px}.wallet-head b{display:block;color:var(--gold2);font-size:19px}.wallet-head small{display:block;color:#9f9587;margin-top:4px;line-height:1.4}
+.consents{display:grid;gap:9px;margin-top:12px}.consent{display:grid;grid-template-columns:24px 1fr;gap:10px;align-items:start;padding:11px;border:1px solid #3c2b13;border-radius:11px;background:#080705}.consent input{width:17px;height:17px;margin-top:2px;accent-color:var(--gold)}.consent span{font-size:13px;color:#cfc5b6;line-height:1.45}
+.btn{width:100%;min-height:54px;margin-top:14px;padding:13px 15px;border-radius:12px;border:1px solid var(--gold);background:linear-gradient(135deg,#ffe09a,#e9a62f);color:#090705;font-size:15px;font-weight:900;cursor:pointer}.btn:disabled{background:#2b251c;color:#8e826f;border-color:#59441f;cursor:not-allowed}.btn.secondary{background:#0b0906;color:var(--gold2);border-color:#75501e}
+.status{margin-top:12px;border:1px solid #4c3516;background:#080705;border-radius:11px;padding:12px;color:#cfc5b6;font-size:13px;line-height:1.55;overflow-wrap:anywhere}.ok{color:#5ee7bd}.warn{color:#f5c96b}.safe{margin-top:14px;padding:12px;border:1px solid rgba(245,185,66,.28);border-radius:11px;background:rgba(245,185,66,.05);color:#d7c6a8;font-size:12px;line-height:1.55}.download{display:block;text-align:center;margin-top:12px;color:var(--gold);font-size:12px;text-decoration:none}[hidden]{display:none!important}
+@media(max-width:560px){.main{padding-top:28px}.card{padding:16px}.wallet-head{align-items:flex-start}.wallet-mark{width:52px;height:52px}.wallet-mark img{width:39px;height:39px}}
 </style>
+<script src="https://wallet.aether.boats/sdk/aether-wallet.js"></script>
 </head>
 <body>
-<div class="shell"><nav class="nav" aria-label="Primary"><a class="brand" href="/" aria-label="AETHER home"><img src="/aether-mark.svg" alt="" width="34" height="34"><span>AETHER</span></a><a class="back" href="/">← Back to landing page</a></nav></div>
+<div class="shell"><nav class="nav"><a class="brand" href="/"><img src="/aether-mark.svg" alt=""><span>AITRADE AETHER</span></a></nav></div>
 <main class="main"><div class="shell">
-<div class="eyebrow">Wallet-only onboarding</div>
-<h1>Your wallet stays yours.</h1>
-<p class="lead">Connect a supported Solana wallet, sign a one-time AETHER login message, and create or access your account. The signature proves wallet ownership only; it does not authorize a trade, transfer, token approval, or custody.</p>
-<p class="brand-statement">Social Trading + On-chain Intelligence + Verified Performance + Automated Risk + Non-Custodial Execution.</p>
-<div class="grid">
-<section class="card" aria-labelledby="connect-title">
-<h2 id="connect-title">Connect and verify</h2>
-<p class="muted">AETHER never asks for a password, seed phrase, recovery phrase, or private key. Login uses a short-lived server challenge and an explicit message signature.</p>
-<button id="connect" class="btn" type="button">1. Connect Solana Wallet</button>
+<div class="eyebrow">Secure Member Login</div><h1>Connect AETHER Wallet.</h1>
+<p class="lead">One flow: connect AETHER Wallet, approve the login signature, then AITrade AETHER opens Member Area automatically. No seed phrase, private key, token approval or fund transfer is requested.</p>
+<section class="card">
+<div class="wallet-head"><div class="wallet-mark"><img src="/aether-mark.svg" alt=""></div><div><b>AETHER Wallet</b><small>Primary wallet for AITrade AETHER member access · Solana wallet ownership verification.</small></div></div>
 <div class="consents" aria-label="Required disclosures">
 <label class="consent"><input id="terms" type="checkbox"><span>I accept the AETHER Terms for this wallet-only account.</span></label>
-<label class="consent"><input id="risk" type="checkbox"><span>I acknowledge that social trading and crypto assets involve loss risk and no profit is guaranteed.</span></label>
-<label class="consent"><input id="fees" type="checkbox"><span>I acknowledge that applicable AETHER fees must be disclosed before execution.</span></label>
+<label class="consent"><input id="risk" type="checkbox"><span>I acknowledge crypto and automated trading involve loss risk and no profit is guaranteed.</span></label>
+<label class="consent"><input id="fees" type="checkbox"><span>I acknowledge applicable AETHER fees must be disclosed before execution.</span></label>
 </div>
-<button id="verify" class="btn" type="button" disabled>2. Sign Login Message & Create Account</button>
-<button id="disconnect" class="btn secondary" type="button" disabled>Disconnect & Sign Out</button>
-<div id="status" class="status" role="status" aria-live="polite">Status: not connected.</div>
-<div class="safe"><strong>Security rule:</strong> the login message explicitly states that it is not a blockchain transaction and does not authorize movement of funds. The authenticated session is stored in a secure HttpOnly cookie, not in browser localStorage.</div>
+<button id="connect" class="btn" type="button" disabled>Accept disclosures (0/3)</button>
+<button id="continue" class="btn secondary" type="button" hidden>Continue in AETHER Wallet</button>
+<div id="status" class="status">Ready. Accept the three disclosures to connect.</div>
+<a class="download" href="https://wallet.aether.boats/">Don't have AETHER Wallet? Download / open AETHER Wallet</a>
+<div class="safe"><strong>Security:</strong> AETHER Wallet signs only a short-lived LOGIN message. The verified web session is stored in a Secure HttpOnly cookie. LIVE execution remains locked and this login does not authorize movement of funds.</div>
 </section>
-<aside class="card" aria-labelledby="steps-title"><h2 id="steps-title">Onboarding flow</h2><div class="steps"><div class="step"><span class="n">1</span><div><b>Connect wallet</b><span class="muted">Read the public Solana address from your wallet.</span></div></div><div class="step"><span class="n">2</span><div><b>Verify ownership</b><span class="muted">AETHER issues a single-use, short-lived nonce and verifies your Ed25519 signature.</span></div></div><div class="step"><span class="n">3</span><div><b>Create secure session</b><span class="muted">The session token is kept in an HttpOnly, Secure, SameSite cookie by the AETHER web edge.</span></div></div><div class="step"><span class="n">4</span><div><b>Enter account area</b><span class="muted">Trading execution remains SHADOW/fail-closed until separate production gates are approved.</span></div></div></div></aside>
-</div>
 </div></main>
-<div class="shell foot">AETHER · Non-custodial by design · LIVE execution remains disabled.</div>
 <script>
 const POLICY_VERSION='2026-08-31-v1';
-const connectButton=document.getElementById('connect');
-const verifyButton=document.getElementById('verify');
-const disconnectButton=document.getElementById('disconnect');
-const statusBox=document.getElementById('status');
+const FLOW_KEY='aether_aitrade_member_login_v2';
+const CALLBACK_URL=location.origin+'/onboarding';
+const connectButton=document.getElementById('connect'),continueButton=document.getElementById('continue'),statusBox=document.getElementById('status');
 const consentInputs=[document.getElementById('terms'),document.getElementById('risk'),document.getElementById('fees')];
-let provider=null;
-let walletAddress='';
-function findProvider(){return window.phantom?.solana||window.solflare||window.solana||null;}
-function escapeHtml(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function setStatus(message,kind=''){statusBox.className='status'+(kind?' '+kind:'');statusBox.innerHTML=message;}
-function consentsAccepted(){return consentInputs.every(input=>input.checked);}
-function updateVerifyState(){verifyButton.disabled=!walletAddress||!consentsAccepted();}
-function bytesToBase64(bytes){let binary='';const array=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes);for(let i=0;i<array.length;i+=0x8000)binary+=String.fromCharCode(...array.subarray(i,i+0x8000));return btoa(binary);}
-async function postJson(url,body){const response=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const payload=await response.json().catch(()=>({error:'invalid_response'}));if(!response.ok)throw Object.assign(new Error(payload.error||`HTTP_${response.status}`),{status:response.status,payload});return payload;}
-consentInputs.forEach(input=>input.addEventListener('change',updateVerifyState));
-connectButton.addEventListener('click',async()=>{
-  provider=findProvider();
-  if(!provider||typeof provider.connect!=='function'){
-    setStatus('No compatible browser-injected Solana wallet was detected. Open this page in a supported wallet browser or enable a trusted Solana wallet extension.','warn');
-    return;
-  }
-  connectButton.disabled=true;
-  try{
-    const result=await provider.connect();
-    const key=result?.publicKey||provider.publicKey;
-    if(!key)throw new Error('wallet_public_key_missing');
-    walletAddress=typeof key.toBase58==='function'?key.toBase58():String(key);
-    disconnectButton.disabled=false;
-    updateVerifyState();
-    setStatus('<span class="ok">Wallet connected.</span><br><span class="address">'+escapeHtml(walletAddress)+'</span><br>Accept the three disclosures, then sign the AETHER login message.');
-  }catch{
-    setStatus('Wallet connection was cancelled or unavailable. No account session was created.','warn');
-  }finally{connectButton.disabled=false;}
-});
-verifyButton.addEventListener('click',async()=>{
-  if(!provider||!walletAddress)return setStatus('Connect your wallet first.','warn');
-  if(!consentsAccepted())return setStatus('Accept all required disclosures before creating an account.','warn');
-  if(typeof provider.signMessage!=='function')return setStatus('This wallet does not expose message signing in the current browser. Use a supported Solana wallet.','warn');
-  verifyButton.disabled=true;
-  connectButton.disabled=true;
-  setStatus('Requesting a single-use AETHER login challenge…');
-  try{
-    const challengeResponse=await postJson('/api/auth/challenge',{wallet_address:walletAddress,purpose:'LOGIN'});
-    const challenge=challengeResponse.challenge;
-    if(!challenge?.message||!challenge?.challenge_id)throw new Error('challenge_missing');
-    setStatus('Check your wallet. Sign the login message only if it says AETHER WALLET AUTHENTICATION and confirms that no trade or fund transfer is authorized.');
-    const signed=await provider.signMessage(new TextEncoder().encode(challenge.message),'utf8');
-    const signatureBytes=signed?.signature||signed;
-    if(!signatureBytes)throw new Error('signature_missing');
-    const result=await postJson('/api/auth/verify',{
-      challenge_id:challenge.challenge_id,
-      wallet_address:walletAddress,
-      signature:bytesToBase64(signatureBytes),
-      signature_encoding:'base64',
-      consents:[
-        {type:'TERMS',version:POLICY_VERSION},
-        {type:'RISK_DISCLOSURE',version:POLICY_VERSION},
-        {type:'FEE_DISCLOSURE',version:POLICY_VERSION}
-      ]
-    });
-    const message=result.account_created?'AETHER account created and wallet ownership verified.':'Wallet ownership verified. You are signed in.';
-    setStatus('<span class="ok">'+message+'</span><br><span class="address">'+escapeHtml(result.user?.primary_wallet||walletAddress)+'</span><br><a class="account-link" href="/account">Continue to your AETHER account →</a>');
-    disconnectButton.disabled=false;
-  }catch(error){
-    const known={auth_rate_limited:'Too many login challenges. Wait a minute and retry.',required_consents_missing:'Required disclosures were not accepted.',invalid_wallet_signature:'The wallet signature could not be verified.',auth_challenge_expired:'The login challenge expired. Retry to create a new one.',auth_challenge_used:'That login challenge was already used.'};
-    setStatus(known[error.message]||'Wallet verification did not complete. No trading authority or fund movement was created.','warn');
-  }finally{connectButton.disabled=false;updateVerifyState();}
-});
-disconnectButton.addEventListener('click',async()=>{
-  try{await fetch('/api/auth/logout',{method:'POST'});}catch{}
-  try{if(provider&&typeof provider.disconnect==='function')await provider.disconnect();}catch{}
-  provider=null;walletAddress='';disconnectButton.disabled=true;updateVerifyState();setStatus('Signed out. The local wallet connection and AETHER web session were cleared.');
-});
-(async()=>{try{const response=await fetch('/api/auth/session',{cache:'no-store'});if(response.ok){const data=await response.json();setStatus('<span class="ok">You already have an active AETHER session.</span><br><span class="address">'+escapeHtml(data.user?.primary_wallet||'')+'</span><br><a class="account-link" href="/account">Open your AETHER account →</a>');disconnectButton.disabled=false;}}catch{}})();
+let busy=false,pendingOpen=null;
+function setStatus(t,k=''){statusBox.className='status'+(k?' '+k:'');statusBox.textContent=t}
+function accepted(){return consentInputs.every(x=>x.checked)}
+function update(){const n=consentInputs.filter(x=>x.checked).length;connectButton.disabled=busy||n!==3;connectButton.textContent=busy?'Working…':n===3?'Connect AETHER Wallet & Enter Member Area':'Accept disclosures ('+n+'/3)'}
+consentInputs.forEach(x=>x.addEventListener('change',update));
+function flowRead(){try{const d=JSON.parse(localStorage.getItem(FLOW_KEY)||'null');if(!d||Date.now()-Number(d.createdAt||0)>10*60*1000){localStorage.removeItem(FLOW_KEY);return null}return d}catch{localStorage.removeItem(FLOW_KEY);return null}}
+function flowSave(d){localStorage.setItem(FLOW_KEY,JSON.stringify({...d,createdAt:Date.now(),consents:true}))}
+function flowClear(){localStorage.removeItem(FLOW_KEY);pendingOpen=null;continueButton.hidden=true}
+function restoreConsents(){const f=flowRead();if(f?.consents)consentInputs.forEach(x=>x.checked=true);update()}
+function cleanHash(){if(location.hash)history.replaceState(null,'',location.pathname+location.search)}
+async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json','accept':'application/json'},body:JSON.stringify(body),cache:'no-store'});const d=await r.json().catch(()=>({error:'invalid_response'}));if(!r.ok)throw new Error(d.error||'request_failed');return d}
+async function hasSession(){try{const r=await fetch('/api/auth/session',{cache:'no-store',headers:{accept:'application/json'}});if(r.ok){flowClear();location.replace('/member');return true}}catch{}return false}
+function findAetherProvider(){const list=[window.aether?.solana,window.aetherWallet?.solana,window.aether,window.aetherWallet].filter(Boolean);return list.find(p=>typeof p.connect==='function'&&typeof p.signMessage==='function')||null}
+function bytesToBase64(bytes){let s='';const a=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes);for(let i=0;i<a.length;i+=0x8000)s+=String.fromCharCode(...a.subarray(i,i+0x8000));return btoa(s)}
+function consents(){return[{type:'TERMS',version:POLICY_VERSION},{type:'RISK_DISCLOSURE',version:POLICY_VERSION},{type:'FEE_DISCLOSURE',version:POLICY_VERSION}]}
+async function verifyServer({challengeId,walletAddress,signature,signatureEncoding='base64'}){await post('/api/auth/verify',{challenge_id:challengeId,wallet_address:walletAddress,signature,signature_encoding:signatureEncoding,consents:consents()});flowClear();setStatus('Login successful. Opening Member Area…','ok');location.replace('/member')}
+async function injectedLogin(provider){setStatus('Connecting AETHER Wallet…');const connected=provider.publicKey?{publicKey:provider.publicKey}:await provider.connect();const key=connected?.publicKey||provider.publicKey;if(!key)throw new Error('wallet_public_key_missing');const walletAddress=typeof key.toBase58==='function'?key.toBase58():String(key);setStatus('Preparing secure login signature…');const c=(await post('/api/auth/challenge',{wallet_address:walletAddress,purpose:'LOGIN'})).challenge;if(!c?.challenge_id||!c?.message)throw new Error('challenge_missing');setStatus('Approve the LOGIN message in AETHER Wallet. No funds will move.');const signed=await provider.signMessage(new TextEncoder().encode(c.message),'utf8');const raw=signed?.signature??signed;if(!raw)throw new Error('signature_missing');let signature,signatureEncoding;if(typeof raw==='string'){signature=raw;signatureEncoding=signed?.signatureEncoding||signed?.encoding||'base64'}else{signature=bytesToBase64(raw);signatureEncoding='base64'}if(!['base64','base58'].includes(signatureEncoding))throw new Error('unsupported_signature_encoding');await verifyServer({challengeId:c.challenge_id,walletAddress,signature,signatureEncoding})}
+function openRequest(req,message){pendingOpen=req.url;flowSave({...flowRead(),requestId:req.requestId});setStatus(message);continueButton.hidden=false;setTimeout(()=>{if(document.visibilityState==='visible')continueButton.hidden=false},1100);location.assign(req.url)}
+function startDeepLink(){if(!window.AetherWallet?.createConnectLink)throw new Error('aether_wallet_sdk_unavailable');const req=window.AetherWallet.createConnectLink({chain:'solana',callback:CALLBACK_URL});flowSave({stage:'CONNECT',requestId:req.requestId});openRequest(req,'Opening AETHER Wallet…')}
+async function continueConnectCallback(cb,f){if(!cb.address)throw new Error('wallet_address_missing');const c=(await post('/api/auth/challenge',{wallet_address:cb.address,purpose:'LOGIN'})).challenge;if(!c?.challenge_id||!c?.message)throw new Error('challenge_missing');const req=window.AetherWallet.createSignMessageLink({chain:'solana',callback:CALLBACK_URL,address:cb.address,message:c.message});flowSave({stage:'SIGN',requestId:req.requestId,challengeId:c.challenge_id,walletAddress:cb.address});cleanHash();openRequest(req,'Wallet connected. Opening AETHER Wallet for the secure LOGIN signature…')}
+async function finishSignCallback(cb,f){if(!cb.signature)throw new Error('signature_missing');if(cb.address&&cb.address!==f.walletAddress)throw new Error('wallet_mismatch');const enc=['base58','base64'].includes(cb.signatureEncoding)?cb.signatureEncoding:'base64';cleanHash();await verifyServer({challengeId:f.challengeId,walletAddress:f.walletAddress,signature:cb.signature,signatureEncoding:enc})}
+async function processCallback(){const cb=window.AetherWallet?.parseCallback?.(location.href);if(!cb)return false;const f=flowRead();if(!f)throw new Error('login_flow_expired');if(cb.requestId!==f.requestId)throw new Error('request_id_mismatch');if(/cancel|reject|error|fail|expired/i.test(String(cb.status||'')))throw new Error(cb.reason||'wallet_request_cancelled');consentInputs.forEach(x=>x.checked=true);update();busy=true;update();if(f.stage==='CONNECT')await continueConnectCallback(cb,f);else if(f.stage==='SIGN')await finishSignCallback(cb,f);else throw new Error('invalid_login_stage');return true}
+continueButton.addEventListener('click',()=>{if(pendingOpen)location.assign(pendingOpen)});
+connectButton.addEventListener('click',async()=>{if(busy||!accepted())return;busy=true;update();try{if(await hasSession())return;const provider=findAetherProvider();if(provider)await injectedLogin(provider);else startDeepLink()}catch(e){flowClear();setStatus('AETHER Wallet login did not complete: '+e.message+'. Please retry.','warn')}finally{busy=false;update()}});
+(async()=>{restoreConsents();if(await hasSession())return;try{await processCallback()}catch(e){cleanHash();flowClear();setStatus('AETHER Wallet login did not complete: '+e.message+'. Please retry.','warn')}finally{busy=false;update()}})();
+update();
 </script>
-</body>
-</html>
+</body></html>
