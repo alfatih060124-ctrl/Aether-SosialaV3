@@ -13,22 +13,31 @@ const webMark = read('web/aether-mark.svg');
 if (publicMark !== webMark) throw new Error('brand_mark_public_web_mismatch');
 
 for (const [needle, label] of [
-  ['AETHER official mark', 'mark'],
-  ['White A monogram with red orbital swoosh', 'mark'],
-  ['id="swoosh"', 'mark'],
-  ['#ef1826', 'mark'],
+  ['AETHER locked gold mark', 'mark'],
+  ['Gold A monogram with open orbital ring', 'mark'],
+  ['id="gold-ring"', 'mark'],
+  ['id="gold-a"', 'mark'],
+  ['#f7c45c', 'mark'],
 ]) requireText(publicMark, needle, label);
-rejectText(publicMark, 'electric-blue orbital ring', 'mark');
+for (const forbidden of ['#ef1826', 'redOrbit', 'White A monogram with red orbital swoosh', 'electric-blue orbital ring']) {
+  rejectText(publicMark, forbidden, 'mark');
+}
 
 const favicon = read('public/favicon.svg');
-requireText(favicon, 'White A monogram with red orbital swoosh', 'favicon');
-requireText(favicon, 'id="swoosh"', 'favicon');
+requireText(favicon, 'Gold A monogram with open orbital ring', 'favicon');
+requireText(favicon, 'id="gold-ring"', 'favicon');
+requireText(favicon, 'id="gold-a"', 'favicon');
+rejectText(favicon, '#ef1826', 'favicon');
+rejectText(favicon, 'redOrbit', 'favicon');
 
 const og = read('public/og-aether.svg');
 requireText(og, 'AETHER — Trade with proof.', 'og');
 requireText(og, 'TRADE WITH PROOF.', 'og');
 requireText(og, 'SHADOW MODE', 'og');
-requireText(og, 'id="red-swoosh"', 'og');
+requireText(og, 'id="og-gold-ring"', 'og');
+requireText(og, '#f7c45c', 'og');
+rejectText(og, '#ef1826', 'og');
+rejectText(og, 'red-swoosh', 'og');
 rejectText(og, 'V3', 'og');
 
 const publicPages = [
@@ -66,4 +75,4 @@ for (const [src, dest] of [
   if (index > fallbackIndex) throw new Error(`vercel_brand_asset_route_after_fallback:${src}`);
 }
 
-console.log('AETHER brand logo regression: PASS');
+console.log('AETHER locked gold brand regression: PASS');
