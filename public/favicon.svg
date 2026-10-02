@@ -1,10 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
 <title id="title">AETHER</title>
-<desc id="desc">White A monogram with red orbital swoosh on black.</desc>
+<desc id="desc">Gold A monogram with open orbital ring on black.</desc>
 <defs>
-  <linearGradient id="redOrbit" x1="44" y1="360" x2="486" y2="176" gradientUnits="userSpaceOnUse"><stop stop-color="#8f0008"/><stop offset=".18" stop-color="#ef1826"/><stop offset=".52" stop-color="#b90010"/><stop offset=".72" stop-color="#fff4f4"/><stop offset=".82" stop-color="#ff5160"/><stop offset="1" stop-color="#b70012"/></linearGradient>
+  <linearGradient id="gold" x1="92" y1="80" x2="416" y2="430" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#8b560f"/><stop offset=".18" stop-color="#f7c45c"/><stop offset=".35" stop-color="#fff0a8"/><stop offset=".56" stop-color="#c7861d"/><stop offset=".77" stop-color="#ffdc77"/><stop offset="1" stop-color="#a56a15"/>
+  </linearGradient>
+  <filter id="glow" x="-25%" y="-25%" width="150%" height="150%"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
 <rect width="512" height="512" rx="92" fill="#000"/>
-<path d="M182.74 321.11H303.18L242.99 165.16 182.74 321.11ZM90 440V416.73H118.83L235.68 111.94H272.59L389.73 416.73H422V440H302.76V416.73H339.18L311.76 344.66H173.74L146.32 416.73H182.32V440H90Z" fill="#fff"/>
-<path id="swoosh" d="M42 347C127 437 285 451 434 314C461 289 482 261 496 232" fill="none" stroke="url(#redOrbit)" stroke-width="16" stroke-linecap="round"/>
+<path id="gold-ring" d="M407 87C330 28 204 31 119 92C31 154 18 281 72 373C132 474 279 496 390 430C438 401 468 365 486 320"
+      fill="none" stroke="url(#gold)" stroke-width="19" stroke-linecap="round" filter="url(#glow)"/>
+<path id="gold-a" d="M111 381L251 91L400 381H343L252 190L176 344C166 365 151 378 111 381Z"
+      fill="url(#gold)" stroke="#ffe89c" stroke-width="2.1" stroke-linejoin="round" filter="url(#glow)"/>
+<path d="M166 352C203 279 244 237 309 225C255 249 217 291 196 354C187 353 177 352 166 352Z"
+      fill="#f6c45e" stroke="#ffefad" stroke-width="1.4"/>
 </svg>
